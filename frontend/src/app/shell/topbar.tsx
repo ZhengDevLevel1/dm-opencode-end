@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Heart,
+  Flower2,
   LogIn,
   LogOut,
   Menu,
@@ -26,7 +26,6 @@ import { staffService } from "@/lib/services";
 import { runWithThemeTransition, nextThemeMode } from "@/lib/theme-transition";
 import { toast } from "@/stores/toast";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownItem,
@@ -127,70 +126,58 @@ export function Topbar() {
           {updatedAt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}
         </span>
 
-        <Tooltip content="全局搜索 ⌘K">
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="全局搜索"
-            onClick={() => setCommandOpen(true)}
-          >
-            <Search className="h-[18px] w-[18px]" />
-          </Button>
-        </Tooltip>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="全局搜索"
+          onClick={() => setCommandOpen(true)}
+        >
+          <Search className="h-[18px] w-[18px]" />
+        </Button>
 
         {authenticated ? (
           <>
-            <Tooltip content="我的收藏">
-              <Link
-                to="/favorites"
-                aria-label="我的收藏"
-                className="relative hidden h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:flex"
-              >
-                <Heart className="h-[18px] w-[18px]" />
-                <IconBadge count={favoriteCount} />
-              </Link>
-            </Tooltip>
-            <Tooltip content="购物车">
-              <Link
-                to="/cart"
-                aria-label="购物车"
-                className="relative flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                <ShoppingBag className="h-[18px] w-[18px]" />
-                <IconBadge count={cartCount} />
-              </Link>
-            </Tooltip>
+            <Link
+              to="/favorites"
+              aria-label="我的收藏"
+              className="relative hidden h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:flex"
+            >
+              <Flower2 className="h-[18px] w-[18px]" />
+              <IconBadge count={favoriteCount} />
+            </Link>
+            <Link
+              to="/cart"
+              aria-label="购物车"
+              className="relative flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <ShoppingBag className="h-[18px] w-[18px]" />
+              <IconBadge count={cartCount} />
+            </Link>
           </>
         ) : null}
 
         {isStaff ? (
-          <Tooltip content="待接单订单">
-            <Link
-              to="/staff/orders"
-              className="relative hidden h-10 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:flex"
-            >
-              <span>待接单</span>
-              <Badge variant={pendingCount > 0 ? "warning" : "secondary"}>{pendingCount}</Badge>
-            </Link>
-          </Tooltip>
+          <Link
+            to="/staff/orders"
+            className="relative hidden h-10 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:flex"
+          >
+            <span>待接单</span>
+            <Badge variant={pendingCount > 0 ? "warning" : "secondary"}>{pendingCount}</Badge>
+          </Link>
         ) : null}
 
-        <Tooltip content="刷新数据">
-          <Button variant="ghost" size="icon" aria-label="刷新数据" onClick={handleRefresh}>
-            <RefreshCw className={cn("h-[18px] w-[18px]", refreshing && "animate-spin")} />
-          </Button>
-        </Tooltip>
+        <Button variant="ghost" size="icon" aria-label="刷新数据" onClick={handleRefresh}>
+          <RefreshCw className={cn("h-[18px] w-[18px]", refreshing && "animate-spin")} />
+        </Button>
 
-        <Tooltip content={resolvedDark ? "切换到亮色" : "切换到暗色"}>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={resolvedDark ? "切换到亮色模式" : "切换到暗色模式"}
-            onClick={handleThemeToggle}
-          >
-            {resolvedDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-          </Button>
-        </Tooltip>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={resolvedDark ? "切换到亮色模式" : "切换到暗色模式"}
+          onClick={handleThemeToggle}
+        >
+          {resolvedDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+        </Button>
 
         {authenticated && user ? (
           <DropdownMenu

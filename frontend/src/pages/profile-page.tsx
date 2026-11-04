@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   CalendarDays,
-  Heart,
+  Flower2,
   KeyRound,
   Mail,
   MessageSquareQuote,
@@ -171,7 +171,7 @@ export function ProfilePage() {
           onClick={() => navigate("/orders")}
         />
         <StatCard
-          icon={Heart}
+          icon={Flower2}
           label="收藏花礼"
           value={favoriteValue}
           hint="查看收藏夹"

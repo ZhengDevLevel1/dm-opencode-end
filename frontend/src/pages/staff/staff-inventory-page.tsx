@@ -37,13 +37,14 @@ import {
 import { ProductImage } from "@/components/domain/product-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
-import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
@@ -304,21 +305,16 @@ export function StaffInventoryPage() {
             <Label htmlFor="inventory-type" className="sr-only">
               变动类型
             </Label>
-            <Select
+            <CustomSelect
               id="inventory-type"
               value={draft.changeType}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, changeType: event.target.value }))
+              onChange={(next) =>
+                setDraft((current) => ({ ...current, changeType: next }))
               }
+              options={changeTypes}
               placeholder="全部变动类型"
               className="h-9 text-xs"
-            >
-              {changeTypes.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
           <div className="xl:col-span-3">
             <Label htmlFor="inventory-order" className="sr-only">
@@ -338,13 +334,11 @@ export function StaffInventoryPage() {
             <Label htmlFor="inventory-start" className="sr-only">
               开始日期
             </Label>
-            <Input
+            <DatePicker
               id="inventory-start"
-              type="date"
               value={draft.start}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, start: event.target.value }))
-              }
+              onChange={(next) => setDraft((current) => ({ ...current, start: next }))}
+              placeholder="开始日期"
               className="h-9 text-xs"
               aria-label="开始日期"
             />
@@ -353,13 +347,11 @@ export function StaffInventoryPage() {
             <Label htmlFor="inventory-end" className="sr-only">
               结束日期
             </Label>
-            <Input
+            <DatePicker
               id="inventory-end"
-              type="date"
               value={draft.end}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, end: event.target.value }))
-              }
+              onChange={(next) => setDraft((current) => ({ ...current, end: next }))}
+              placeholder="结束日期"
               className="h-9 text-xs"
               aria-label="结束日期"
             />
@@ -584,13 +576,14 @@ export function StaffInventoryPage() {
                 placeholder="输入商品名称、花语或标签搜索"
                 className="pl-8"
                 autoComplete="off"
+                data-autofocus
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
               公开商品接口只返回已上架商品，因此这里无法选择已下架商品。
             </p>
             {productKeyword.trim() ? (
-              <div className="max-h-44 overflow-y-auto rounded-lg border border-border/60">
+              <div className="h-44 overflow-y-auto rounded-lg border border-border/60">
                 {productSearch.isLoading ? (
                   <div className="space-y-1.5 p-2">
                     <Skeleton className="h-10 w-full" />
@@ -644,41 +637,43 @@ export function StaffInventoryPage() {
             ) : null}
           </div>
 
-          {adjust.loadingProduct ? (
-            <Skeleton className="h-16 w-full rounded-lg" />
-          ) : adjust.product ? (
-            <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-              <ProductImage
-                src={adjust.product.imageUrl}
-                alt={adjust.product.name}
-                seed={adjust.product.name}
-                className="h-12 w-12 shrink-0 rounded-lg"
-                iconClassName="h-5 w-5"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{adjust.product.name}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  #{adjust.product.id} · {adjust.product.category} · 当前库存{" "}
-                  <span className="font-medium text-foreground tabular">
-                    {formatNumber(adjust.product.stock)}
-                  </span>{" "}
-                  件
-                </p>
+          <div className="h-20">
+            {adjust.loadingProduct ? (
+              <Skeleton className="h-full w-full rounded-lg" />
+            ) : adjust.product ? (
+              <div className="flex h-full items-center gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+                <ProductImage
+                  src={adjust.product.imageUrl}
+                  alt={adjust.product.name}
+                  seed={adjust.product.name}
+                  className="h-12 w-12 shrink-0 rounded-lg"
+                  iconClassName="h-5 w-5"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{adjust.product.name}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    #{adjust.product.id} · {adjust.product.category} · 当前库存{" "}
+                    <span className="font-medium text-foreground tabular">
+                      {formatNumber(adjust.product.stock)}
+                    </span>{" "}
+                    件
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="取消选择商品"
+                  onClick={() => setAdjust((current) => ({ ...current, product: null }))}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="取消选择商品"
-                onClick={() => setAdjust((current) => ({ ...current, product: null }))}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ) : (
-            <p className="rounded-lg border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-              尚未选择商品。请先在上方搜索并选择一个商品。
-            </p>
-          )}
+            ) : (
+              <p className="flex h-full items-center rounded-lg border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
+                尚未选择商品。请先在上方搜索并选择一个商品。
+              </p>
+            )}
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">

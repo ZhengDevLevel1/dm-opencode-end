@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   KeyRound,
   MoreHorizontal,
   Pencil,
+  RotateCcw,
   Search,
   UserPlus,
   UsersRound,
-  X,
 } from "lucide-react";
 import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
@@ -31,6 +31,7 @@ import { UserAvatar } from "@/components/domain/user-avatar";
 import { UserStatusBadge } from "@/components/domain/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { Dialog } from "@/components/ui/dialog";
 import {
   DropdownItem,
@@ -42,7 +43,6 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
-import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
@@ -52,6 +52,11 @@ const roleOptions: Array<{ value: UserRole; label: string }> = [
   { value: "CUSTOMER", label: "消费者" },
   { value: "STAFF", label: "店员" },
   { value: "ADMIN", label: "管理员" },
+];
+
+const userStatusOptions: Array<{ value: UserStatus; label: string }> = [
+  { value: "ENABLED", label: "启用" },
+  { value: "DISABLED", label: "禁用" },
 ];
 
 const roleLabels: Record<UserRole, string> = {
@@ -196,58 +201,47 @@ export function AdminUsersPage() {
             <Label htmlFor="admin-user-role" className="sr-only">
               角色
             </Label>
-            <Select
+            <CustomSelect
               id="admin-user-role"
               value={role}
-              onChange={(event) => {
-                setRole(event.target.value);
+              onChange={(next) => {
+                setRole(next);
                 setPage(1);
               }}
+              options={roleOptions}
               placeholder="全部角色"
               className="h-9 text-xs"
-            >
-              {roleOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
           <div className="xl:col-span-2">
             <Label htmlFor="admin-user-status" className="sr-only">
               状态
             </Label>
-            <Select
+            <CustomSelect
               id="admin-user-status"
               value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
+              onChange={(next) => {
+                setStatus(next);
                 setPage(1);
               }}
+              options={userStatusOptions}
               placeholder="全部状态"
               className="h-9 text-xs"
-            >
-              <option value="ENABLED">启用</option>
-              <option value="DISABLED">禁用</option>
-            </Select>
+            />
           </div>
           <div className="flex gap-2 xl:col-span-2">
-            <Button type="submit" size="sm" className="h-9 flex-1">
-              <Search className="h-3.5 w-3.5" />
+            <Button type="submit" className="h-9 w-full px-6 sm:w-auto">
               搜索
             </Button>
-            {activeFilters > 0 ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2"
-                onClick={clearFilters}
-                aria-label="清除筛选"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-9 shrink-0 px-4"
+              onClick={clearFilters}
+            >
+              <RotateCcw className="h-4 w-4" />
+              重置
+            </Button>
           </div>
         </form>
       </div>
@@ -403,6 +397,7 @@ function CreateUserDialog({
   const queryClient = useQueryClient();
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -496,13 +491,18 @@ function CreateUserDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="create-role">角色 *</Label>
-            <Select id="create-role" {...register("role")}>
-              {roleOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
+            <Controller
+              control={control}
+              name="role"
+              render={({ field }) => (
+                <CustomSelect
+                  id="create-role"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={roleOptions}
+                />
+              )}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="create-phone">手机号</Label>
@@ -544,6 +544,7 @@ function EditUserDialog({
   const setUser = useAuthStore((state) => state.setUser);
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -651,20 +652,34 @@ function EditUserDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="edit-role">角色</Label>
-            <Select id="edit-role" {...register("role")}>
-              {roleOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
+            <Controller
+              control={control}
+              name="role"
+              render={({ field }) => (
+                <CustomSelect
+                  id="edit-role"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={roleOptions}
+                />
+              )}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="edit-status">状态</Label>
-            <Select id="edit-status" disabled={isSelf} {...register("status")}>
-              <option value="ENABLED">启用</option>
-              <option value="DISABLED">禁用</option>
-            </Select>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <CustomSelect
+                  id="edit-status"
+                  disabled={isSelf}
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={userStatusOptions}
+                />
+              )}
+            />
             {isSelf ? (
               <p className="text-[11px] text-muted-foreground">当前登录账号不能禁用自己。</p>
             ) : null}

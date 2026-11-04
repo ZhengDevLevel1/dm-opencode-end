@@ -41,8 +41,13 @@ export function Dialog({
   className,
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const onOpenChangeRef = useRef(onOpenChange);
   const titleId = useId();
   const descriptionId = useId();
+
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -53,12 +58,12 @@ export function Dialog({
     const panel = panelRef.current;
     const first = panel?.querySelector<HTMLElement>("[data-autofocus]") ??
       panel?.querySelector<HTMLElement>(FOCUSABLE);
-    window.setTimeout(() => first?.focus(), 30);
+    const focusTimer = window.setTimeout(() => first?.focus(), 30);
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onOpenChange(false);
+        onOpenChangeRef.current(false);
         return;
       }
       if (event.key !== "Tab" || !panel) return;
@@ -79,11 +84,12 @@ export function Dialog({
 
     document.addEventListener("keydown", handleKey);
     return () => {
+      window.clearTimeout(focusTimer);
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus?.();
     };
-  }, [open, onOpenChange]);
+  }, [open]);
 
   if (!open) return null;
 

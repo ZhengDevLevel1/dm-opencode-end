@@ -7,12 +7,10 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
-  Search,
   Sparkles,
   Target,
   UserRound,
   WandSparkles,
-  X,
 } from "lucide-react";
 import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
@@ -27,6 +25,7 @@ import type {
 } from "@/types/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -34,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
 import { Progress } from "@/components/ui/progress";
+import { RangeSlider } from "@/components/ui/range-slider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -293,20 +293,18 @@ function WeightsSection() {
                     className="h-8 w-24 text-right font-mono-ui text-xs"
                   />
                 </div>
-                <input
-                  type="range"
+                <RangeSlider
                   min={0}
                   max={1}
                   step={0.001}
                   value={value}
-                  onChange={(event) => {
-                    const next = Number(event.target.value);
+                  onChange={(next) => {
                     setWeights((previous) => ({
                       ...(previous ?? current),
                       [field.key]: next,
                     }));
                   }}
-                  className="mt-2 w-full accent-[var(--primary)]"
+                  className="mt-2 w-full"
                   aria-label={`${field.label}权重`}
                 />
               </div>
@@ -699,13 +697,11 @@ function LogsSection() {
             <Label htmlFor="log-start" className="sr-only">
               开始日期
             </Label>
-            <Input
+            <DatePicker
               id="log-start"
-              type="date"
               value={draft.start}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, start: event.target.value }))
-              }
+              onChange={(next) => setDraft((current) => ({ ...current, start: next }))}
+              placeholder="开始日期"
               className="h-9 text-xs"
               aria-label="开始日期"
             />
@@ -714,39 +710,33 @@ function LogsSection() {
             <Label htmlFor="log-end" className="sr-only">
               结束日期
             </Label>
-            <Input
+            <DatePicker
               id="log-end"
-              type="date"
               value={draft.end}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, end: event.target.value }))
-              }
+              onChange={(next) => setDraft((current) => ({ ...current, end: next }))}
+              placeholder="结束日期"
               className="h-9 text-xs"
               aria-label="结束日期"
             />
           </div>
           <div className="flex gap-2 xl:col-span-2">
-            <Button type="submit" size="sm" className="h-9 flex-1">
-              <Search className="h-3.5 w-3.5" />
+            <Button type="submit" className="h-9 w-full px-6 sm:w-auto">
               筛选
             </Button>
-            {activeFilters > 0 ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2"
-                onClick={() => {
-                  const empty = { userId: "", start: "", end: "" };
-                  setDraft(empty);
-                  setFilters(empty);
-                  setPage(1);
-                }}
-                aria-label="清除筛选"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-9 shrink-0 px-4"
+              onClick={() => {
+                const empty = { userId: "", start: "", end: "" };
+                setDraft(empty);
+                setFilters(empty);
+                setPage(1);
+              }}
+            >
+              <RotateCcw className="h-4 w-4" />
+              重置
+            </Button>
           </div>
         </form>
       </div>

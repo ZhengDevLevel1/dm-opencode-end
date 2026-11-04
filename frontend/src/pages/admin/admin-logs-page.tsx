@@ -4,9 +4,9 @@ import {
   CheckCircle2,
   Clock3,
   FileSearch,
+  RotateCcw,
   ScrollText,
   Search,
-  X,
   XCircle,
 } from "lucide-react";
 import { adminService } from "@/lib/services";
@@ -16,6 +16,7 @@ import { formatDateTimeFull, formatNumber } from "@/lib/format";
 import type { OperationLog, OperationLogQuery } from "@/types/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
@@ -117,13 +118,11 @@ export function AdminLogsPage() {
             <Label htmlFor="log-date-start" className="sr-only">
               开始日期
             </Label>
-            <Input
+            <DatePicker
               id="log-date-start"
-              type="date"
               value={draft.start}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, start: event.target.value }))
-              }
+              onChange={(next) => setDraft((current) => ({ ...current, start: next }))}
+              placeholder="开始日期"
               className="h-9 text-xs"
               aria-label="开始日期"
             />
@@ -132,34 +131,28 @@ export function AdminLogsPage() {
             <Label htmlFor="log-date-end" className="sr-only">
               结束日期
             </Label>
-            <Input
+            <DatePicker
               id="log-date-end"
-              type="date"
               value={draft.end}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, end: event.target.value }))
-              }
+              onChange={(next) => setDraft((current) => ({ ...current, end: next }))}
+              placeholder="结束日期"
               className="h-9 text-xs"
               aria-label="结束日期"
             />
           </div>
           <div className="flex gap-2 xl:col-span-3">
-            <Button type="submit" size="sm" className="h-9 flex-1">
-              <Search className="h-3.5 w-3.5" />
-              查询日志
+            <Button type="submit" className="h-9 w-full px-6 sm:w-auto">
+              搜索
             </Button>
-            {activeFilters > 0 ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2"
-                onClick={clearFilters}
-                aria-label="清除筛选"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-9 shrink-0 px-4"
+              onClick={clearFilters}
+            >
+              <RotateCcw className="h-4 w-4" />
+              重置
+            </Button>
           </div>
         </form>
       </div>

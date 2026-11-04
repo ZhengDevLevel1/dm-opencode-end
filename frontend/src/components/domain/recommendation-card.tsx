@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Heart, Loader2, ShoppingBag, Sparkles } from "lucide-react";
+import { ChevronDown, Flower2, Loader2, ShoppingBag, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatNumber, formatScore } from "@/lib/format";
 import type { RecommendationItemVO } from "@/types/api";
@@ -43,7 +43,7 @@ export function RecommendationCard({
   );
 
   return (
-    <article className="ui-card flex flex-col overflow-hidden">
+    <article className="ui-card flex flex-col overflow-hidden transition-[border-color,box-shadow,transform,translate] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-primary/30 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
       <Link to={`/products/${item.productId}`} className="group block">
         <ProductImage
           src={item.imageUrl}
@@ -101,25 +101,26 @@ export function RecommendationCard({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={isFavorite ? "取消收藏" : "收藏"}
+                aria-pressed={Boolean(isFavorite)}
+                aria-busy={favoritePending}
                 disabled={favoritePending}
                 onClick={() => onFavorite(item)}
               >
-                {favoritePending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Heart
-                    className={cn(
-                      "h-4 w-4",
-                      isFavorite ? "fill-flower-rose text-flower-rose" : "text-muted-foreground",
-                    )}
-                  />
-                )}
+                <Flower2
+                  className={cn(
+                    "h-4 w-4 transition-colors",
+                    isFavorite
+                      ? "fill-flower-rose/15 text-flower-rose"
+                      : "text-muted-foreground",
+                  )}
+                />
               </Button>
             ) : null}
             {onAddToCart ? (
               <Button
                 variant="secondary"
                 size="icon-sm"
+                className="shadow-none"
                 aria-label="加入购物车"
                 disabled={addPending}
                 onClick={() => onAddToCart(item)}

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ChevronDown,
-  Heart,
+  Flower2,
   Leaf,
   Loader2,
   Minus,
@@ -291,7 +291,7 @@ export function ProductDetailPage() {
               </Button>
             </div>
             <Button
-              className="h-11 flex-1 sm:flex-none"
+              className="h-11 flex-1 shadow-none sm:flex-none"
               disabled={soldOut || addMutation.isPending}
               onClick={handleAdd}
             >
@@ -323,7 +323,13 @@ export function ProductDetailPage() {
                 {favoriteMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Heart className={isFavorite ? "h-4 w-4 fill-flower-rose text-flower-rose" : "h-4 w-4"} />
+                  <Flower2
+                    className={
+                      isFavorite
+                        ? "h-4 w-4 fill-flower-rose/15 text-flower-rose"
+                        : "h-4 w-4"
+                    }
+                  />
                 )}
               </Button>
             </Tooltip>

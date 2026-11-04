@@ -12,8 +12,8 @@ import { useDict } from "@/hooks/queries";
 import { OrderStatusBadge } from "@/components/domain/status-badge";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -129,7 +129,8 @@ export function StaffOrdersPage() {
     }, {}) ?? {};
 
   const records = orders.data?.records ?? [];
-  const hasFilters = Boolean(keyword || start || end || status);
+  const activeFilterCount = [keyword, start, end, status].filter(Boolean).length;
+  const hasFilters = activeFilterCount > 0;
 
   return (
     <div className="space-y-4">
@@ -175,58 +176,61 @@ export function StaffOrdersPage() {
       </div>
 
       <section className="ui-card p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="flex items-center gap-1.5 text-xs font-semibold">
+            <SlidersHorizontal className="h-3.5 w-3.5 text-primary" />
+            筛选订单
+          </h2>
+          {hasFilters ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11px] text-muted-foreground"
+              onClick={resetFilters}
+            >
+              <X className="h-3 w-3" />
+              清除 {activeFilterCount} 项
+            </Button>
+          ) : null}
+        </div>
         <form
-          className="flex flex-wrap items-end gap-3"
+          className="flex flex-wrap items-center gap-3"
           onSubmit={(event) => {
             event.preventDefault();
             applyFilters();
           }}
         >
-          <div className="min-w-52 flex-1 space-y-1.5">
-            <Label htmlFor="staff-keyword">搜索</Label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="staff-keyword"
-                value={keywordDraft}
-                onChange={(event) => setKeywordDraft(event.target.value)}
-                placeholder="订单号、收货人或联系电话"
-                className="pl-8"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="staff-start">下单开始</Label>
+          <div className="relative min-w-52 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              id="staff-start"
-              type="date"
-              value={startDraft}
-              onChange={(event) => setStartDraft(event.target.value)}
-              className="w-40"
+              id="staff-keyword"
+              value={keywordDraft}
+              onChange={(event) => setKeywordDraft(event.target.value)}
+              placeholder="订单号、收货人或联系电话"
+              className="pl-8"
+              aria-label="搜索订单"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="staff-end">下单结束</Label>
-            <Input
-              id="staff-end"
-              type="date"
-              value={endDraft}
-              onChange={(event) => setEndDraft(event.target.value)}
-              className="w-40"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button type="submit" size="sm">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              筛选
-            </Button>
-            {hasFilters ? (
-              <Button type="button" size="sm" variant="ghost" onClick={resetFilters}>
-                <X className="h-3.5 w-3.5" />
-                重置
-              </Button>
-            ) : null}
-          </div>
+          <DatePicker
+            id="staff-start"
+            value={startDraft}
+            onChange={setStartDraft}
+            placeholder="开始日期"
+            className="w-40"
+            aria-label="下单开始"
+          />
+          <DatePicker
+            id="staff-end"
+            value={endDraft}
+            onChange={setEndDraft}
+            placeholder="结束日期"
+            className="w-40"
+            aria-label="下单结束"
+          />
+          <Button type="submit" size="sm">
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            筛选
+          </Button>
         </form>
       </section>
 

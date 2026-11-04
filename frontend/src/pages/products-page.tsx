@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Filter, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Filter, RotateCcw, Search, X } from "lucide-react";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
 import { cartService, favoriteService, productService } from "@/lib/services";
 import { useDict, useFavoritesQuery } from "@/hooks/queries";
@@ -15,9 +15,8 @@ import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { Label } from "@/components/ui/label";
-import { Sheet } from "@/components/ui/sheet";
 import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 
@@ -29,34 +28,15 @@ const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
   { value: "rating_desc", label: "评分优先" },
 ];
 
+const FILTER_SELECT_CLASS =
+  "h-9 w-full cursor-pointer rounded-lg border-border bg-card font-medium shadow-xs transition-[border-color,background-color,box-shadow] hover:border-primary/40 hover:bg-accent/40";
+
 const SEASON_VALUES: SeasonSuitability[] = ["SPRING", "SUMMER", "AUTUMN", "WINTER", "ALL"];
 const PAGE_SIZE_OPTIONS = [12, 24, 48];
-
-interface FilterDraft {
-  keyword: string;
-  category: string;
-  occasion: string;
-  festival: string;
-  season: string;
-  minPrice: string;
-  maxPrice: string;
-  sort: string;
-  size: string;
-}
-
-function readDraft(params: URLSearchParams): FilterDraft {
-  return {
-    keyword: params.get("keyword") ?? "",
-    category: params.get("category") ?? "",
-    occasion: params.get("occasion") ?? "",
-    festival: params.get("festival") ?? "",
-    season: params.get("season") ?? "",
-    minPrice: params.get("minPrice") ?? "",
-    maxPrice: params.get("maxPrice") ?? "",
-    sort: params.get("sort") ?? "sales_desc",
-    size: params.get("size") ?? "12",
-  };
-}
+const PAGE_SIZE_SELECT_OPTIONS = PAGE_SIZE_OPTIONS.map((option) => ({
+  value: String(option),
+  label: `${option} 条`,
+}));
 
 export function ProductsPage() {
   const [params, setParams] = useSearchParams();
@@ -65,8 +45,6 @@ export function ProductsPage() {
   const dict = useDict();
   const favorites = useFavoritesQuery();
   const [searchInput, setSearchInput] = useState(params.get("keyword") ?? "");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [draft, setDraft] = useState<FilterDraft>(() => readDraft(params));
   const [favPendingId, setFavPendingId] = useState<number | null>(null);
   const [addingId, setAddingId] = useState<number | null>(null);
 
@@ -144,18 +122,6 @@ export function ProductsPage() {
     setParams(next);
   };
 
-  const applyDraft = () => {
-    const next = new URLSearchParams();
-    (Object.entries(draft) as Array<[keyof FilterDraft, string]>).forEach(([key, value]) => {
-      if (!value) return;
-      if (key === "sort" && value === "sales_desc") return;
-      if (key === "size" && value === "12") return;
-      next.set(key, value);
-    });
-    setParams(next);
-    setFilterOpen(false);
-  };
-
   const clearAll = () => {
     setParams(new URLSearchParams());
     setSearchInput("");
@@ -197,6 +163,23 @@ export function ProductsPage() {
 
   const seasonLabel = dict.data?.seasons.find((item) => item.value === season)?.label;
 
+  const categoryOptions = useMemo(
+    () => (dict.data?.categories ?? []).map((item) => ({ value: item, label: item })),
+    [dict.data],
+  );
+  const occasionOptions = useMemo(
+    () => (dict.data?.occasions ?? []).map((item) => ({ value: item, label: item })),
+    [dict.data],
+  );
+  const festivalOptions = useMemo(
+    () => (dict.data?.festivals ?? []).map((item) => ({ value: item, label: item })),
+    [dict.data],
+  );
+  const seasonOptions = useMemo(
+    () => (dict.data?.seasons ?? []).map((item) => ({ value: item.value, label: item.label })),
+    [dict.data],
+  );
+
   const activeChips: Array<{ key: string; label: string; onRemove: () => void }> = [];
   const keyword = params.get("keyword");
   const category = params.get("category");
@@ -221,143 +204,136 @@ export function ProductsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="ui-card p-4 md:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="flex flex-1 gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchInput}
-                onChange={(event) => setSearchInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") submitSearch();
-                }}
-                placeholder="搜索花名、花语、场景或节日"
-                className="pl-9"
-                aria-label="搜索花礼"
-              />
-            </div>
-            <Button onClick={submitSearch} className="shrink-0">
+      <div className="ui-card space-y-4 p-5">
+        {/* 第一行：主搜索区（移动端纵向堆叠，桌面端一行） */}
+        <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:flex-1">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") submitSearch();
+              }}
+              placeholder="搜索花名、花语、场景或节日"
+              className="pl-10"
+              aria-label="搜索花礼"
+            />
+          </div>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Button onClick={submitSearch} className="w-full px-6 sm:w-auto">
               搜索
             </Button>
             <Button
-              variant="outline"
-              className="shrink-0 lg:hidden"
-              onClick={() => {
-                setDraft(readDraft(params));
-                setFilterOpen(true);
-              }}
+              variant="secondary"
+              onClick={clearAll}
+              className="shrink-0 px-4"
+              title="重置全部筛选"
             >
-              <SlidersHorizontal className="h-4 w-4" />
-              筛选
-            </Button>
-          </div>
-
-          <div className="hidden flex-wrap items-center gap-2 lg:flex">
-            <Select
-              aria-label="品类"
-              value={category ?? ""}
-              onChange={(event) => updateParams({ category: event.target.value || undefined })}
-              placeholder="全部品类"
-              className="w-32"
-            >
-              {dict.data?.categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-            <Select
-              aria-label="场景"
-              value={occasion ?? ""}
-              onChange={(event) => updateParams({ occasion: event.target.value || undefined })}
-              placeholder="全部场景"
-              className="w-32"
-            >
-              {dict.data?.occasions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-            <Select
-              aria-label="节日"
-              value={festival ?? ""}
-              onChange={(event) => updateParams({ festival: event.target.value || undefined })}
-              placeholder="全部节日"
-              className="w-32"
-            >
-              {dict.data?.festivals.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-            <Select
-              aria-label="季节"
-              value={season ?? ""}
-              onChange={(event) => updateParams({ season: event.target.value || undefined })}
-              placeholder="全部季节"
-              className="w-32"
-            >
-              {dict.data?.seasons.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
-            <div className="flex items-center gap-1">
-              <Input
-                id="price-minPrice"
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="最低价"
-                defaultValue={minPrice ?? ""}
-                className="h-10 w-24"
-                aria-label="最低价格"
-                onBlur={() => applyPrice("minPrice")}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") applyPrice("minPrice");
-                }}
-              />
-              <span className="text-xs text-muted-foreground">—</span>
-              <Input
-                id="price-maxPrice"
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="最高价"
-                defaultValue={maxPrice ?? ""}
-                className="h-10 w-24"
-                aria-label="最高价格"
-                onBlur={() => applyPrice("maxPrice")}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") applyPrice("maxPrice");
-                }}
-              />
-            </div>
-            <Select
-              aria-label="排序"
-              value={sort}
-              onChange={(event) => updateParams({ sort: event.target.value })}
-              className="w-36"
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-            <Button variant="ghost" size="sm" onClick={clearAll}>
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RotateCcw className="h-4 w-4" />
               重置
             </Button>
           </div>
         </div>
 
+        {/* 分割线 */}
+        <div className="h-px w-full bg-border/60" aria-hidden />
+
+        {/* 第二行：筛选选项区，自动换行，排序靠右 */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-28 shrink-0">
+            <CustomSelect
+              aria-label="品类"
+              value={category ?? ""}
+              onChange={(next) => updateParams({ category: next || undefined })}
+              placeholder="全部品类"
+              options={categoryOptions}
+              className={FILTER_SELECT_CLASS}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <CustomSelect
+              aria-label="场景"
+              value={occasion ?? ""}
+              onChange={(next) => updateParams({ occasion: next || undefined })}
+              placeholder="全部场景"
+              options={occasionOptions}
+              className={FILTER_SELECT_CLASS}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <CustomSelect
+              aria-label="节日"
+              value={festival ?? ""}
+              onChange={(next) => updateParams({ festival: next || undefined })}
+              placeholder="全部节日"
+              options={festivalOptions}
+              className={FILTER_SELECT_CLASS}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <CustomSelect
+              aria-label="季节"
+              value={season ?? ""}
+              onChange={(next) => updateParams({ season: next || undefined })}
+              placeholder="全部季节"
+              options={seasonOptions}
+              className={FILTER_SELECT_CLASS}
+            />
+          </div>
+
+          {/* 价格区间 */}
+          <div className="flex items-center gap-1.5">
+            <Input
+              id="price-minPrice"
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="最低价"
+              defaultValue={minPrice ?? ""}
+              className="h-9 w-24 rounded-lg px-3 text-center tabular-nums shadow-xs"
+              aria-label="最低价格"
+              onBlur={() => applyPrice("minPrice")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") applyPrice("minPrice");
+              }}
+            />
+            <span className="text-muted-foreground select-none" aria-hidden>
+              -
+            </span>
+            <Input
+              id="price-maxPrice"
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="最高价"
+              defaultValue={maxPrice ?? ""}
+              className="h-9 w-24 rounded-lg px-3 text-center tabular-nums shadow-xs"
+              aria-label="最高价格"
+              onBlur={() => applyPrice("maxPrice")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") applyPrice("maxPrice");
+              }}
+            />
+          </div>
+
+          {/* 排序靠右 */}
+          <div className="ml-auto w-36 shrink-0">
+            <CustomSelect
+              aria-label="排序"
+              value={sort}
+              onChange={(next) => updateParams({ sort: next })}
+              options={SORT_OPTIONS}
+              className={FILTER_SELECT_CLASS}
+            />
+          </div>
+        </div>
+
         {activeChips.length > 0 ? (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-3">
             <Filter className="mr-0.5 h-3.5 w-3.5 text-muted-foreground" />
             {activeChips.map((chip) => (
               <Badge key={chip.key} variant="secondary" className="gap-1 pr-1">
@@ -387,18 +363,16 @@ export function ProductsPage() {
           <Label htmlFor="page-size" className="text-xs text-muted-foreground">
             每页
           </Label>
-          <Select
-            id="page-size"
-            value={String(size)}
-            onChange={(event) => updateParams({ size: event.target.value }, true)}
-            className="h-9 w-20"
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option} 条
-              </option>
-            ))}
-          </Select>
+          <div className="w-24 shrink-0">
+            <CustomSelect
+              id="page-size"
+              aria-label="每页条数"
+              value={String(size)}
+              onChange={(next) => updateParams({ size: next }, true)}
+              options={PAGE_SIZE_SELECT_OPTIONS}
+              className={FILTER_SELECT_CLASS}
+            />
+          </div>
         </div>
       </div>
 
@@ -446,125 +420,6 @@ export function ProductsPage() {
         </>
       )}
 
-      <Sheet
-        open={filterOpen}
-        onOpenChange={setFilterOpen}
-        title="筛选花礼"
-        description="按品类、场景、节日、季节与价格缩小范围"
-        side="bottom"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setDraft(readDraft(new URLSearchParams()))}
-            >
-              重置
-            </Button>
-            <Button onClick={applyDraft}>应用筛选</Button>
-          </>
-        }
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="draft-keyword">关键词</Label>
-            <Input
-              id="draft-keyword"
-              value={draft.keyword}
-              onChange={(event) => setDraft({ ...draft, keyword: event.target.value })}
-              placeholder="花名、花语、场景或节日"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>品类</Label>
-            <Select
-              value={draft.category}
-              onChange={(event) => setDraft({ ...draft, category: event.target.value })}
-              placeholder="全部品类"
-            >
-              {dict.data?.categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>场景</Label>
-            <Select
-              value={draft.occasion}
-              onChange={(event) => setDraft({ ...draft, occasion: event.target.value })}
-              placeholder="全部场景"
-            >
-              {dict.data?.occasions.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>节日</Label>
-            <Select
-              value={draft.festival}
-              onChange={(event) => setDraft({ ...draft, festival: event.target.value })}
-              placeholder="全部节日"
-            >
-              {dict.data?.festivals.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>季节</Label>
-            <Select
-              value={draft.season}
-              onChange={(event) => setDraft({ ...draft, season: event.target.value })}
-              placeholder="全部季节"
-            >
-              {dict.data?.seasons.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>价格区间</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                min={0}
-                value={draft.minPrice}
-                onChange={(event) => setDraft({ ...draft, minPrice: event.target.value })}
-                placeholder="最低"
-              />
-              <span className="text-xs text-muted-foreground">—</span>
-              <Input
-                type="number"
-                min={0}
-                value={draft.maxPrice}
-                onChange={(event) => setDraft({ ...draft, maxPrice: event.target.value })}
-                placeholder="最高"
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>排序</Label>
-            <Select
-              value={draft.sort}
-              onChange={(event) => setDraft({ ...draft, sort: event.target.value })}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-      </Sheet>
     </div>
   );
 }

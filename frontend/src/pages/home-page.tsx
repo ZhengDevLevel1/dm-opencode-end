@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Flower2,
   Gift,
-  Heart,
   Leaf,
   PackageCheck,
   Sparkles,
@@ -470,7 +469,7 @@ export function HomePage() {
               to={`/products?occasion=${encodeURIComponent(occasion)}`}
               className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
             >
-              <Heart className="h-3 w-3" />
+              <Flower2 className="h-3 w-3" />
               {occasion}
             </Link>
           ))}

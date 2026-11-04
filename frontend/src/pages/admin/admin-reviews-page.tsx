@@ -7,8 +7,8 @@ import {
   MessageCircleReply,
   MessageSquareText,
   MoreHorizontal,
+  RotateCcw,
   Search,
-  X,
 } from "lucide-react";
 import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
@@ -22,6 +22,7 @@ import { UserAvatar } from "@/components/domain/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { Dialog } from "@/components/ui/dialog";
 import {
   DropdownItem,
@@ -33,11 +34,15 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
-import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 const PAGE_SIZE = 10;
+
+const reviewStatusOptions: Array<{ value: ReviewStatus; label: string }> = [
+  { value: "VISIBLE", label: "显示中" },
+  { value: "HIDDEN", label: "已隐藏" },
+];
 
 export function AdminReviewsPage() {
   const queryClient = useQueryClient();
@@ -139,37 +144,31 @@ export function AdminReviewsPage() {
             <Label htmlFor="admin-review-status" className="sr-only">
               状态
             </Label>
-            <Select
+            <CustomSelect
               id="admin-review-status"
               value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
+              onChange={(next) => {
+                setStatus(next);
                 setPage(1);
               }}
+              options={reviewStatusOptions}
               placeholder="全部状态"
               className="h-9 text-xs"
-            >
-              <option value="VISIBLE">显示中</option>
-              <option value="HIDDEN">已隐藏</option>
-            </Select>
+            />
           </div>
           <div className="flex gap-2 xl:col-span-2">
-            <Button type="submit" size="sm" className="h-9 flex-1">
-              <Search className="h-3.5 w-3.5" />
+            <Button type="submit" className="h-9 w-full px-6 sm:w-auto">
               筛选
             </Button>
-            {activeFilters > 0 ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2"
-                onClick={clearFilters}
-                aria-label="清除筛选"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-9 shrink-0 px-4"
+              onClick={clearFilters}
+            >
+              <RotateCcw className="h-4 w-4" />
+              重置
+            </Button>
           </div>
         </form>
       </div>

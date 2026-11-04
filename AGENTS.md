@@ -2,7 +2,8 @@
 
 ## Project overview
 
-- This is the backend of a graduation-project flower shop/e-commerce system. Recommendation is the core research feature; the repository contains backend code only, with no frontend.
+- This is a graduation-project flower shop/e-commerce system with a Spring Boot backend (`backend/`) and a React frontend (`frontend/`). Recommendation is the core research feature.
+- Frontend scope: customer storefront, product search/filtering, cart/checkout, orders/reviews, staff fulfillment/inventory, admin dashboards, recommendation operations, theming, and a command palette.
 - Main business scope: authentication and RBAC, user profiles, product catalog/search, cart, favorites, inventory, orders, mock payment, fulfillment, reviews, after-sales/refunds, operation logs, statistics/dictionaries, and recommendation.
 - Roles:
   - `CUSTOMER`: browse products, receive recommendations, manage cart/favorites, place orders, pay, review, and request after-sales.
@@ -13,7 +14,8 @@
 
 ## Tech stack and architecture
 
-- Java 17, Spring Boot 3.2.3, Maven, Spring MVC, Spring Security, Validation, AOP, MyBatis-Plus 3.5.5, MySQL 8, Redis, JJWT 0.12.5, Knife4j 4.4.0, Lombok, and H2 for automated tests.
+- Backend: Java 17, Spring Boot 3.2.3, Maven, Spring MVC, Spring Security, Validation, AOP, MyBatis-Plus 3.5.5, MySQL 8, Redis, JJWT 0.12.5, Knife4j 4.4.0, Lombok, and H2 for automated tests.
+- Frontend: React 19, TypeScript 5.7, Vite 6, Tailwind CSS 4, React Router 7, TanStack Query 5, Zustand 5, React Hook Form + Zod, Framer Motion, Recharts, and lucide-react. The `@/` alias resolves to `frontend/src/`.
 - Modular monolith organized by feature: controllers call services, services use MyBatis-Plus mappers, and each module owns its entities/DTOs.
 - Top-level backend packages:
   - `common`: unified API response, pagination, enums, exceptions, utilities.
@@ -47,9 +49,26 @@
 - `backend/src/main/java/com/flower/mall/`: production code (`common`, `config`, `security`, `support`, `module`).
 - `backend/src/main/resources/`: `application.yml` and logging configuration.
 - `backend/src/test/java/` and `backend/src/test/resources/`: H2-backed integration/unit tests and test data.
+- `frontend/`: the React/Vite application; run npm commands from this directory.
+- `frontend/src/app/`: router, shell, auth/role guards, providers, and navigation config.
+- `frontend/src/components/ui/`: shared UI primitives, including `custom-select.tsx` (accessible custom listbox with portal-positioned panel) and `date-picker.tsx` (custom calendar popover).
+- `frontend/src/components/domain/`: product, order, review, status, and recommendation business components.
+- `frontend/src/pages/`: route pages; `admin/`, `staff/`, and `auth/` hold role-specific screens.
+- `frontend/src/lib/`: API client, typed services, query keys, formatting, storage, and permissions.
+- `frontend/src/styles/globals.css`: Tailwind v4 theme tokens, palettes, accents, density, and motion settings.
+- `frontend/src/types/api.ts`: backend API request/response types.
 - `docs/` and `.scratch/`: agent/domain documentation and local issue/spec files.
 - `docs/backend-api.md`: complete frontend-oriented REST API reference with request/response schemas.
 - `.agents/` and `.opencode/`: local agent skills and configuration.
+
+## Frontend conventions
+
+- Routing and role guards live in `frontend/src/app/router.tsx`; protected pages use `RequireAuth` and `RequireRole`.
+- API access goes through `frontend/src/lib/api-client.ts` and `frontend/src/lib/services.ts`; server state uses TanStack Query hooks from `frontend/src/hooks/queries.ts`.
+- Styling uses Tailwind v4 semantic tokens from `frontend/src/styles/globals.css` (`bg-card`, `border-border`, `text-muted-foreground`, etc.) instead of raw palette values where possible.
+- Filter/sort dropdowns on the product list, smart recommendation, staff inventory, and admin products/users/reviews pages use `frontend/src/components/ui/custom-select.tsx` (`CustomSelect`). It is a fully custom listbox with click-outside close, arrow-key/Enter/Escape navigation, selected check mark, and a spring open animation. Its panel is rendered through a portal with fixed positioning so it is not clipped inside dialogs.
+- Admin product/user dialogs use `CustomSelect` with `react-hook-form` via `Controller`; do not use native `register` with it.
+- Date filters on staff orders, staff inventory, admin operation logs, and the admin recommendation log use `frontend/src/components/ui/date-picker.tsx` (`DatePicker`), a custom calendar popover with Monday-first grid, month navigation, today/selected states, clear/today actions, keyboard navigation, and outside-click/Escape close.
 
 ## Core domain flows
 
@@ -69,6 +88,8 @@
 - Redis defaults to `localhost:6379`; disable or avoid depending on it with `APP_REDIS_ENABLED=false` during local development.
 - Product-detail and hot-product caches are controlled by `app.cache.*`; recommendation candidate limit is controlled by `app.recommendation.candidate-limit`.
 - Run from `backend/` with `mvn spring-boot:run`, or run the packaged jar `backend/target/flower-shop-backend-1.0.0.jar`.
+- Run from `frontend/` with Node.js 20+: `npm install`, copy `.env.example` to `.env`, then `npm run dev`. Vite serves `http://localhost:5173` and proxies `/api` to `http://localhost:8080`.
+- Frontend environment: `VITE_API_BASE_URL` defaults to `/api`; `VITE_IMAGE_BASE_URL` is optional for product images.
 - Tests use H2 with MySQL compatibility mode and `app.redis.enabled=false`; test schema/data live under `backend/src/test/resources`.
 - Demo accounts:
   - `admin / admin123`
@@ -103,9 +124,11 @@ Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
 - `docs/backend-api.md` is complete; its endpoint table was checked against the source: 65 source endpoints and 65 documented endpoints match with no extras or omissions.
 - `mvn -s "C:\Users\28408\AppData\Local\Temp\opencode\settings-central.xml" -B -ntp clean test` passes 25/25 tests.
 - Run `mvn -s "C:\Users\28408\AppData\Local\Temp\opencode\settings-central.xml" -B -ntp -DskipTests package` to build `backend\target\flower-shop-backend-1.0.0.jar`.
+- Frontend `npm run typecheck`, `npm run lint`, and `npm run build` pass. Lint reports 5 pre-existing `react-refresh/only-export-components` warnings (no errors).
 
 ## Remaining uncovered items
 
 - Location dimension is not modeled. `RecommendationQuery.scene` is accepted but does not affect recommendation results.
 - No smoke test has been run against a real MySQL 8 + Redis instance; automated tests use H2 with Redis disabled.
+- The frontend has no automated test suite; verification is currently `npm run typecheck`, `npm run lint`, and `npm run build`.
 - Changes are not committed to Git.

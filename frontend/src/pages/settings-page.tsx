@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RangeSlider } from "@/components/ui/range-slider";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -420,20 +421,33 @@ export function SettingsPage() {
                     ))}
                   </OptionRow>
                   <div>
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between gap-2 text-xs">
                       <span className="font-medium">界面缩放</span>
-                      <span className="text-muted-foreground tabular">
-                        {Math.round(theme.scale * 100)}%
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground tabular">
+                          {Math.round(theme.scale * 100)}%
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-1.5 text-[11px] text-muted-foreground"
+                          onClick={() => theme.set({ scale: 1 })}
+                          disabled={theme.scale === 1}
+                          title="重置为 100%"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          重置
+                        </Button>
+                      </div>
                     </div>
-                    <input
-                      type="range"
+                    <RangeSlider
                       min={0.9}
                       max={1.1}
                       step={0.01}
                       value={theme.scale}
-                      onChange={(event) => theme.set({ scale: Number(event.target.value) })}
-                      className="mt-2 w-full accent-[var(--primary)]"
+                      onChange={(next) => theme.set({ scale: next })}
+                      className="mt-2 w-full"
                       aria-label="界面缩放"
                     />
                     <p className="mt-1 text-[11px] text-muted-foreground">
@@ -483,16 +497,13 @@ export function SettingsPage() {
                               {Math.round(theme.backgroundOpacity * 100)}%
                             </span>
                           </div>
-                          <input
-                            type="range"
+                          <RangeSlider
                             min={0.4}
                             max={0.98}
                             step={0.01}
                             value={theme.backgroundOpacity}
-                            onChange={(event) =>
-                              theme.set({ backgroundOpacity: Number(event.target.value) })
-                            }
-                            className="mt-2 w-full accent-[var(--primary)]"
+                            onChange={(next) => theme.set({ backgroundOpacity: next })}
+                            className="mt-2 w-full"
                             aria-label="背景遮罩不透明度"
                           />
                         </div>
@@ -503,16 +514,13 @@ export function SettingsPage() {
                               {theme.backgroundBlur}px
                             </span>
                           </div>
-                          <input
-                            type="range"
+                          <RangeSlider
                             min={0}
                             max={20}
                             step={1}
                             value={theme.backgroundBlur}
-                            onChange={(event) =>
-                              theme.set({ backgroundBlur: Number(event.target.value) })
-                            }
-                            className="mt-2 w-full accent-[var(--primary)]"
+                            onChange={(next) => theme.set({ backgroundBlur: next })}
+                            className="mt-2 w-full"
                             aria-label="背景模糊"
                           />
                         </div>

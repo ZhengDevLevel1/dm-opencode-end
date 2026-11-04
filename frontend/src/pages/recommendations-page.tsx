@@ -13,8 +13,8 @@ import type { RecommendationItemVO, SeasonSuitability } from "@/types/api";
 import { RecommendationCard } from "@/components/domain/recommendation-card";
 import { SectionHeading } from "@/components/domain/section-heading";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -22,6 +22,10 @@ import { Progress } from "@/components/ui/progress";
 
 const SEASON_VALUES: SeasonSuitability[] = ["SPRING", "SUMMER", "AUTUMN", "WINTER", "ALL"];
 const LIMIT_OPTIONS = [6, 10, 20];
+const LIMIT_SELECT_OPTIONS = LIMIT_OPTIONS.map((item) => ({
+  value: String(item),
+  label: `${item} 件`,
+}));
 
 const weightLabels = [
   { key: "contentWeight", label: "内容相似度" },
@@ -46,6 +50,15 @@ export function RecommendationsPage() {
   const festival = params.get("festival") ?? undefined;
   const limitParam = Number(params.get("limit") ?? "10");
   const limit = LIMIT_OPTIONS.includes(limitParam) ? limitParam : 10;
+
+  const seasonOptions = useMemo(
+    () => (dict.data?.seasons ?? []).map((item) => ({ value: item.value, label: item.label })),
+    [dict.data?.seasons],
+  );
+  const festivalOptions = useMemo(
+    () => (dict.data?.festivals ?? []).map((item) => ({ value: item, label: item })),
+    [dict.data?.festivals],
+  );
 
   const query = useMemo(
     () => ({ limit, festival, season, scene: "home" }),
@@ -115,9 +128,9 @@ export function RecommendationsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-card)] md:p-7">
+      <section className="relative rounded-2xl border border-border/60 bg-card p-5 shadow-[var(--shadow-card)] md:p-7">
         <div
-          className="pointer-events-none absolute inset-0"
+          className="pointer-events-none absolute inset-0 rounded-2xl"
           style={{
             background:
               "radial-gradient(42rem 20rem at 100% 0%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 65%)",
@@ -141,47 +154,32 @@ export function RecommendationsPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-32 space-y-1.5">
               <Label htmlFor="rec-season">季节</Label>
-              <Select
+              <CustomSelect
                 id="rec-season"
                 value={season ?? ""}
-                onChange={(event) => updateParams({ season: event.target.value || undefined })}
+                onChange={(next) => updateParams({ season: next || undefined })}
+                options={seasonOptions}
                 placeholder="自动识别"
-              >
-                {dict.data?.seasons.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </Select>
+              />
             </div>
             <div className="w-36 space-y-1.5">
               <Label htmlFor="rec-festival">节日</Label>
-              <Select
+              <CustomSelect
                 id="rec-festival"
                 value={festival ?? ""}
-                onChange={(event) => updateParams({ festival: event.target.value || undefined })}
+                onChange={(next) => updateParams({ festival: next || undefined })}
+                options={festivalOptions}
                 placeholder="自动识别"
-              >
-                {dict.data?.festivals.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </Select>
+              />
             </div>
             <div className="w-28 space-y-1.5">
               <Label htmlFor="rec-limit">推荐数量</Label>
-              <Select
+              <CustomSelect
                 id="rec-limit"
                 value={String(limit)}
-                onChange={(event) => updateParams({ limit: event.target.value })}
-              >
-                {LIMIT_OPTIONS.map((item) => (
-                  <option key={item} value={item}>
-                    {item} 件
-                  </option>
-                ))}
-              </Select>
+                onChange={(next) => updateParams({ limit: next })}
+                options={LIMIT_SELECT_OPTIONS}
+              />
             </div>
             <Button
               variant="ghost"

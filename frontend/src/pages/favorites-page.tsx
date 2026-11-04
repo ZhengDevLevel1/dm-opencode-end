@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Heart } from "lucide-react";
+import { Flower2 } from "lucide-react";
 import { useFavoritesQuery } from "@/hooks/queries";
 import { cartService, favoriteService } from "@/lib/services";
 import { getErrorMessage } from "@/lib/api-client";
@@ -66,7 +66,7 @@ export function FavoritesPage() {
         </div>
         <Button variant="outline" size="sm" asChild>
           <Link to="/products">
-            <Heart className="h-3.5 w-3.5" />
+            <Flower2 className="h-3.5 w-3.5" />
             去发现更多
           </Link>
         </Button>
@@ -82,9 +82,9 @@ export function FavoritesPage() {
         />
       ) : products.length === 0 ? (
         <EmptyState
-          icon={Heart}
+          icon={Flower2}
           title="收藏夹还是空的"
-          description="浏览花礼时点一下爱心，就能把喜欢的款式收在这里。"
+          description="浏览花礼时点一下花朵，就能把喜欢的款式收在这里。"
           action={
             <Button onClick={() => navigate("/products")}>去逛逛花礼</Button>
           }

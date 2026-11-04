@@ -1,11 +1,10 @@
-import { Heart, Loader2, ShoppingBag } from "lucide-react";
+import { Flower2, Loader2, ShoppingBag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/format";
 import { splitTags } from "@/lib/format";
 import type { ProductVO } from "@/types/api";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import { ProductImage } from "./product-image";
 import { Price } from "./price";
 import { Rating } from "./rating";
@@ -39,7 +38,7 @@ export function ProductCard({
   return (
     <article
       className={cn(
-        "ui-card group relative flex flex-col overflow-hidden transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/30",
+        "ui-card group relative flex flex-col overflow-hidden transition-[border-color,box-shadow,transform,translate] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-primary/30 motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         className,
       )}
     >
@@ -96,60 +95,48 @@ export function ProductCard({
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {onFavorite ? (
-              <Tooltip content={isFavorite ? "取消收藏" : "收藏花礼"}>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={isFavorite ? "取消收藏" : "收藏"}
-                  aria-pressed={Boolean(isFavorite)}
-                  disabled={favoritePending}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onFavorite(product);
-                  }}
-                >
-                  {favoritePending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Heart
-                      className={cn(
-                        "h-4 w-4",
-                        isFavorite ? "fill-flower-rose text-flower-rose" : "text-muted-foreground",
-                      )}
-                    />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={isFavorite ? "取消收藏" : "收藏"}
+                aria-pressed={Boolean(isFavorite)}
+                aria-busy={favoritePending}
+                disabled={favoritePending}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onFavorite(product);
+                }}
+              >
+                <Flower2
+                  className={cn(
+                    "h-4 w-4 transition-colors",
+                    isFavorite
+                      ? "fill-flower-rose/15 text-flower-rose"
+                      : "text-muted-foreground",
                   )}
-                </Button>
-              </Tooltip>
+                />
+              </Button>
             ) : null}
             {onAddToCart ? (
-              <Tooltip
-                content={
-                  offShelf
-                    ? "该花礼已下架"
-                    : soldOut
-                      ? "该花礼暂时售罄，补货后可购买"
-                      : "加入购物车"
-                }
+              <Button
+                variant={unavailable ? "ghost" : "secondary"}
+                size="icon-sm"
+                className="shadow-none"
+                aria-label="加入购物车"
+                disabled={unavailable || addPending}
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onAddToCart(product);
+                }}
               >
-                <Button
-                  variant={unavailable ? "ghost" : "secondary"}
-                  size="icon-sm"
-                  aria-label="加入购物车"
-                  disabled={unavailable || addPending}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onAddToCart(product);
-                  }}
-                >
-                  {addPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ShoppingBag className="h-4 w-4" />
-                  )}
-                </Button>
-              </Tooltip>
+                {addPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ShoppingBag className="h-4 w-4" />
+                )}
+              </Button>
             ) : null}
           </div>
         </div>

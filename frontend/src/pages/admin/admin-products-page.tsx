@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -11,9 +11,9 @@ import {
   PackagePlus,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
-  X,
 } from "lucide-react";
 import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
@@ -35,6 +35,7 @@ import { Rating } from "@/components/domain/rating";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { Dialog } from "@/components/ui/dialog";
 import {
   DropdownItem,
@@ -46,11 +47,13 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
-import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 const PAGE_SIZE = 10;
+
+const FILTER_SELECT_CLASS =
+  "h-9 w-full cursor-pointer rounded-lg border-border bg-card font-medium shadow-xs transition-[border-color,background-color,box-shadow] hover:border-primary/40 hover:bg-accent/40";
 
 const seasons: Array<{ value: SeasonSuitability; label: string }> = [
   { value: "SPRING", label: "春季" },
@@ -60,9 +63,22 @@ const seasons: Array<{ value: SeasonSuitability; label: string }> = [
   { value: "ALL", label: "四季" },
 ];
 
+const productStatusOptions: Array<{ value: ProductStatus; label: string }> = [
+  { value: "ON_SALE", label: "上架" },
+  { value: "OFF_SHELF", label: "下架" },
+];
+
+const productSortOptions: Array<{ value: ProductSort; label: string }> = [
+  { value: "newest", label: "最新上架" },
+  { value: "sales_desc", label: "销量优先" },
+  { value: "price_asc", label: "价格从低到高" },
+  { value: "price_desc", label: "价格从高到低" },
+  { value: "rating_desc", label: "评分优先" },
+];
+
 const productSchema = z.object({
   name: z.string().trim().min(1, "请输入商品名称").max(100, "商品名称最多 100 个字符"),
-  category: z.string().trim().min(1, "请输入品类").max(30, "品类最多 30 个字符"),
+  category: z.string().trim().min(1, "请选择品类").max(30, "品类最多 30 个字符"),
   flowerMeaning: z.string().trim().max(200, "花语最多 200 个字符").optional(),
   occasionTags: z.string().trim().max(200, "场景标签最多 200 个字符").optional(),
   festivalTags: z.string().trim().max(200, "节日标签最多 200 个字符").optional(),
@@ -129,6 +145,19 @@ export function AdminProductsPage() {
     product: null,
   });
   const [deleting, setDeleting] = useState<ProductVO | null>(null);
+
+  const categoryFilterOptions = useMemo(
+    () => (dict.data?.categories ?? []).map((item) => ({ value: item, label: item })),
+    [dict.data?.categories],
+  );
+  const occasionFilterOptions = useMemo(
+    () => (dict.data?.occasions ?? []).map((item) => ({ value: item, label: item })),
+    [dict.data?.occasions],
+  );
+  const festivalFilterOptions = useMemo(
+    () => (dict.data?.festivals ?? []).map((item) => ({ value: item, label: item })),
+    [dict.data?.festivals],
+  );
 
   useEffect(() => {
     if (!urlKeyword) return;
@@ -234,196 +263,176 @@ export function AdminProductsPage() {
         </Button>
       </div>
 
-      <div className="ui-card p-4">
-        <form className="grid gap-2 sm:grid-cols-2 xl:grid-cols-12" onSubmit={applyFilters}>
-          <div className="relative xl:col-span-4">
-            <Label htmlFor="admin-product-keyword" className="sr-only">
-              搜索商品
-            </Label>
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="admin-product-keyword"
-              value={draftKeyword}
-              onChange={(event) => setDraftKeyword(event.target.value)}
-              placeholder="搜索名称、花语、场景或节日标签"
-              className="h-9 pl-8 text-xs"
-            />
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-status" className="sr-only">
-              状态
-            </Label>
-            <Select
-              id="admin-product-status"
-              value={status}
-              onChange={(event) => {
-                setStatus(event.target.value);
-                setPage(1);
-              }}
-              placeholder="全部状态"
-              className="h-9 text-xs"
-            >
-              <option value="ON_SALE">已上架</option>
-              <option value="OFF_SHELF">已下架</option>
-            </Select>
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-category" className="sr-only">
-              品类
-            </Label>
-            <Select
-              id="admin-product-category"
-              value={category}
-              onChange={(event) => {
-                setCategory(event.target.value);
-                setPage(1);
-              }}
-              placeholder="全部品类"
-              className="h-9 text-xs"
-            >
-              {(dict.data?.categories ?? []).map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-season" className="sr-only">
-              季节
-            </Label>
-            <Select
-              id="admin-product-season"
-              value={season}
-              onChange={(event) => {
-                setSeason(event.target.value);
-                setPage(1);
-              }}
-              placeholder="全部季节"
-              className="h-9 text-xs"
-            >
-              {seasons.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-occasion" className="sr-only">
-              场景
-            </Label>
-            <Select
-              id="admin-product-occasion"
-              value={occasion}
-              onChange={(event) => {
-                setOccasion(event.target.value);
-                setPage(1);
-              }}
-              placeholder="全部场景"
-              className="h-9 text-xs"
-            >
-              {(dict.data?.occasions ?? []).map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-festival" className="sr-only">
-              节日
-            </Label>
-            <Select
-              id="admin-product-festival"
-              value={festival}
-              onChange={(event) => {
-                setFestival(event.target.value);
-                setPage(1);
-              }}
-              placeholder="全部节日"
-              className="h-9 text-xs"
-            >
-              {(dict.data?.festivals ?? []).map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-min-price" className="sr-only">
-              最低价格
-            </Label>
-            <Input
-              id="admin-product-min-price"
-              type="number"
-              min={0}
-              step={0.01}
-              value={minPrice}
-              onChange={(event) => {
-                setMinPrice(event.target.value);
-                setPage(1);
-              }}
-              placeholder="最低价格"
-              className="h-9 text-xs"
-            />
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-max-price" className="sr-only">
-              最高价格
-            </Label>
-            <Input
-              id="admin-product-max-price"
-              type="number"
-              min={0}
-              step={0.01}
-              value={maxPrice}
-              onChange={(event) => {
-                setMaxPrice(event.target.value);
-                setPage(1);
-              }}
-              placeholder="最高价格"
-              className="h-9 text-xs"
-            />
-          </div>
-          <div className="xl:col-span-2">
-            <Label htmlFor="admin-product-sort" className="sr-only">
-              排序
-            </Label>
-            <Select
-              id="admin-product-sort"
-              value={sort}
-              onChange={(event) => {
-                setSort(event.target.value as ProductSort);
-                setPage(1);
-              }}
-              className="h-9 text-xs"
-            >
-              <option value="newest">最新上架</option>
-              <option value="sales_desc">销量优先</option>
-              <option value="price_asc">价格从低到高</option>
-              <option value="price_desc">价格从高到低</option>
-              <option value="rating_desc">评分优先</option>
-            </Select>
-          </div>
-          <div className="flex gap-2 xl:col-span-2">
-            <Button type="submit" size="sm" className="h-9 flex-1">
-              <Search className="h-3.5 w-3.5" />
-              搜索
-            </Button>
-            {activeFilters > 0 ? (
+      <div className="ui-card space-y-4 p-5">
+        <form onSubmit={applyFilters}>
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:flex-1">
+              <Label htmlFor="admin-product-keyword" className="sr-only">
+                搜索商品
+              </Label>
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                id="admin-product-keyword"
+                value={draftKeyword}
+                onChange={(event) => setDraftKeyword(event.target.value)}
+                placeholder="搜索名称、花语、场景或节日标签"
+                className="pl-10"
+                aria-label="搜索商品"
+              />
+            </div>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <Button type="submit" className="w-full px-6 sm:w-auto">
+                搜索
+              </Button>
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2"
+                variant="secondary"
                 onClick={clearFilters}
-                aria-label="清除筛选"
+                className="shrink-0 px-4"
+                title="重置全部筛选"
               >
-                <X className="h-3.5 w-3.5" />
+                <RotateCcw className="h-4 w-4" />
+                重置
               </Button>
-            ) : null}
+            </div>
+          </div>
+
+          <div className="my-4 h-px w-full bg-border/60" aria-hidden />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-28 shrink-0">
+              <Label htmlFor="admin-product-status" className="sr-only">
+                状态
+              </Label>
+              <CustomSelect
+                id="admin-product-status"
+                value={status}
+                onChange={(next) => {
+                  setStatus(next);
+                  setPage(1);
+                }}
+                options={productStatusOptions}
+                placeholder="全部状态"
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+            <div className="w-28 shrink-0">
+              <Label htmlFor="admin-product-category" className="sr-only">
+                品类
+              </Label>
+              <CustomSelect
+                id="admin-product-category"
+                value={category}
+                onChange={(next) => {
+                  setCategory(next);
+                  setPage(1);
+                }}
+                options={categoryFilterOptions}
+                placeholder="全部品类"
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+            <div className="w-28 shrink-0">
+              <Label htmlFor="admin-product-occasion" className="sr-only">
+                场景
+              </Label>
+              <CustomSelect
+                id="admin-product-occasion"
+                value={occasion}
+                onChange={(next) => {
+                  setOccasion(next);
+                  setPage(1);
+                }}
+                options={occasionFilterOptions}
+                placeholder="全部场景"
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+            <div className="w-28 shrink-0">
+              <Label htmlFor="admin-product-festival" className="sr-only">
+                节日
+              </Label>
+              <CustomSelect
+                id="admin-product-festival"
+                value={festival}
+                onChange={(next) => {
+                  setFestival(next);
+                  setPage(1);
+                }}
+                options={festivalFilterOptions}
+                placeholder="全部节日"
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+            <div className="w-28 shrink-0">
+              <Label htmlFor="admin-product-season" className="sr-only">
+                季节
+              </Label>
+              <CustomSelect
+                id="admin-product-season"
+                value={season}
+                onChange={(next) => {
+                  setSeason(next);
+                  setPage(1);
+                }}
+                options={seasons}
+                placeholder="全部季节"
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Input
+                id="admin-product-min-price"
+                type="number"
+                min={0}
+                step={0.01}
+                value={minPrice}
+                onChange={(event) => {
+                  setMinPrice(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="最低价"
+                className="h-9 w-24 rounded-lg px-3 text-center tabular-nums shadow-xs"
+                aria-label="最低价格"
+              />
+              <span className="text-muted-foreground select-none" aria-hidden>
+                -
+              </span>
+              <Input
+                id="admin-product-max-price"
+                type="number"
+                min={0}
+                step={0.01}
+                value={maxPrice}
+                onChange={(event) => {
+                  setMaxPrice(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="最高价"
+                className="h-9 w-24 rounded-lg px-3 text-center tabular-nums shadow-xs"
+                aria-label="最高价格"
+              />
+            </div>
+
+            <div className="ml-auto w-36 shrink-0">
+              <Label htmlFor="admin-product-sort" className="sr-only">
+                排序
+              </Label>
+              <CustomSelect
+                id="admin-product-sort"
+                value={sort}
+                onChange={(next) => {
+                  setSort(next as ProductSort);
+                  setPage(1);
+                }}
+                options={productSortOptions}
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
           </div>
         </form>
       </div>
@@ -651,6 +660,7 @@ function ProductEditorDialog({
   const dict = useDict();
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -699,7 +709,9 @@ function ProductEditorDialog({
 
   const categoryOptions = Array.from(
     new Set([...categories, ...(dict.data?.categories ?? []), product?.category ?? ""]),
-  ).filter(Boolean);
+  )
+    .filter(Boolean)
+    .map((item) => ({ value: item, label: item }));
 
   return (
     <Dialog
@@ -751,30 +763,36 @@ function ProductEditorDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="product-category">品类 *</Label>
-            <Input
-              id="product-category"
-              list="admin-product-categories"
-              placeholder="选择或输入品类"
-              maxLength={30}
-              aria-invalid={Boolean(errors.category)}
-              {...register("category")}
+            <Controller
+              control={control}
+              name="category"
+              render={({ field }) => (
+                <CustomSelect
+                  id="product-category"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={categoryOptions}
+                  placeholder="请选择品类"
+                  aria-invalid={Boolean(errors.category)}
+                />
+              )}
             />
-            <datalist id="admin-product-categories">
-              {categoryOptions.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
             <FieldError message={errors.category?.message} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="product-season">适用季节 *</Label>
-            <Select id="product-season" {...register("seasonSuitability")}>
-              {seasons.map((season) => (
-                <option key={season.value} value={season.value}>
-                  {season.label}
-                </option>
-              ))}
-            </Select>
+            <Controller
+              control={control}
+              name="seasonSuitability"
+              render={({ field }) => (
+                <CustomSelect
+                  id="product-season"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={seasons}
+                />
+              )}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="product-price">售价（元）*</Label>
@@ -818,10 +836,18 @@ function ProductEditorDialog({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="product-status">状态 *</Label>
-            <Select id="product-status" {...register("status")}>
-              <option value="ON_SALE">上架</option>
-              <option value="OFF_SHELF">下架</option>
-            </Select>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <CustomSelect
+                  id="product-status"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={productStatusOptions}
+                />
+              )}
+            />
           </div>
         </div>
 
