@@ -1,4 +1,5 @@
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\recommendation\dto\RecommendationWeightsVO.java
+D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\file\service\FileStorageService.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\stats\dto\CategorySalesVO.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\common\util\OrderNoGenerator.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\recommendation\model\RecommendationCandidate.java
@@ -43,6 +44,7 @@ D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\commo
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\auth\controller\AuthController.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\order\dto\CreateOrderRequest.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\security\JwtService.java
+D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\file\controller\FileController.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\order\dto\CancelOrderRequest.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\common\util\IpUtils.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\security\UserDetailsServiceImpl.java
@@ -54,6 +56,7 @@ D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\modul
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\config\AppProperties.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\fulfillment\mapper\FulfillmentRecordMapper.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\order\mapper\OrderItemMapper.java
+D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\recommendation\model\RecommendationLogLabels.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\config\SecurityConfig.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\security\JwtAuthenticationFilter.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\common\exception\BusinessException.java
@@ -82,6 +85,7 @@ D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\modul
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\recommendation\model\RecommendationWeights.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\user\dto\UserVO.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\recommendation\model\TagUtils.java
+D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\file\dto\FileUploadVO.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\recommendation\dto\RecommendationWeightRequest.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\common\enums\SeasonSuitability.java
 D:\wenjian\biyesheji\dm-opencode-end\backend\src\main\java\com\flower\mall\module\log\service\OperationLogService.java

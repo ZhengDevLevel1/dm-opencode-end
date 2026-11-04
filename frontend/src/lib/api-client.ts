@@ -74,7 +74,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   const token = getToken();
   const finalHeaders = new Headers(headers);
-  if (!finalHeaders.has("Content-Type") && body !== undefined) {
+  const isFormData = body instanceof FormData;
+  if (!finalHeaders.has("Content-Type") && body !== undefined && !isFormData) {
     finalHeaders.set("Content-Type", "application/json");
   }
   finalHeaders.set("Accept", "application/json");
@@ -86,7 +87,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
       ...rest,
       headers: finalHeaders,
       signal: controller.signal,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isFormData ? body : JSON.stringify(body),
     });
   } catch (error) {
     window.clearTimeout(timer);

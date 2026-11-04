@@ -205,6 +205,7 @@ public class ProductService {
             case "price_desc" -> wrapper.orderByDesc(Product::getPrice);
             case "newest" -> wrapper.orderByDesc(Product::getCreatedAt);
             case "rating_desc" -> wrapper.orderByDesc(Product::getRatingAvg);
+            case "stock_asc" -> wrapper.orderByAsc(Product::getStock);
             default -> wrapper.orderByDesc(Product::getSalesCount);
         }
         wrapper.orderByDesc(Product::getId);

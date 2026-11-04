@@ -156,13 +156,23 @@ public class OrderService {
 
     public PageResult<OrderVO> pageForStaff(long page, long size, String status, String keyword,
                                             LocalDateTime start, LocalDateTime end) {
+        String search = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String pattern = search == null ? null : "%" + search + "%";
         IPage<Order> orderPage = orderMapper.selectPage(new Page<>(Math.max(page, 1), clampSize(size)),
                 Wrappers.<Order>lambdaQuery()
                         .eq(StringUtils.hasText(status), Order::getStatus, status)
-                        .and(StringUtils.hasText(keyword), wrapper -> wrapper
-                                .like(Order::getOrderNo, keyword)
-                                .or().like(Order::getReceiverName, keyword)
-                                .or().like(Order::getReceiverPhone, keyword))
+                        .and(pattern != null, wrapper -> wrapper
+                                .like(Order::getOrderNo, search)
+                                .or().like(Order::getReceiverName, search)
+                                .or().like(Order::getReceiverPhone, search)
+                                .or().apply("EXISTS (SELECT 1 FROM sys_user u "
+                                                + "WHERE u.id = shop_order.user_id "
+                                                + "AND (u.nickname LIKE {0} OR u.username LIKE {0}))",
+                                        pattern)
+                                .or().apply("EXISTS (SELECT 1 FROM order_item oi "
+                                                + "WHERE oi.order_id = shop_order.id "
+                                                + "AND oi.product_name LIKE {0})",
+                                        pattern))
                         .ge(start != null, Order::getCreatedAt, start)
                         .le(end != null, Order::getCreatedAt, end)
                         .orderByDesc(Order::getId));

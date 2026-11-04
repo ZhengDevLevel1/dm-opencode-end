@@ -17,6 +17,8 @@ export const queryKeys = {
   staffOrders: (params: object) => ["staff", "orders", params] as const,
   staffOrder: (id: number) => ["staff", "order", id] as const,
   staffFulfillments: (orderId: number) => ["staff", "fulfillments", orderId] as const,
+  staffProducts: (params: object) => ["staff", "products", params] as const,
+  staffProduct: (id: number) => ["staff", "product", id] as const,
   staffInventory: (params: object) => ["staff", "inventory", params] as const,
   adminOverview: ["admin", "overview"] as const,
   adminSalesTrend: (days: number) => ["admin", "sales-trend", days] as const,

@@ -206,7 +206,7 @@ export function StaffOrdersPage() {
               id="staff-keyword"
               value={keywordDraft}
               onChange={(event) => setKeywordDraft(event.target.value)}
-              placeholder="订单号、收货人或联系电话"
+              placeholder="订单号、买家、收货人、电话或商品"
               className="pl-8"
               aria-label="搜索订单"
             />

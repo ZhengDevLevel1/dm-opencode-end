@@ -308,7 +308,11 @@ export function AdminUsersPage() {
                   <TR key={user.id}>
                     <TD className="min-w-52 py-2.5">
                       <div className="flex items-center gap-2.5">
-                        <UserAvatar name={user.nickname || user.username} size="sm" />
+                        <UserAvatar
+                          name={user.nickname || user.username}
+                          src={user.avatarUrl}
+                          size="sm"
+                        />
                         <div className="min-w-0">
                           <p className="truncate text-xs font-medium">
                             {user.nickname || user.username}

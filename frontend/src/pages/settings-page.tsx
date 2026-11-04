@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useShallow } from "zustand/react/shallow";
 import {
   Check,
   Download,
@@ -19,6 +20,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  DEFAULT_BACKGROUND_BLUR,
+  DEFAULT_BACKGROUND_OPACITY,
   useThemeStore,
   type AccentId,
   type BackgroundId,
@@ -42,6 +45,7 @@ import { Label } from "@/components/ui/label";
 import { RangeSlider } from "@/components/ui/range-slider";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ImageUpload } from "@/components/domain/image-upload";
 
 const modes: Array<{ value: ThemeMode; label: string; icon: LucideIcon }> = [
   { value: "light", label: "浅色", icon: Sun },
@@ -148,7 +152,27 @@ const passwordSchema = z
 type PasswordValues = z.infer<typeof passwordSchema>;
 
 export function SettingsPage() {
-  const theme = useThemeStore();
+  // 仅订阅页面渲染需要的字段；缩放、遮罩、模糊由各自小组件独立订阅，
+  // 拖拽滑动条时不会重渲染整个设置页，保证跟手不卡顿。
+  const theme = useThemeStore(
+    useShallow((state) => ({
+      mode: state.mode,
+      palette: state.palette,
+      accent: state.accent,
+      customAccent: state.customAccent,
+      radius: state.radius,
+      density: state.density,
+      sidebarStyle: state.sidebarStyle,
+      reduceMotion: state.reduceMotion,
+      highContrast: state.highContrast,
+      background: state.background,
+      backgroundImage: state.backgroundImage,
+      set: state.set,
+      reset: state.reset,
+      exportTheme: state.exportTheme,
+      importTheme: state.importTheme,
+    })),
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState("appearance");
   const [resetOpen, setResetOpen] = useState(false);
@@ -420,40 +444,7 @@ export function SettingsPage() {
                       </Pill>
                     ))}
                   </OptionRow>
-                  <div>
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-medium">界面缩放</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground tabular">
-                          {Math.round(theme.scale * 100)}%
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-1.5 text-[11px] text-muted-foreground"
-                          onClick={() => theme.set({ scale: 1 })}
-                          disabled={theme.scale === 1}
-                          title="重置为 100%"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                          重置
-                        </Button>
-                      </div>
-                    </div>
-                    <RangeSlider
-                      min={0.9}
-                      max={1.1}
-                      step={0.01}
-                      value={theme.scale}
-                      onChange={(next) => theme.set({ scale: next })}
-                      className="mt-2 w-full"
-                      aria-label="界面缩放"
-                    />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      建议保持在 90% - 110% 之间。
-                    </p>
-                  </div>
+                  <ScaleControl />
                 </div>
               </section>
 
@@ -464,6 +455,10 @@ export function SettingsPage() {
                   description="为画布添加纯色、渐变光晕，或使用图片。"
                 />
                 <div className="mt-4 space-y-4">
+                  <BackgroundPreview
+                    background={theme.background}
+                    image={theme.backgroundImage}
+                  />
                   <OptionRow label="背景类型">
                     {backgrounds.map((background) => (
                       <Pill
@@ -477,54 +472,15 @@ export function SettingsPage() {
                   </OptionRow>
                   {theme.background === "image" ? (
                     <>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="background-image">图片地址</Label>
-                        <Input
-                          id="background-image"
-                          value={theme.backgroundImage}
-                          onChange={(event) => theme.set({ backgroundImage: event.target.value })}
-                          placeholder="https://… 或 /images/…"
-                        />
-                        <p className="text-[11px] text-muted-foreground">
-                          没有图片上传接口，这里只保存 URL。图片不可用时保持纯色背景。
-                        </p>
-                      </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium">遮罩不透明度</span>
-                            <span className="text-muted-foreground tabular">
-                              {Math.round(theme.backgroundOpacity * 100)}%
-                            </span>
-                          </div>
-                          <RangeSlider
-                            min={0.4}
-                            max={0.98}
-                            step={0.01}
-                            value={theme.backgroundOpacity}
-                            onChange={(next) => theme.set({ backgroundOpacity: next })}
-                            className="mt-2 w-full"
-                            aria-label="背景遮罩不透明度"
-                          />
-                        </div>
-                        <div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-medium">背景模糊</span>
-                            <span className="text-muted-foreground tabular">
-                              {theme.backgroundBlur}px
-                            </span>
-                          </div>
-                          <RangeSlider
-                            min={0}
-                            max={20}
-                            step={1}
-                            value={theme.backgroundBlur}
-                            onChange={(next) => theme.set({ backgroundBlur: next })}
-                            className="mt-2 w-full"
-                            aria-label="背景模糊"
-                          />
-                        </div>
-                      </div>
+                      <ImageUpload
+                        value={theme.backgroundImage}
+                        onChange={(backgroundImage) => theme.set({ backgroundImage })}
+                        category="background"
+                        className="h-40 w-full"
+                        actionLabel="上传背景图片"
+                        cropAspect={16 / 9}
+                      />
+                      <BackgroundSliders />
                     </>
                   ) : null}
                 </div>
@@ -780,6 +736,158 @@ function AccountSettings() {
           </p>
         </section>
       </aside>
+    </div>
+  );
+}
+
+function ScaleControl() {
+  const scale = useThemeStore((state) => state.scale);
+  const set = useThemeStore((state) => state.set);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="font-medium">界面缩放</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground tabular">{Math.round(scale * 100)}%</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[11px] text-muted-foreground"
+            onClick={() => set({ scale: 1 })}
+            disabled={scale === 1}
+            title="重置为 100%"
+          >
+            <RotateCcw className="h-3 w-3" />
+            重置
+          </Button>
+        </div>
+      </div>
+      <RangeSlider
+        min={0.9}
+        max={1.1}
+        step={0.01}
+        value={scale}
+        onChange={(next) => set({ scale: next })}
+        className="mt-2 w-full"
+        aria-label="界面缩放"
+      />
+      <p className="mt-1 text-[11px] text-muted-foreground">建议保持在 90% - 110% 之间。</p>
+    </div>
+  );
+}
+
+function BackgroundSliders() {
+  const backgroundOpacity = useThemeStore((state) => state.backgroundOpacity);
+  const backgroundBlur = useThemeStore((state) => state.backgroundBlur);
+  const set = useThemeStore((state) => state.set);
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium">遮罩不透明度</span>
+            <span className="text-muted-foreground tabular">
+              {Math.round(backgroundOpacity * 100)}%
+            </span>
+          </div>
+          <RangeSlider
+            min={0.4}
+            max={0.98}
+            step={0.01}
+            value={backgroundOpacity}
+            onChange={(next) => set({ backgroundOpacity: next })}
+            className="mt-2 w-full"
+            aria-label="背景遮罩不透明度"
+          />
+        </div>
+        <div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium">背景模糊</span>
+            <span className="text-muted-foreground tabular">{backgroundBlur}px</span>
+          </div>
+          <RangeSlider
+            min={0}
+            max={20}
+            step={1}
+            value={backgroundBlur}
+            onChange={(next) => set({ backgroundBlur: next })}
+            className="mt-2 w-full"
+            aria-label="背景模糊"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-[11px] text-muted-foreground"
+          onClick={() =>
+            set({
+              backgroundOpacity: DEFAULT_BACKGROUND_OPACITY,
+              backgroundBlur: DEFAULT_BACKGROUND_BLUR,
+            })
+          }
+          disabled={
+            backgroundOpacity === DEFAULT_BACKGROUND_OPACITY &&
+            backgroundBlur === DEFAULT_BACKGROUND_BLUR
+          }
+        >
+          <RotateCcw className="h-3 w-3" />
+          重置遮罩与模糊
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function BackgroundPreview({
+  background,
+  image,
+}: {
+  background: BackgroundId;
+  image: string;
+}) {
+  const opacity = useThemeStore((state) => state.backgroundOpacity);
+  const blur = useThemeStore((state) => state.backgroundBlur);
+  const hasImage = background === "image" && image.trim().length > 0;
+  const label =
+    background === "none"
+      ? "无背景"
+      : background === "solid"
+        ? "纯色"
+        : background === "gradient"
+          ? "渐变光晕"
+          : hasImage
+            ? "自定义图片"
+            : "等待上传图片";
+
+  return (
+    <div className="relative h-40 overflow-hidden rounded-xl border border-border/60 bg-background">
+      <div className="app-background pointer-events-none absolute inset-0" aria-hidden="true" />
+      <div className="relative z-10 flex h-full flex-col justify-between p-3">
+        <div className="flex items-start justify-between gap-3">
+          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur">
+            页面背景
+          </span>
+          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+            {label}
+          </span>
+        </div>
+        <div className="max-w-[72%] rounded-lg border border-border/60 bg-card/88 p-2.5 shadow-sm backdrop-blur-sm">
+          <p className="text-[11px] font-semibold">背景效果实时预览</p>
+          <div className="mt-1.5 h-1.5 w-24 rounded-full bg-muted" />
+          <div className="mt-1 h-1.5 w-16 rounded-full bg-muted" />
+          {background === "image" ? (
+            <p className="mt-1.5 text-[10px] text-muted-foreground tabular">
+              遮罩 {Math.round(opacity * 100)}% · 模糊 {blur}px
+            </p>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

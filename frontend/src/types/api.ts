@@ -40,7 +40,8 @@ export type ProductSort =
   | "price_asc"
   | "price_desc"
   | "newest"
-  | "rating_desc";
+  | "rating_desc"
+  | "stock_asc";
 
 export interface UserVO {
   id: number;
@@ -48,6 +49,7 @@ export interface UserVO {
   nickname?: string;
   phone?: string;
   email?: string;
+  avatarUrl?: string;
   role: UserRole;
   roleLabel: string;
   status: UserStatus;
@@ -79,6 +81,17 @@ export interface UpdateProfileRequest {
   nickname?: string;
   phone?: string;
   email?: string;
+  avatarUrl?: string;
+}
+
+export type ImageCategory = "avatar" | "product" | "background";
+
+export interface FileUploadVO {
+  url: string;
+  objectName: string;
+  originalName?: string;
+  contentType: string;
+  size: number;
 }
 
 export interface ChangePasswordRequest {
@@ -338,6 +351,7 @@ export interface InventoryQuery {
   productId?: number;
   changeType?: InventoryChangeType;
   orderNo?: string;
+  keyword?: string;
   start?: string;
   end?: string;
 }
@@ -429,9 +443,12 @@ export interface RecommendationResponse {
 export interface RecommendationLogVO {
   id: number;
   userId?: number;
+  userNickname?: string;
   scene: string;
+  sceneLabel: string;
   festival?: string;
   season: SeasonSuitability;
+  seasonLabel: string;
   coldStart: boolean;
   productIds: string;
   weightsJson?: string;
@@ -443,6 +460,7 @@ export interface RecommendationLogQuery {
   page?: number;
   size?: number;
   userId?: number;
+  keyword?: string;
   start?: string;
   end?: string;
 }
@@ -541,6 +559,7 @@ export interface AdminReviewQuery {
   size?: number;
   productId?: number;
   status?: ReviewStatus;
+  keyword?: string;
 }
 
 export interface ReviewPageQuery {

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -23,6 +23,7 @@ import { getErrorMessage } from "@/lib/api-client";
 import { formatDate, formatNumber, maskPhone } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
+import { ImageUpload } from "@/components/domain/image-upload";
 import { UserAvatar } from "@/components/domain/user-avatar";
 import { StatCard } from "@/components/domain/stat-card";
 import { UserStatusBadge } from "@/components/domain/status-badge";
@@ -52,6 +53,7 @@ type FormValues = z.infer<typeof schema>;
 
 export function ProfilePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const storeUser = useAuthStore((state) => state.user);
   const setUser = useAuthStore((state) => state.setUser);
 
@@ -106,6 +108,7 @@ export function ProfilePage() {
       }),
     onSuccess: (user) => {
       setUser(user);
+      queryClient.setQueryData(queryKeys.me, user);
       reset({
         nickname: user.nickname ?? "",
         phone: user.phone ?? "",
@@ -114,6 +117,15 @@ export function ProfilePage() {
       toast.success("资料已更新", "新的联系方式已经保存。");
     },
     onError: (error) => toast.error("资料更新失败", getErrorMessage(error)),
+  });
+
+  const updateAvatar = useMutation({
+    mutationFn: (avatarUrl: string) => authService.updateProfile({ avatarUrl }),
+    onSuccess: (user) => {
+      setUser(user);
+      queryClient.setQueryData(queryKeys.me, user);
+      toast.success("头像已更新");
+    },
   });
 
   if (me.isLoading && !profile) {
@@ -190,7 +202,45 @@ export function ProfilePage() {
         <div className="space-y-4">
           <section className="ui-card p-5">
             <div className="flex flex-col items-center text-center">
-              <UserAvatar name={profile.nickname || profile.username} size="lg" />
+              <ImageUpload
+                value={profile.avatarUrl}
+                onChange={async (avatarUrl) => {
+                  await updateAvatar.mutateAsync(avatarUrl);
+                }}
+                category="avatar"
+                shape="circle"
+                className="h-20 w-20"
+                showActions={false}
+                disabled={updateAvatar.isPending}
+                title="点击更换头像"
+                fallback={
+                  <UserAvatar
+                    name={profile.nickname || profile.username}
+                    size="lg"
+                    className="h-full w-full"
+                  />
+                }
+              />
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                点击头像更换，支持 JPG/PNG/WEBP/GIF，最大 5MB
+              </p>
+              {profile.avatarUrl ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-1 h-7 px-2 text-[11px] text-muted-foreground"
+                  loading={updateAvatar.isPending}
+                  onClick={() =>
+                    updateAvatar.mutate("", {
+                      onError: (error) =>
+                        toast.error("头像更新失败", getErrorMessage(error)),
+                    })
+                  }
+                >
+                  恢复默认头像
+                </Button>
+              ) : null}
               <h2 className="mt-3 text-base font-semibold tracking-tight">
                 {profile.nickname || profile.username}
               </h2>

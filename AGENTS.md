@@ -14,7 +14,7 @@
 
 ## Tech stack and architecture
 
-- Backend: Java 17, Spring Boot 3.2.3, Maven, Spring MVC, Spring Security, Validation, AOP, MyBatis-Plus 3.5.5, MySQL 8, Redis, JJWT 0.12.5, Knife4j 4.4.0, Lombok, and H2 for automated tests.
+- Backend: Java 17, Spring Boot 3.2.3, Maven, Spring MVC, Spring Security, Validation, AOP, MyBatis-Plus 3.5.5, MySQL 8, Redis, MinIO, JJWT 0.12.5, Knife4j 4.4.0, Lombok, and H2 for automated tests.
 - Frontend: React 19, TypeScript 5.7, Vite 6, Tailwind CSS 4, React Router 7, TanStack Query 5, Zustand 5, React Hook Form + Zod, Framer Motion, Recharts, and lucide-react. The `@/` alias resolves to `frontend/src/`.
 - Modular monolith organized by feature: controllers call services, services use MyBatis-Plus mappers, and each module owns its entities/DTOs.
 - Top-level backend packages:
@@ -41,11 +41,12 @@
 | `stats` | Sales/order/product/review overview and charts |
 | `dict` | Categories, order/payment/fulfillment status options |
 | `log` | AOP-based operation log recording and admin query |
+| `file` | MinIO image upload for avatars, product images, and appearance backgrounds |
 
 ## Repository layout
 
 - `backend/`: the Spring Boot application; run Maven commands from this directory.
-- `backend/db/`: MySQL `schema.sql` and demo `data.sql`.
+- `backend/db/`: MySQL `schema.sql`, demo `data.sql`, and incremental migration SQL files.
 - `backend/src/main/java/com/flower/mall/`: production code (`common`, `config`, `security`, `support`, `module`).
 - `backend/src/main/resources/`: `application.yml` and logging configuration.
 - `backend/src/test/java/` and `backend/src/test/resources/`: H2-backed integration/unit tests and test data.
@@ -69,6 +70,7 @@
 - Filter/sort dropdowns on the product list, smart recommendation, staff inventory, and admin products/users/reviews pages use `frontend/src/components/ui/custom-select.tsx` (`CustomSelect`). It is a fully custom listbox with click-outside close, arrow-key/Enter/Escape navigation, selected check mark, and a spring open animation. Its panel is rendered through a portal with fixed positioning so it is not clipped inside dialogs.
 - Admin product/user dialogs use `CustomSelect` with `react-hook-form` via `Controller`; do not use native `register` with it.
 - Date filters on staff orders, staff inventory, admin operation logs, and the admin recommendation log use `frontend/src/components/ui/date-picker.tsx` (`DatePicker`), a custom calendar popover with Monday-first grid, month navigation, today/selected states, clear/today actions, keyboard navigation, and outside-click/Escape close.
+- Image uploads use `frontend/src/components/domain/image-upload.tsx` (`ImageUpload`), which posts multipart files through `fileService.uploadImage`, preloads the returned MinIO URL, and falls back to the provided placeholder when the URL is empty or broken.
 
 ## Core domain flows
 
@@ -79,18 +81,21 @@
 - After-sales/refund: only completed orders can request after-sales. Approval refunds the paid record, restores stock, and decreases sales; rejection returns the order to `COMPLETED`.
 - Recommendation: combines TF-IDF/cosine content similarity with purchase/favorite/review behavior, category distribution, favorite tags, festival/season context, popularity, and rating. Cold-start users fall back to festival/season and popularity signals. Admin can adjust four weights and run five-persona Top-10 evaluation.
 - Consistency: stock changes use conditional SQL updates; order/payment/cancellation/refund paths invalidate product-detail and hot-product caches after stock or sales changes.
+- Image upload: authenticated users post JPG/PNG/WEBP/GIF files (max 5MB) with category `avatar/product/background`; `FileStorageService` stores objects in MinIO and returns a public URL. Avatar URL persists in `sys_user.avatar_url`, product images in `product.image_url`, and background images stay in theme localStorage.
 
 ## Data, configuration, and local run
 
 - Main database: MySQL 8 database `flower_shop`. Import `backend/db/schema.sql` then `backend/db/data.sql`; the application does not auto-initialize the main database (`spring.sql.init.mode=never`).
-- Default MySQL connection: `localhost:3306/flower_shop`, username `root`, password `123456`; override with `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`.
+- Default MySQL connection: `localhost:3306/flower_shop`, username `root`, password `1234`; override with `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`.
 - Default server port is `8080`; override with `SERVER_PORT`.
 - Redis defaults to `localhost:6379`; disable or avoid depending on it with `APP_REDIS_ENABLED=false` during local development.
 - Product-detail and hot-product caches are controlled by `app.cache.*`; recommendation candidate limit is controlled by `app.recommendation.candidate-limit`.
+- MinIO uploads are controlled by `app.minio.*`; set `MINIO_ENABLED=true` and configure `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, and optionally `MINIO_PUBLIC_URL`. The backend auto-creates the bucket by default (`MINIO_AUTO_CREATE_BUCKET=true`) and applies a public-read policy (`MINIO_PUBLIC_READ=true`); the bucket must still be publicly reachable or fronted by a public CDN URL.
+- Existing MySQL installations need `backend/db/migration_20261104_add_user_avatar.sql` to add `sys_user.avatar_url`; fresh installs get it from `schema.sql`.
 - Run from `backend/` with `mvn spring-boot:run`, or run the packaged jar `backend/target/flower-shop-backend-1.0.0.jar`.
 - Run from `frontend/` with Node.js 20+: `npm install`, copy `.env.example` to `.env`, then `npm run dev`. Vite serves `http://localhost:5173` and proxies `/api` to `http://localhost:8080`.
 - Frontend environment: `VITE_API_BASE_URL` defaults to `/api`; `VITE_IMAGE_BASE_URL` is optional for product images.
-- Tests use H2 with MySQL compatibility mode and `app.redis.enabled=false`; test schema/data live under `backend/src/test/resources`.
+- Tests use H2 with MySQL compatibility mode, `app.redis.enabled=false`, and `app.minio.enabled=false`; test schema/data live under `backend/src/test/resources`.
 - Demo accounts:
   - `admin / admin123`
   - `staff / staff123`
@@ -103,7 +108,7 @@
 ## Key API areas
 
 - Public: `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/products/**`, `GET /api/recommendations`, `GET /api/reviews/products/**`, `GET /api/dict/**`.
-- Customer: `GET/PUT /api/auth/me`, `PUT /api/auth/password`, `POST /api/auth/logout`, `/api/cart/**`, `/api/favorites/**`, `/api/orders/**`, `/api/payments/**`, `POST /api/reviews`, `GET /api/reviews/my`.
+- Customer: `GET/PUT /api/auth/me`, `PUT /api/auth/password`, `POST /api/auth/logout`, `POST /api/files/images`, `/api/cart/**`, `/api/favorites/**`, `/api/orders/**`, `/api/payments/**`, `POST /api/reviews`, `GET /api/reviews/my`.
 - Staff: `/api/staff/orders/**`, `/api/staff/products/{id}/stock`, `GET /api/staff/inventory`.
 - Admin: `/api/admin/users/**`, `/api/admin/products/**`, `/api/admin/recommendations/**`, `/api/admin/reviews/**`, `/api/admin/stats/**`, `GET /api/admin/operation-logs`.
 - Full frontend-oriented API reference: `docs/backend-api.md`.
@@ -121,14 +126,15 @@ Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
 ## Current verification state
 
 - Backend P0+P1 work is complete: recommendation behavior features, five personas, Top-10 metrics, `ALL` season matching, cache invalidation, invalid-season `400`, cart quantity cap, and rounded weight validation.
-- `docs/backend-api.md` is complete; its endpoint table was checked against the source: 65 source endpoints and 65 documented endpoints match with no extras or omissions.
-- `mvn -s "C:\Users\28408\AppData\Local\Temp\opencode\settings-central.xml" -B -ntp clean test` passes 25/25 tests.
-- Run `mvn -s "C:\Users\28408\AppData\Local\Temp\opencode\settings-central.xml" -B -ntp -DskipTests package` to build `backend\target\flower-shop-backend-1.0.0.jar`.
+- Image upload work is complete: MinIO storage service, `/api/files/images`, `sys_user.avatar_url`, and frontend avatar/product/background pickers with broken-URL fallbacks. A local MinIO smoke test passed for all three upload categories, public URL fetch, and avatar update/clear through `PUT /api/auth/me`.
+- `docs/backend-api.md` is complete; its endpoint table was checked against the source: 68 source endpoints and 68 documented endpoints match with no extras or omissions.
+- `mvn -B -ntp test` passes 32/32 tests.
+- Run `mvn -B -ntp -DskipTests package` to build `backend\target\flower-shop-backend-1.0.0.jar`.
 - Frontend `npm run typecheck`, `npm run lint`, and `npm run build` pass. Lint reports 5 pre-existing `react-refresh/only-export-components` warnings (no errors).
 
 ## Remaining uncovered items
 
 - Location dimension is not modeled. `RecommendationQuery.scene` is accepted but does not affect recommendation results.
-- No smoke test has been run against a real MySQL 8 + Redis instance; automated tests use H2 with Redis disabled.
+- MinIO upload has been manually smoke-tested against local MySQL and MinIO; automated tests still use H2 with Redis and MinIO disabled. Redis and full real-environment end-to-end flows remain uncovered.
 - The frontend has no automated test suite; verification is currently `npm run typecheck`, `npm run lint`, and `npm run build`.
 - Changes are not committed to Git.

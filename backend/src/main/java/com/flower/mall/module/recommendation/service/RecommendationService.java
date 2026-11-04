@@ -28,10 +28,13 @@ import com.flower.mall.module.recommendation.mapper.RecommendationLogMapper;
 import com.flower.mall.module.recommendation.mapper.RecommendationWeightMapper;
 import com.flower.mall.module.recommendation.model.RecommendationCandidate;
 import com.flower.mall.module.recommendation.model.RecommendationContext;
+import com.flower.mall.module.recommendation.model.RecommendationLogLabels;
 import com.flower.mall.module.recommendation.model.RecommendationResult;
 import com.flower.mall.module.recommendation.model.RecommendationWeights;
 import com.flower.mall.module.recommendation.model.ScoredProduct;
 import com.flower.mall.module.recommendation.model.UserBehaviorData;
+import com.flower.mall.module.user.entity.User;
+import com.flower.mall.module.user.mapper.UserMapper;
 import com.flower.mall.security.AuthUser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +54,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -67,6 +71,7 @@ public class RecommendationService {
     private final UserBehaviorService userBehaviorService;
     private final RecommendationWeightMapper weightMapper;
     private final RecommendationLogMapper logMapper;
+    private final UserMapper userMapper;
     private final RecommendationEngine engine;
     private final ObjectMapper objectMapper;
     private final AppProperties properties;
@@ -129,16 +134,58 @@ public class RecommendationService {
         return RecommendationWeightsVO.from(weightMapper.selectById(entity.getId()));
     }
 
-    public PageResult<RecommendationLogVO> pageLogs(long page, long size, Long userId,
+    public PageResult<RecommendationLogVO> pageLogs(long page, long size, Long userId, String keyword,
                                                     LocalDateTime start, LocalDateTime end) {
+        String search = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String pattern = search == null ? null : "%" + search + "%";
+        List<String> sceneMatches = RecommendationLogLabels.matchingScenes(search);
+        List<String> seasonMatches = RecommendationLogLabels.matchingSeasons(search);
         IPage<RecommendationLog> logPage = logMapper.selectPage(
                 new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), 100)),
                 Wrappers.<RecommendationLog>lambdaQuery()
                         .eq(userId != null, RecommendationLog::getUserId, userId)
+                        .and(pattern != null, wrapper -> {
+                            wrapper.like(RecommendationLog::getScene, search)
+                                    .or().like(RecommendationLog::getSeason, search)
+                                    .or().like(RecommendationLog::getFestival, search)
+                                    .or().apply("EXISTS (SELECT 1 FROM sys_user u "
+                                                    + "WHERE u.id = recommendation_log.user_id "
+                                                    + "AND (u.nickname LIKE {0} OR u.username LIKE {0}))",
+                                            pattern);
+                            if (!sceneMatches.isEmpty()) {
+                                wrapper.or().in(RecommendationLog::getScene, sceneMatches);
+                            }
+                            if (!seasonMatches.isEmpty()) {
+                                wrapper.or().in(RecommendationLog::getSeason, seasonMatches);
+                            }
+                        })
                         .ge(start != null, RecommendationLog::getCreatedAt, start)
                         .le(end != null, RecommendationLog::getCreatedAt, end)
                         .orderByDesc(RecommendationLog::getId));
-        return PageResult.of(logPage, RecommendationLogVO::from);
+        Map<Long, User> users = loadLogUsers(logPage.getRecords());
+        return PageResult.of(logPage, log -> {
+            RecommendationLogVO vo = RecommendationLogVO.from(log);
+            User user = log.getUserId() == null ? null : users.get(log.getUserId());
+            if (user != null) {
+                vo.setUserNickname(StringUtils.hasText(user.getNickname())
+                        ? user.getNickname()
+                        : user.getUsername());
+            }
+            return vo;
+        });
+    }
+
+    private Map<Long, User> loadLogUsers(List<RecommendationLog> logs) {
+        List<Long> userIds = logs.stream()
+                .map(RecommendationLog::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
     }
 
     public RecommendationStatsVO stats() {

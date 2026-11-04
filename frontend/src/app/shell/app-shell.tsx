@@ -33,8 +33,9 @@ export function AppShell() {
       <Sidebar />
 
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background md:rounded-tl-2xl md:shadow-[0_0_18px_-6px_rgb(0_0_0/0.14)]">
+        <div className="app-background pointer-events-none absolute inset-0 z-0" aria-hidden="true" />
         <Topbar />
-        <main className="app-canvas relative min-h-0 flex-1 overflow-y-auto">
+        <main className="app-canvas relative z-[1] min-h-0 flex-1 overflow-y-auto bg-transparent">
           <div className="relative z-[1] mx-auto w-full max-w-[1600px] px-4 py-5 md:px-6 md:py-6 lg:px-8">
             <PageTransition>
               <Suspense fallback={<PageLoading />}>

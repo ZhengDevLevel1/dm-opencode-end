@@ -44,7 +44,13 @@ public enum ErrorCode {
     REVIEW_NOT_FOUND(6003, 404, "评价不存在"),
 
     WEIGHT_INVALID(7001, 400, "推荐权重不合法，四项权重之和必须为1"),
-    RECOMMENDATION_EMPTY(7002, 200, "暂无可推荐商品");
+    RECOMMENDATION_EMPTY(7002, 200, "暂无可推荐商品"),
+
+    FILE_UPLOAD_DISABLED(8001, 503, "图片上传服务未启用"),
+    FILE_TYPE_INVALID(8002, 400, "仅支持 JPG、PNG、WEBP、GIF 格式的图片"),
+    FILE_TOO_LARGE(8003, 400, "图片大小不能超过5MB"),
+    FILE_UPLOAD_FAILED(8004, 500, "图片上传失败，请检查 MinIO 配置"),
+    FILE_CATEGORY_INVALID(8005, 400, "图片分类不合法");
 
     private final int code;
     private final int status;

@@ -51,9 +51,10 @@ public class AdminRecommendationController {
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
-        return ApiResponse.ok(recommendationService.pageLogs(page, size, userId, start, end));
+        return ApiResponse.ok(recommendationService.pageLogs(page, size, userId, keyword, start, end));
     }
 
     @Operation(summary = "三类典型用户画像推荐效果评估")

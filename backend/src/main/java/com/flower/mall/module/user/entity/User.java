@@ -27,6 +27,8 @@ public class User {
 
     private String email;
 
+    private String avatarUrl;
+
     private String role;
 
     private String status;

@@ -184,7 +184,11 @@ export function Topbar() {
             triggerLabel="用户菜单"
             trigger={
               <span className="ml-1 flex items-center gap-2 rounded-md p-0.5 transition-opacity hover:opacity-85">
-                <UserAvatar name={user.nickname || user.username} size="sm" />
+                <UserAvatar
+                  name={user.nickname || user.username}
+                  src={user.avatarUrl}
+                  size="sm"
+                />
               </span>
             }
             contentClassName="w-56"

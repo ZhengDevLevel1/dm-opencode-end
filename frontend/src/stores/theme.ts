@@ -35,6 +35,9 @@ export interface ThemeState {
   importTheme: (json: string) => boolean;
 }
 
+export const DEFAULT_BACKGROUND_OPACITY = 0.82;
+export const DEFAULT_BACKGROUND_BLUR = 6;
+
 const DEFAULT_THEME = {
   mode: "system" as ThemeMode,
   palette: "default" as PaletteId,
@@ -48,8 +51,8 @@ const DEFAULT_THEME = {
   highContrast: false,
   background: "solid" as BackgroundId,
   backgroundImage: "",
-  backgroundOpacity: 0.82,
-  backgroundBlur: 6,
+  backgroundOpacity: DEFAULT_BACKGROUND_OPACITY,
+  backgroundBlur: DEFAULT_BACKGROUND_BLUR,
 };
 
 export const useThemeStore = create<ThemeState>()(

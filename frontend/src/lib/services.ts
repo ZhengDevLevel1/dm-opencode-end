@@ -14,8 +14,10 @@ import type {
   ChangePasswordRequest,
   CreateOrderRequest,
   DictOptions,
+  FileUploadVO,
   FulfillmentRequest,
   FulfillmentVO,
+  ImageCategory,
   InventoryQuery,
   InventoryRecord,
   LoginRequest,
@@ -64,6 +66,15 @@ export const authService = {
   me: () => api.get<UserVO>("/auth/me", { skipAuthRedirect: true }),
   updateProfile: (body: UpdateProfileRequest) => api.put<UserVO>("/auth/me", body),
   changePassword: (body: ChangePasswordRequest) => api.put<void>("/auth/password", body),
+};
+
+export const fileService = {
+  uploadImage: (file: File, category: ImageCategory) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("category", category);
+    return api.post<FileUploadVO>("/files/images", form, { timeout: 30_000 });
+  },
 };
 
 export const dictService = {
@@ -126,6 +137,9 @@ export const staffService = {
   orders: (query: StaffOrderQuery) =>
     api.get<PageResult<OrderVO>>("/staff/orders", { query }),
   order: (id: number) => api.get<OrderVO>(`/staff/orders/${id}`),
+  products: (query: ProductQuery) =>
+    api.get<PageResult<ProductVO>>("/staff/products", { query }),
+  product: (id: number) => api.get<ProductVO>(`/staff/products/${id}`),
   accept: (id: number) => api.post<FulfillmentVO[]>(`/staff/orders/${id}/accept`, undefined),
   advance: (id: number, body: FulfillmentRequest) =>
     api.post<FulfillmentVO[]>(`/staff/orders/${id}/fulfillment`, body),

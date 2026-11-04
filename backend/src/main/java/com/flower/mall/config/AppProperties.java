@@ -14,6 +14,7 @@ public class AppProperties {
     private Redis redis = new Redis();
     private Cache cache = new Cache();
     private Recommendation recommendation = new Recommendation();
+    private Minio minio = new Minio();
     private Cors cors = new Cors();
 
     @Data
@@ -38,6 +39,18 @@ public class AppProperties {
     @Data
     public static class Recommendation {
         private int candidateLimit = 60;
+    }
+
+    @Data
+    public static class Minio {
+        private boolean enabled = false;
+        private String endpoint = "http://localhost:9000";
+        private String accessKey = "minioadmin";
+        private String secretKey = "minioadmin";
+        private String bucket = "flower-shop";
+        private String publicUrl = "";
+        private boolean autoCreateBucket = true;
+        private boolean publicRead = true;
     }
 
     @Data

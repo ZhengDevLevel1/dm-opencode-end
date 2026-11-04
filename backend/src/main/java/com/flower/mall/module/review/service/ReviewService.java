@@ -103,11 +103,24 @@ public class ReviewService {
                 reviewPage.getTotal(), reviewPage.getCurrent(), reviewPage.getSize());
     }
 
-    public PageResult<ReviewVO> pageAdmin(long page, long size, Long productId, String status) {
+    public PageResult<ReviewVO> pageAdmin(long page, long size, Long productId, String status,
+                                          String keyword) {
+        String search = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String pattern = search == null ? null : "%" + search + "%";
         IPage<Review> reviewPage = reviewMapper.selectPage(new Page<>(Math.max(page, 1), clampSize(size)),
                 Wrappers.<Review>lambdaQuery()
                         .eq(productId != null, Review::getProductId, productId)
                         .eq(StringUtils.hasText(status), Review::getStatus, status)
+                        .and(pattern != null, wrapper -> wrapper
+                                .apply("EXISTS (SELECT 1 FROM product p "
+                                                + "WHERE p.id = review.product_id "
+                                                + "AND (p.name LIKE {0} OR p.flower_meaning LIKE {0} "
+                                                + "OR p.occasion_tags LIKE {0} OR p.festival_tags LIKE {0}))",
+                                        pattern)
+                                .or().apply("EXISTS (SELECT 1 FROM sys_user u "
+                                                + "WHERE u.id = review.user_id "
+                                                + "AND (u.nickname LIKE {0} OR u.username LIKE {0}))",
+                                        pattern))
                         .orderByDesc(Review::getId));
         return PageResult.of(toVOList(reviewPage.getRecords(), true),
                 reviewPage.getTotal(), reviewPage.getCurrent(), reviewPage.getSize());

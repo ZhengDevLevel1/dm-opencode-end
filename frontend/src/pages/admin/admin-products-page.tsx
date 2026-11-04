@@ -30,6 +30,7 @@ import type {
   ProductVO,
   SeasonSuitability,
 } from "@/types/api";
+import { ImageUpload } from "@/components/domain/image-upload";
 import { ProductImage } from "@/components/domain/product-image";
 import { Rating } from "@/components/domain/rating";
 import { Badge } from "@/components/ui/badge";
@@ -663,11 +664,14 @@ function ProductEditorDialog({
     control,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: toFormValues(product),
   });
+  const imageUrl = watch("imageUrl");
 
   useEffect(() => {
     if (open) reset(toFormValues(product));
@@ -888,17 +892,16 @@ function ProductEditorDialog({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="product-image">图片地址</Label>
-          <Input
-            id="product-image"
-            placeholder="/images/products/rose-11.svg 或 https://…"
-            maxLength={500}
-            {...register("imageUrl")}
+          <Label>商品图片</Label>
+          <ImageUpload
+            value={imageUrl}
+            onChange={(url) =>
+              setValue("imageUrl", url, { shouldDirty: true, shouldValidate: true })
+            }
+            category="product"
+            className="h-36 w-full"
+            actionLabel="上传商品图片"
           />
-          <p className="text-[11px] text-muted-foreground">
-            没有图片上传接口，这里直接保存字符串地址。
-          </p>
-          <FieldError message={errors.imageUrl?.message} />
         </div>
 
         <div className="space-y-1.5">

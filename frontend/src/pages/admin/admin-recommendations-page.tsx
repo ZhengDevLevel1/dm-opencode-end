@@ -114,12 +114,12 @@ function normalizeWeights(weights: RecommendationWeightRequest): RecommendationW
 
 export function AdminRecommendationsPage() {
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (searchParams.get("userId") ? "logs" : "weights"));
-  const userIdParam = searchParams.get("userId");
+  const [tab, setTab] = useState(() => (searchParams.get("keyword") ? "logs" : "weights"));
+  const keywordParam = searchParams.get("keyword");
 
   useEffect(() => {
-    if (userIdParam) setTab("logs");
-  }, [userIdParam]);
+    if (keywordParam) setTab("logs");
+  }, [keywordParam]);
 
   return (
     <div className="space-y-4">
@@ -631,10 +631,10 @@ function RecommendedProductChip({ id }: { id: string }) {
 }
 
 function LogsSection() {
-  const [searchParams] = useSearchParams();
-  const userIdParam = searchParams.get("userId") ?? "";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const keywordParam = searchParams.get("keyword") ?? "";
   const [draft, setDraft] = useState({
-    userId: userIdParam,
+    keyword: keywordParam,
     start: "",
     end: "",
   });
@@ -642,17 +642,35 @@ function LogsSection() {
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<RecommendationLogVO | null>(null);
 
-  useEffect(() => {
-    if (!userIdParam) return;
-    setDraft((current) => ({ ...current, userId: userIdParam }));
-    setFilters((current) => ({ ...current, userId: userIdParam }));
+  const syncKeywordParam = (keyword: string) => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        const trimmed = keyword.trim();
+        if (trimmed) next.set("keyword", trimmed);
+        else next.delete("keyword");
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  const applyKeyword = (keyword: string) => {
+    setDraft((current) => ({ ...current, keyword }));
+    setFilters((current) => ({ ...current, keyword }));
     setPage(1);
-  }, [userIdParam]);
+    syncKeywordParam(keyword);
+  };
+
+  useEffect(() => {
+    setDraft((current) => ({ ...current, keyword: keywordParam }));
+    setFilters((current) => ({ ...current, keyword: keywordParam }));
+    setPage(1);
+  }, [keywordParam]);
 
   const params = useMemo<RecommendationLogQuery>(() => {
     const query: RecommendationLogQuery = { page, size: LOG_PAGE_SIZE };
-    const userId = Number(filters.userId);
-    if (filters.userId.trim() && Number.isInteger(userId) && userId > 0) query.userId = userId;
+    if (filters.keyword.trim()) query.keyword = filters.keyword.trim();
     if (filters.start) query.start = `${filters.start}T00:00:00`;
     if (filters.end) query.end = `${filters.end}T23:59:59`;
     return query;
@@ -664,32 +682,32 @@ function LogsSection() {
     placeholderData: (previous) => previous,
   });
 
-  const activeFilters = [filters.userId, filters.start, filters.end].filter(Boolean).length;
+  const activeFilters = [filters.keyword, filters.start, filters.end].filter(Boolean).length;
   const records = query.data?.records ?? [];
 
   return (
     <div className="space-y-4">
       <div className="ui-card p-4">
         <form
-          className="grid gap-2 sm:grid-cols-2 xl:grid-cols-10"
+          className="grid gap-2 sm:grid-cols-2 xl:grid-cols-12"
           onSubmit={(event) => {
             event.preventDefault();
             setFilters(draft);
             setPage(1);
+            syncKeywordParam(draft.keyword);
           }}
         >
-          <div className="xl:col-span-2">
-            <Label htmlFor="log-user-id" className="sr-only">
-              用户 ID
+          <div className="xl:col-span-4">
+            <Label htmlFor="log-keyword" className="sr-only">
+              搜索推荐日志
             </Label>
             <Input
-              id="log-user-id"
-              value={draft.userId}
+              id="log-keyword"
+              value={draft.keyword}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, userId: event.target.value }))
+                setDraft((current) => ({ ...current, keyword: event.target.value }))
               }
-              placeholder="用户 ID"
-              inputMode="numeric"
+              placeholder="用户昵称、场景、季节或节日"
               className="h-9 text-xs"
             />
           </div>
@@ -728,10 +746,11 @@ function LogsSection() {
               variant="secondary"
               className="h-9 shrink-0 px-4"
               onClick={() => {
-                const empty = { userId: "", start: "", end: "" };
+                const empty = { keyword: "", start: "", end: "" };
                 setDraft(empty);
                 setFilters(empty);
                 setPage(1);
+                syncKeywordParam("");
               }}
             >
               <RotateCcw className="h-4 w-4" />
@@ -768,7 +787,7 @@ function LogsSection() {
             title={activeFilters > 0 ? "没有符合筛选条件的日志" : "还没有推荐日志"}
             description={
               activeFilters > 0
-                ? "试试清除筛选条件，或换一个用户 ID / 时间范围。"
+                ? "试试清除筛选条件，或换一个用户昵称、场景、季节、节日或时间范围。"
                 : "用户访问推荐页后，请求记录会出现在这里。"
             }
             bare
@@ -799,21 +818,31 @@ function LogsSection() {
                       </TD>
                       <TD className="text-xs">
                         {log.userId ? (
-                          <Link
-                            to={`/admin/recommendations?userId=${log.userId}`}
-                            className="text-primary hover:underline"
-                          >
-                            #{log.userId}
-                          </Link>
+                          <div className="flex min-w-0 flex-col">
+                            {log.userNickname ? (
+                              <Link
+                                to={`/admin/recommendations?keyword=${encodeURIComponent(log.userNickname)}`}
+                                onClick={() => applyKeyword(log.userNickname ?? "")}
+                                className="truncate text-primary hover:underline"
+                              >
+                                {log.userNickname}
+                              </Link>
+                            ) : (
+                              <span className="truncate">用户 #{log.userId}</span>
+                            )}
+                            <span className="text-[10px] text-muted-foreground tabular">
+                              #{log.userId}
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">匿名</span>
                         )}
                       </TD>
                       <TD>
-                        <Badge variant="outline">{log.scene || "默认"}</Badge>
+                        <Badge variant="outline">{log.sceneLabel || log.scene || "默认场景"}</Badge>
                       </TD>
                       <TD className="text-xs text-muted-foreground">
-                        {log.season}
+                        {log.seasonLabel || log.season}
                         {log.festival ? ` · ${log.festival}` : ""}
                       </TD>
                       <TD>
@@ -879,9 +908,9 @@ function LogsSection() {
         title={`推荐日志 #${detail?.id ?? ""}`}
         description={
           detail
-            ? `${formatDateTime(detail.createdAt)} · ${detail.scene || "默认场景"} · ${
-                detail.coldStart ? "冷启动" : "常规推荐"
-              }`
+            ? `${formatDateTime(detail.createdAt)} · ${
+                detail.sceneLabel || detail.scene || "默认场景"
+              } · ${detail.coldStart ? "冷启动" : "常规推荐"}`
             : undefined
         }
         size="lg"
@@ -896,15 +925,22 @@ function LogsSection() {
             <dl className="grid grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/30 p-3 text-xs sm:grid-cols-4">
               <div>
                 <dt className="text-[10px] text-muted-foreground">用户</dt>
-                <dd className="mt-0.5">{detail.userId ? `#${detail.userId}` : "匿名"}</dd>
+                <dd className="mt-0.5">
+                  {detail.userNickname || (detail.userId ? `用户 #${detail.userId}` : "匿名")}
+                  {detail.userNickname && detail.userId ? (
+                    <span className="ml-1 text-[10px] text-muted-foreground tabular">
+                      #{detail.userId}
+                    </span>
+                  ) : null}
+                </dd>
               </div>
               <div>
                 <dt className="text-[10px] text-muted-foreground">场景</dt>
-                <dd className="mt-0.5">{detail.scene || "默认"}</dd>
+                <dd className="mt-0.5">{detail.sceneLabel || detail.scene || "默认场景"}</dd>
               </div>
               <div>
                 <dt className="text-[10px] text-muted-foreground">季节</dt>
-                <dd className="mt-0.5">{detail.season}</dd>
+                <dd className="mt-0.5">{detail.seasonLabel || detail.season}</dd>
               </div>
               <div>
                 <dt className="text-[10px] text-muted-foreground">节日</dt>

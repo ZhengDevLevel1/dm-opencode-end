@@ -5,6 +5,9 @@ import com.flower.mall.common.api.PageResult;
 import com.flower.mall.module.inventory.dto.StockAdjustRequest;
 import com.flower.mall.module.inventory.entity.InventoryRecord;
 import com.flower.mall.module.inventory.service.InventoryService;
+import com.flower.mall.module.product.dto.ProductQuery;
+import com.flower.mall.module.product.dto.ProductVO;
+import com.flower.mall.module.product.service.ProductService;
 import com.flower.mall.module.log.annotation.OperationLogRecord;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +31,19 @@ import java.time.LocalDateTime;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final ProductService productService;
+
+    @Operation(summary = "分页查询商品库存（含下架商品）")
+    @GetMapping("/products")
+    public ApiResponse<PageResult<ProductVO>> products(ProductQuery query) {
+        return ApiResponse.ok(PageResult.of(productService.page(query, true), ProductVO::from));
+    }
+
+    @Operation(summary = "查看商品库存详情（含下架商品）")
+    @GetMapping("/products/{id}")
+    public ApiResponse<ProductVO> product(@PathVariable Long id) {
+        return ApiResponse.ok(productService.detail(id, true));
+    }
 
     @Operation(summary = "人工调整商品库存")
     @PostMapping("/products/{id}/stock")
@@ -45,9 +61,10 @@ public class InventoryController {
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) String changeType,
             @RequestParam(required = false) String orderNo,
+            @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
         return ApiResponse.ok(PageResult.of(
-                inventoryService.page(page, size, productId, changeType, orderNo, start, end)));
+                inventoryService.page(page, size, productId, changeType, orderNo, keyword, start, end)));
     }
 }

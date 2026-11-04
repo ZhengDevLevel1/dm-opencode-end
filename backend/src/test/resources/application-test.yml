@@ -22,6 +22,8 @@ app:
     enabled: false
   recommendation:
     candidate-limit: 60
+  minio:
+    enabled: false
 
 logging:
   level:

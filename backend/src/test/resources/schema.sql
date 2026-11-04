@@ -19,6 +19,7 @@ CREATE TABLE sys_user (
     nickname VARCHAR(30),
     phone VARCHAR(20),
     email VARCHAR(100),
+    avatar_url VARCHAR(500),
     role VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ENABLED',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

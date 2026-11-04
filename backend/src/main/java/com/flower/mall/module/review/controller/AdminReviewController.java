@@ -32,8 +32,9 @@ public class AdminReviewController {
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
             @RequestParam(required = false) Long productId,
-            @RequestParam(required = false) String status) {
-        return ApiResponse.ok(reviewService.pageAdmin(page, size, productId, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(reviewService.pageAdmin(page, size, productId, status, keyword));
     }
 
     @Operation(summary = "显示或隐藏评价")

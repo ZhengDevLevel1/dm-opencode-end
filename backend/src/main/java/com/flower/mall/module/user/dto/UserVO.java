@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
@@ -21,6 +22,7 @@ public class UserVO {
     private String nickname;
     private String phone;
     private String email;
+    private String avatarUrl;
     private String role;
     private String roleLabel;
     private String status;
@@ -36,6 +38,7 @@ public class UserVO {
                 .nickname(user.getNickname())
                 .phone(user.getPhone())
                 .email(user.getEmail())
+                .avatarUrl(StringUtils.hasText(user.getAvatarUrl()) ? user.getAvatarUrl() : null)
                 .role(role.name())
                 .roleLabel(role.getLabel())
                 .status(status.name())

@@ -98,7 +98,7 @@ Content-Type: application/json
 | 枚举 | string | 使用大写下划线值，如 `PENDING_PAYMENT` |
 | 商品标签 | string | `occasionTags`、`festivalTags` 是逗号分隔字符串，不是数组 |
 | 推荐标签 | string[] | 推荐结果中的 `occasionTags`、`festivalTags` 已转换为数组 |
-| 图片地址 | string | `imageUrl` 目前是 `/images/products/xxx.svg` 形式的相对路径，后端未提供静态图片文件，前端需配置图片域名、占位图或自行提供资源 |
+| 图片地址 | string | 商品图片 `imageUrl` 兼容 `/images/products/xxx.svg` 相对路径；上传接口返回 MinIO 绝对 URL。地址不可用时前端应显示占位图 |
 
 日期时间请求参数使用 `@DateTimeFormat(iso = DATE_TIME)`，格式为 `yyyy-MM-ddTHH:mm:ss`，例如：
 
@@ -168,6 +168,11 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | `6003` | `404` | 评价不存在 | 管理端操作不存在的评价 |
 | `7001` | `400` | 推荐权重不合法，四项权重之和必须为1 | 权重校验失败 |
 | `7002` | `200` | 暂无可推荐商品 | 已定义，当前推荐接口不主动抛出，空结果仍返回 200 |
+| `8001` | `503` | 图片上传服务未启用 | MinIO 未配置或 `app.minio.enabled=false` |
+| `8002` | `400` | 仅支持 JPG、PNG、WEBP、GIF 格式的图片 | 文件为空或类型不支持 |
+| `8003` | `400` | 图片大小不能超过5MB | 文件超过单图限制 |
+| `8004` | `500` | 图片上传失败，请检查 MinIO 配置 | MinIO 连接、存储桶或写入失败 |
+| `8005` | `400` | 图片分类不合法 | `category` 不是 `avatar/product/background` |
 
 参数校验失败时，`message` 可能是多个字段错误用 `; ` 拼接的文本，例如：
 
@@ -267,6 +272,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | GET | `/api/auth/me` | 登录 | `ApiResponse<UserVO>` |
 | PUT | `/api/auth/me` | 登录 | `ApiResponse<UserVO>` |
 | PUT | `/api/auth/password` | 登录 | `ApiResponse<Void>` |
+| POST | `/api/files/images` | 登录 | `ApiResponse<FileUploadVO>` |
 | GET | `/api/dict/options` | 公开 | `ApiResponse<DictOptions>` |
 | GET | `/api/products` | 公开 | `ApiResponse<PageResult<ProductVO>>` |
 | GET | `/api/products/hot` | 公开 | `ApiResponse<ProductVO[]>` |
@@ -299,6 +305,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | POST | `/api/staff/orders/{id}/cancel` | 店员 | `ApiResponse<OrderVO>` |
 | POST | `/api/staff/orders/{id}/after-sale` | 店员 | `ApiResponse<OrderVO>` |
 | GET | `/api/staff/orders/{id}/fulfillments` | 店员 | `ApiResponse<FulfillmentVO[]>` |
+| GET | `/api/staff/products` | 店员 | `ApiResponse<PageResult<ProductVO>>` |
+| GET | `/api/staff/products/{id}` | 店员 | `ApiResponse<ProductVO>` |
 | POST | `/api/staff/products/{id}/stock` | 店员 | `ApiResponse<InventoryRecord>` |
 | GET | `/api/staff/inventory` | 店员 | `ApiResponse<PageResult<InventoryRecord>>` |
 | GET | `/api/admin/users` | 管理员 | `ApiResponse<PageResult<UserVO>>` |
@@ -366,6 +374,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | `nickname` | string | 否 | 最长 30；不传则不变 |
 | `phone` | string | 否 | 传空字符串 `""` 可清空 |
 | `email` | string | 否 | 传空字符串 `""` 可清空 |
+| `avatarUrl` | string | 否 | 最长 500；传空字符串 `""` 可清空，恢复默认首字母头像 |
 
 `ChangePasswordRequest`
 
@@ -415,8 +424,35 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 - 注册固定创建 `CUSTOMER` 角色，状态为 `ENABLED`。
 - 登录失败返回 `401/1003`；账号被禁用返回 `403/1004`。
 - `POST /api/auth/logout` 需要有效 JWT；控制器允许缺省 `Authorization` 头仅用于容错，实际没有有效令牌会在安全过滤器返回 `401`。令牌已失效时应直接清理本地状态。
-- `PUT /api/auth/me` 只更新传入的非 `null` 字段；手机号、邮箱传空字符串会清空。
+- `PUT /api/auth/me` 只更新传入的非 `null` 字段；手机号、邮箱、头像地址传空字符串会清空。
 - 修改密码不会自动使当前 JWT 失效，前端可在成功后要求重新登录。
+
+### 4.5 图片上传
+
+`POST /api/files/images`
+
+- 权限：登录用户即可调用；个人头像、商品图片、背景图片共用此接口。
+- 请求：`multipart/form-data`
+- 文件字段：`file`，支持 JPG/PNG/WEBP/GIF，单张最大 5MB。
+- 分类字段：`category`，取值为 `avatar`、`product`、`background`，默认 `product`。
+- 响应：`ApiResponse<FileUploadVO>`，`data.url` 可直接保存到 `avatarUrl` 或 `imageUrl`。
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "url": "http://localhost:9000/flower-shop/product/2026-11-04/xxx.jpg",
+    "objectName": "product/2026-11-04/xxx.jpg",
+    "originalName": "rose.jpg",
+    "contentType": "image/jpeg",
+    "size": 245760
+  },
+  "timestamp": 1760000000000
+}
+```
+
+MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后需保证 `bucket` 可公开读取，或配置 `public-url` 指向可访问的对象前缀。
 
 ## 5. 商品浏览与字典
 
@@ -441,7 +477,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | `season` | string |  | `SPRING/SUMMER/AUTUMN/WINTER/ALL`；会同时匹配对应季节和 `ALL` |
 | `minPrice` | number |  | 最低价格，包含边界 |
 | `maxPrice` | number |  | 最高价格，包含边界 |
-| `sort` | string | `sales_desc` | `sales_desc`、`price_asc`、`price_desc`、`newest`、`rating_desc`；非法值回退为销量降序 |
+| `sort` | string | `sales_desc` | `sales_desc`、`price_asc`、`price_desc`、`newest`、`rating_desc`、`stock_asc`；非法值回退为销量降序 |
 
 说明：
 
@@ -782,8 +818,12 @@ AFTER_SALE --店员拒绝--> COMPLETED
 
 | 方法 | 路径 | 权限 | 请求 | 响应 |
 | --- | --- | --- | --- | --- |
+| GET | `/api/staff/products` | 店员 | `ProductQuery` | `ApiResponse<PageResult<ProductVO>>` |
+| GET | `/api/staff/products/{id}` | 店员 | 无 | `ApiResponse<ProductVO>` |
 | POST | `/api/staff/products/{id}/stock` | 店员 | `StockAdjustRequest` | `ApiResponse<InventoryRecord>` |
 | GET | `/api/staff/inventory` | 店员 | 分页/筛选参数 | `ApiResponse<PageResult<InventoryRecord>>` |
+
+店员商品查询复用 `ProductQuery`，与公开商品列表参数一致，但会同时返回已上架和下架商品；`status` 可用于精确筛选商品状态，`sort=stock_asc` 可按库存升序排列。商品详情同样不受上下架状态限制。
 
 `StockAdjustRequest`
 
@@ -799,6 +839,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `page` | long | `1` | 页码 |
 | `size` | long | `10` | 每页数量 |
 | `productId` | number |  | 商品 ID |
+| `keyword` | string |  | 模糊匹配商品名、花语、场景标签、节日标签 |
 | `changeType` | string |  | `STOCK_IN/ORDER_DEDUCT/ORDER_CANCEL/MANUAL_ADJUST/AFTER_SALE_RESTORE` |
 | `orderNo` | string |  | 关联订单号精确匹配 |
 | `start` | datetime |  | 创建时间起 |
@@ -831,7 +872,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `page` | long | `1` | 页码 |
 | `size` | long | `10` | 每页数量，最大 100 |
 | `status` | string |  | 订单状态精确匹配 |
-| `keyword` | string |  | 模糊匹配订单号、收货人、联系电话 |
+| `keyword` | string |  | 模糊匹配订单号、收货人、联系电话、买家昵称/用户名、订单商品名 |
 | `start` | datetime |  | 下单时间起 |
 | `end` | datetime |  | 下单时间止 |
 
@@ -970,13 +1011,13 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 编辑商品时 `stock` 必填；后端按新库存与旧库存的差值自动调整，并记录库存变动。
 - 商品上下架通过查询参数传入，例如：`PUT /api/admin/products/1/status?status=OFF_SHELF`。
 - 删除商品是逻辑删除；删除后公开接口不可见。
-- 没有图片上传接口，`imageUrl` 直接保存字符串地址。
+- `imageUrl` 可保存上传接口返回的 URL，也可继续保存外部或相对地址。
 
 ### 13.3 评价管理
 
 | 方法 | 路径 | 权限 | 请求 | 响应 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/admin/reviews` | 管理员 | `page`、`size`、`productId`、`status` | `ApiResponse<PageResult<ReviewVO>>` |
+| GET | `/api/admin/reviews` | 管理员 | `page`、`size`、`productId`、`status`、`keyword` | `ApiResponse<PageResult<ReviewVO>>` |
 | PUT | `/api/admin/reviews/{id}/status` | 管理员 | `status` 查询参数 | `ApiResponse<ReviewVO>` |
 | PUT | `/api/admin/reviews/{id}/reply` | 管理员 | `ReviewReplyRequest` | `ApiResponse<ReviewVO>` |
 
@@ -989,6 +1030,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 说明：
 
 - `status` 查询参数取 `VISIBLE` 或 `HIDDEN`。
+- `keyword` 模糊匹配商品名、花语、场景标签、节日标签，以及评价用户昵称、用户名。
 - 显示/隐藏评价会影响商品评分统计和公开评价列表。
 - 回复评价会覆盖原回复内容（当前接口是设置而不是追加）。
 
@@ -1061,6 +1103,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `page` | long | 默认 1 |
 | `size` | long | 默认 10，最大 100 |
 | `userId` | number | 可选，按用户筛选 |
+| `keyword` | string | 模糊匹配用户昵称、用户名、场景、季节、节日；支持中文场景/季节标签 |
 | `start` | datetime | 创建时间起 |
 | `end` | datetime | 创建时间止 |
 
@@ -1208,6 +1251,7 @@ export interface UserVO {
   nickname?: string;
   phone?: string;
   email?: string;
+  avatarUrl?: string;
   role: UserRole;
   roleLabel: string;
   status: UserStatus;
@@ -1239,6 +1283,17 @@ export interface UpdateProfileRequest {
   nickname?: string;
   phone?: string;
   email?: string;
+  avatarUrl?: string;
+}
+
+export type ImageCategory = 'avatar' | 'product' | 'background';
+
+export interface FileUploadVO {
+  url: string;
+  objectName: string;
+  originalName?: string;
+  contentType: string;
+  size: number;
 }
 
 export interface ChangePasswordRequest {
@@ -1325,7 +1380,7 @@ export interface ProductQuery {
   status?: ProductStatus;
   minPrice?: number;
   maxPrice?: number;
-  sort?: 'sales_desc' | 'price_asc' | 'price_desc' | 'newest' | 'rating_desc';
+  sort?: 'sales_desc' | 'price_asc' | 'price_desc' | 'newest' | 'rating_desc' | 'stock_asc';
 }
 
 export interface ProductSaveRequest {
@@ -1586,9 +1641,12 @@ export interface RecommendationResponse {
 export interface RecommendationLogVO {
   id: number;
   userId?: number;
+  userNickname?: string;
   scene: string;
+  sceneLabel: string;
   festival?: string;
   season: SeasonSuitability;
+  seasonLabel: string;
   coldStart: boolean;
   productIds: string;
   weightsJson?: string;
@@ -1669,7 +1727,7 @@ export interface TopProductVO {
 
 ## 16. 已知边界与前端注意事项
 
-- 没有图片上传接口：`imageUrl` 只是字符串，后端也没有提供 `/images/**` 静态资源；前端需要准备图片映射、占位图或独立静态资源服务。
+- 图片上传依赖 MinIO；未配置时上传接口返回 `503/8001`。商品历史相对地址仍可使用占位图或独立静态资源服务兜底。
 - 没有地址簿、优惠券、积分、真实物流、真实支付；地址随订单提交，支付只有模拟回调。
 - 没有订单预览接口：前端可从购物车列表计算预计金额，但最终金额以下单响应为准。
 - `RecommendationQuery.scene` 目前不会改变推荐排序；地点维度尚未建模。

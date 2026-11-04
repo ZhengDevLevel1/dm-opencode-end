@@ -16,4 +16,7 @@ public class UpdateProfileRequest {
 
     @Email(message = "邮箱格式不正确")
     private String email;
+
+    @Size(max = 500, message = "头像地址长度不能超过500个字符")
+    private String avatarUrl;
 }

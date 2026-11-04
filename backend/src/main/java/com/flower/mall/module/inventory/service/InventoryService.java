@@ -87,12 +87,22 @@ public class InventoryService {
     }
 
     public IPage<InventoryRecord> page(long page, long size, Long productId, String changeType,
-                                       String orderNo, LocalDateTime start, LocalDateTime end) {
+                                       String orderNo, String keyword, LocalDateTime start,
+                                       LocalDateTime end) {
+        String search = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String pattern = search == null ? null : "%" + search + "%";
         return inventoryRecordMapper.selectPage(new Page<>(page, size),
                 Wrappers.<InventoryRecord>lambdaQuery()
                         .eq(productId != null, InventoryRecord::getProductId, productId)
                         .eq(StringUtils.hasText(changeType), InventoryRecord::getChangeType, changeType)
                         .eq(StringUtils.hasText(orderNo), InventoryRecord::getOrderNo, orderNo)
+                        .and(pattern != null, wrapper -> wrapper
+                                .like(InventoryRecord::getProductName, search)
+                                .or().apply("EXISTS (SELECT 1 FROM product p "
+                                                + "WHERE p.id = inventory_record.product_id "
+                                                + "AND (p.name LIKE {0} OR p.flower_meaning LIKE {0} "
+                                                + "OR p.occasion_tags LIKE {0} OR p.festival_tags LIKE {0}))",
+                                        pattern))
                         .ge(start != null, InventoryRecord::getCreatedAt, start)
                         .le(end != null, InventoryRecord::getCreatedAt, end)
                         .orderByDesc(InventoryRecord::getId));

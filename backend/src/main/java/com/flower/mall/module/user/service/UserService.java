@@ -118,6 +118,11 @@ public class UserService {
         if (request.getEmail() != null) {
             user.setEmail(blankToNull(request.getEmail()));
         }
+        if (request.getAvatarUrl() != null) {
+            user.setAvatarUrl(StringUtils.hasText(request.getAvatarUrl())
+                    ? request.getAvatarUrl().trim()
+                    : "");
+        }
         userMapper.updateById(user);
         return UserVO.from(userMapper.selectById(userId));
     }

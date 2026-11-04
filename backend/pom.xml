@@ -25,6 +25,7 @@
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <knife4j.version>4.4.0</knife4j.version>
         <jjwt.version>0.12.5</jjwt.version>
+        <minio.version>8.4.3</minio.version>
     </properties>
 
     <dependencies>
@@ -57,6 +58,11 @@
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
             <version>${knife4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>${minio.version}</version>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>

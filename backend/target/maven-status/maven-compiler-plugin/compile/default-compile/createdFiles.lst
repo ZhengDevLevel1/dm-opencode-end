@@ -74,6 +74,7 @@ com\flower\mall\module\order\dto\OrderVO$OrderVOBuilder.class
 com\flower\mall\common\util\FestivalCalendar.class
 com\flower\mall\config\AppProperties$Cors.class
 com\flower\mall\config\AppProperties.class
+com\flower\mall\module\file\dto\FileUploadVO$FileUploadVOBuilder.class
 com\flower\mall\module\review\dto\ReviewVO.class
 com\flower\mall\config\AppProperties$Recommendation.class
 com\flower\mall\module\stats\dto\OrderStatusVO$OrderStatusVOBuilder.class
@@ -81,6 +82,7 @@ com\flower\mall\module\review\service\ReviewService.class
 com\flower\mall\module\stats\service\StatsService.class
 com\flower\mall\module\recommendation\mapper\RecommendationWeightMapper.class
 com\flower\mall\module\stats\dto\TopProductVO.class
+com\flower\mall\module\file\controller\FileController.class
 com\flower\mall\module\order\mapper\OrderItemMapper.class
 com\flower\mall\module\recommendation\dto\RecommendationEvaluationVO.class
 com\flower\mall\module\favorite\service\FavoriteService.class
@@ -125,6 +127,7 @@ com\flower\mall\security\JwtService$TokenInfo.class
 com\flower\mall\module\order\dto\AfterSaleRequest.class
 com\flower\mall\module\stats\mapper\StatsMapper.class
 com\flower\mall\common\enums\UserStatus.class
+com\flower\mall\module\file\service\FileStorageService.class
 com\flower\mall\module\fulfillment\mapper\FulfillmentRecordMapper.class
 com\flower\mall\config\AppProperties$Cache.class
 com\flower\mall\module\cart\dto\CartUpdateRequest.class
@@ -144,10 +147,12 @@ com\flower\mall\module\order\controller\StaffOrderController.class
 com\flower\mall\module\review\dto\ReviewVO$ReviewVOBuilder.class
 com\flower\mall\module\cart\dto\CartItemVO.class
 com\flower\mall\module\log\entity\OperationLog.class
+com\flower\mall\module\file\dto\FileUploadVO.class
 com\flower\mall\module\order\entity\Order.class
 com\flower\mall\module\cart\entity\CartItem.class
 com\flower\mall\module\product\service\ProductService$1.class
 com\flower\mall\module\stats\dto\CategorySalesVO.class
+com\flower\mall\config\AppProperties$Minio.class
 com\flower\mall\module\recommendation\controller\RecommendationController.class
 com\flower\mall\module\fulfillment\service\FulfillmentService.class
 com\flower\mall\module\recommendation\model\ScoredProduct.class

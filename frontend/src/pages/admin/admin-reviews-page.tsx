@@ -47,9 +47,9 @@ const reviewStatusOptions: Array<{ value: ReviewStatus; label: string }> = [
 export function AdminReviewsPage() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const productIdParam = searchParams.get("productId") ?? "";
-  const [draftProductId, setDraftProductId] = useState(productIdParam);
-  const [productId, setProductId] = useState(productIdParam);
+  const keywordParam = searchParams.get("keyword") ?? "";
+  const [draftKeyword, setDraftKeyword] = useState(keywordParam);
+  const [keyword, setKeyword] = useState(keywordParam);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [replying, setReplying] = useState<ReviewVO | null>(null);
@@ -59,22 +59,20 @@ export function AdminReviewsPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!productIdParam) return;
-    setDraftProductId(productIdParam);
-    setProductId(productIdParam);
+    if (!keywordParam) return;
+    setDraftKeyword(keywordParam);
+    setKeyword(keywordParam);
     setPage(1);
-  }, [productIdParam]);
+  }, [keywordParam]);
 
   const params = useMemo<AdminReviewQuery>(() => {
-    const numeric = Number(productId);
     return {
       page,
       size: PAGE_SIZE,
-      productId:
-        productId.trim() && Number.isInteger(numeric) && numeric > 0 ? numeric : undefined,
+      keyword: keyword.trim() || undefined,
       status: status ? (status as ReviewStatus) : undefined,
     };
-  }, [page, productId, status]);
+  }, [page, keyword, status]);
 
   const query = useQuery({
     queryKey: queryKeys.adminReviews(params),
@@ -98,12 +96,12 @@ export function AdminReviewsPage() {
     onError: (error) => toast.error("状态更新失败", getErrorMessage(error)),
   });
 
-  const activeFilters = [productId, status].filter(Boolean).length;
+  const activeFilters = [keyword, status].filter(Boolean).length;
   const records = query.data?.records ?? [];
 
   const clearFilters = () => {
-    setDraftProductId("");
-    setProductId("");
+    setDraftKeyword("");
+    setKeyword("");
     setStatus("");
     setPage(1);
   };
@@ -122,21 +120,20 @@ export function AdminReviewsPage() {
           className="grid gap-2 sm:grid-cols-2 xl:grid-cols-8"
           onSubmit={(event) => {
             event.preventDefault();
-            setProductId(draftProductId);
+            setKeyword(draftKeyword.trim());
             setPage(1);
           }}
         >
           <div className="relative xl:col-span-4">
-            <Label htmlFor="admin-review-product" className="sr-only">
-              商品 ID
+            <Label htmlFor="admin-review-keyword" className="sr-only">
+              搜索评价
             </Label>
             <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              id="admin-review-product"
-              value={draftProductId}
-              onChange={(event) => setDraftProductId(event.target.value)}
-              placeholder="按商品 ID 筛选"
-              inputMode="numeric"
+              id="admin-review-keyword"
+              value={draftKeyword}
+              onChange={(event) => setDraftKeyword(event.target.value)}
+              placeholder="搜索花名、花语、场景、节日或用户昵称"
               className="h-9 pl-8 text-xs"
             />
           </div>
@@ -200,7 +197,7 @@ export function AdminReviewsPage() {
             title={activeFilters > 0 ? "没有符合筛选条件的评价" : "还没有评价"}
             description={
               activeFilters > 0
-                ? "试试清除筛选条件，或换一个商品 ID。"
+                ? "试试清除筛选条件，或换一个花名、花语、场景、节日或用户昵称。"
                 : "用户完成订单后留下的评价会出现在这里。"
             }
             bare

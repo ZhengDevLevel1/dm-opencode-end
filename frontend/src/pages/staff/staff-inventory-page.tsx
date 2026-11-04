@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
+  type UseQueryResult,
 } from "@tanstack/react-query";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
   History,
+  LayoutGrid,
+  List,
   Minus,
   PackageOpen,
   Plus,
@@ -17,7 +20,8 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { productService, staffService } from "@/lib/services";
+import { LayoutGroup, motion } from "framer-motion";
+import { staffService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
@@ -28,6 +32,7 @@ import type {
   InventoryChangeType,
   InventoryQuery,
   InventoryRecord,
+  PageResult,
   ProductVO,
 } from "@/types/api";
 import {
@@ -49,9 +54,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 
 const PAGE_SIZE = 20;
+const CARD_PAGE_SIZE = 12;
+const LOW_STOCK_THRESHOLD = 10;
+
+type InventoryView = "cards" | "list";
 
 interface Filters {
-  productId: string;
+  keyword: string;
   changeType: string;
   orderNo: string;
   start: string;
@@ -59,7 +68,7 @@ interface Filters {
 }
 
 const emptyFilters: Filters = {
-  productId: "",
+  keyword: "",
   changeType: "",
   orderNo: "",
   start: "",
@@ -86,10 +95,7 @@ const emptyAdjust: AdjustState = {
 
 function buildQuery(filters: Filters, page: number): InventoryQuery {
   const query: InventoryQuery = { page, size: PAGE_SIZE };
-  const productId = Number(filters.productId);
-  if (filters.productId.trim() && Number.isInteger(productId) && productId > 0) {
-    query.productId = productId;
-  }
+  if (filters.keyword.trim()) query.keyword = filters.keyword.trim();
   if (filters.changeType) query.changeType = filters.changeType as InventoryChangeType;
   if (filters.orderNo.trim()) query.orderNo = filters.orderNo.trim();
   if (filters.start) query.start = `${filters.start}T00:00:00`;
@@ -99,14 +105,14 @@ function buildQuery(filters: Filters, page: number): InventoryQuery {
 
 export function StaffInventoryPage() {
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
   const dict = useDict();
-  const [draft, setDraft] = useState<Filters>(() => ({
-    ...emptyFilters,
-    productId: searchParams.get("productId") ?? "",
-  }));
-  const [filters, setFilters] = useState<Filters>(draft);
+  const [view, setView] = useState<InventoryView>("cards");
+  const [draft, setDraft] = useState<Filters>(emptyFilters);
+  const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [page, setPage] = useState(1);
+  const [cardKeywordDraft, setCardKeywordDraft] = useState("");
+  const [cardKeyword, setCardKeyword] = useState("");
+  const [cardPage, setCardPage] = useState(1);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjust, setAdjust] = useState<AdjustState>(emptyAdjust);
   const [productKeyword, setProductKeyword] = useState("");
@@ -115,21 +121,40 @@ export function StaffInventoryPage() {
   const query = useQuery({
     queryKey: queryKeys.staffInventory({ ...filters, page, size: PAGE_SIZE }),
     queryFn: () => staffService.inventory(buildQuery(filters, page)),
+    enabled: view === "list",
+    placeholderData: keepPreviousData,
+  });
+
+  const cardQuery = useQuery({
+    queryKey: queryKeys.staffProducts({
+      page: cardPage,
+      size: CARD_PAGE_SIZE,
+      keyword: cardKeyword || undefined,
+      sort: "stock_asc",
+    }),
+    queryFn: () =>
+      staffService.products({
+        page: cardPage,
+        size: CARD_PAGE_SIZE,
+        keyword: cardKeyword || undefined,
+        sort: "stock_asc",
+      }),
+    enabled: view === "cards",
     placeholderData: keepPreviousData,
   });
 
   const productSearch = useQuery({
-    queryKey: queryKeys.products({
+    queryKey: queryKeys.staffProducts({
       page: 1,
       size: 20,
       keyword: productKeyword.trim(),
-      status: "ON_SALE",
     }),
     queryFn: () =>
-      productService.list({
+      staffService.products({
         page: 1,
         size: 20,
         keyword: productKeyword.trim() || undefined,
+        sort: "stock_asc",
       }),
     enabled: adjustOpen && productKeyword.trim().length > 0,
     staleTime: 30_000,
@@ -152,10 +177,12 @@ export function StaffInventoryPage() {
       setAdjust(emptyAdjust);
       setAdjustError("");
       void queryClient.invalidateQueries({ queryKey: ["staff", "inventory"] });
+      void queryClient.invalidateQueries({ queryKey: ["staff", "products"] });
       void queryClient.invalidateQueries({ queryKey: ["products"] });
     },
     onError: (error) => {
       setAdjustError(getErrorMessage(error));
+      void queryClient.invalidateQueries({ queryKey: ["staff", "products"] });
       void queryClient.invalidateQueries({ queryKey: ["products"] });
     },
   });
@@ -181,19 +208,19 @@ export function StaffInventoryPage() {
     setAdjust({
       ...emptyAdjust,
       product: null,
-      mode: record.stockAfter < 10 ? "increase" : "decrease",
+      mode: record.stockAfter < LOW_STOCK_THRESHOLD ? "increase" : "decrease",
       loadingProduct: true,
     });
     setProductKeyword("");
     setAdjustError("");
     setAdjustOpen(true);
     try {
-      const product = await productService.detail(record.productId);
+      const product = await staffService.product(record.productId);
       setAdjust((current) => ({ ...current, product, loadingProduct: false }));
     } catch (error) {
       setAdjust((current) => ({ ...current, loadingProduct: false }));
       setAdjustError(
-        `${getErrorMessage(error)}。该商品可能已下架，无法通过公开商品接口读取当前库存；请从商品搜索结果中选择。`,
+        `${getErrorMessage(error)}。该商品可能已删除，请从商品搜索结果中选择。`,
       );
     }
   };
@@ -229,6 +256,7 @@ export function StaffInventoryPage() {
     () => Object.values(filters).filter((value) => value.trim() !== "").length,
     [filters],
   );
+  const activeViewQuery = view === "cards" ? cardQuery : query;
 
   return (
     <div className="space-y-4">
@@ -236,17 +264,18 @@ export function StaffInventoryPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">库存管理</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            查看库存变动流水，并对商品执行人工入库或扣减。库存低于 10 件的记录会标红。
+            切换卡片与流水视图，查看商品库存或库存变动记录。库存低于 10 件会标红。
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <InventoryViewSwitch value={view} onChange={setView} />
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void query.refetch()}
-            disabled={query.isFetching}
+            onClick={() => void activeViewQuery.refetch()}
+            disabled={activeViewQuery.isFetching}
           >
-            <History className={cn("h-3.5 w-3.5", query.isFetching && "animate-spin")} />
+            <History className={cn("h-3.5 w-3.5", activeViewQuery.isFetching && "animate-spin")} />
             刷新
           </Button>
           <Button size="sm" onClick={() => openAdjust()}>
@@ -256,6 +285,27 @@ export function StaffInventoryPage() {
         </div>
       </div>
 
+      {view === "cards" ? (
+        <InventoryCardsSection
+          draftKeyword={cardKeywordDraft}
+          keyword={cardKeyword}
+          onDraftKeywordChange={setCardKeywordDraft}
+          onSearch={() => {
+            setCardKeyword(cardKeywordDraft.trim());
+            setCardPage(1);
+          }}
+          onClear={() => {
+            setCardKeywordDraft("");
+            setCardKeyword("");
+            setCardPage(1);
+          }}
+          page={cardPage}
+          onPageChange={setCardPage}
+          query={cardQuery}
+          onAdjust={openAdjust}
+        />
+      ) : (
+        <>
       <div className="ui-card p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold">
@@ -286,18 +336,17 @@ export function StaffInventoryPage() {
             setPage(1);
           }}
         >
-          <div className="xl:col-span-2">
-            <Label htmlFor="inventory-product" className="sr-only">
-              商品 ID
+          <div className="xl:col-span-3">
+            <Label htmlFor="inventory-keyword" className="sr-only">
+              搜索商品
             </Label>
             <Input
-              id="inventory-product"
-              value={draft.productId}
+              id="inventory-keyword"
+              value={draft.keyword}
               onChange={(event) =>
-                setDraft((current) => ({ ...current, productId: event.target.value }))
+                setDraft((current) => ({ ...current, keyword: event.target.value }))
               }
-              placeholder="商品 ID"
-              inputMode="numeric"
+              placeholder="花名、花语、场景或节日"
               className="h-9 text-xs"
             />
           </div>
@@ -373,7 +422,7 @@ export function StaffInventoryPage() {
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
-            变动后库存 &lt; 10
+            变动后库存 &lt; {LOW_STOCK_THRESHOLD}
           </div>
         </div>
 
@@ -395,7 +444,7 @@ export function StaffInventoryPage() {
             title={activeFilterCount > 0 ? "没有符合筛选条件的记录" : "还没有库存变动记录"}
             description={
               activeFilterCount > 0
-                ? "试试清除部分筛选条件，或换一个商品 ID / 订单号。"
+                ? "试试清除部分筛选条件，或换一个花名、花语、场景、节日或订单号。"
                 : "商品建档、下单扣减、取消回补和人工调整都会在这里留下记录。"
             }
             bare
@@ -433,7 +482,7 @@ export function StaffInventoryPage() {
               <TBody>
                 {records.map((record) => {
                   const negative = record.changeQuantity < 0;
-                  const low = record.stockAfter < 10;
+                  const low = record.stockAfter < LOW_STOCK_THRESHOLD;
                   const label =
                     changeTypes.find((item) => item.value === record.changeType)?.label ??
                     inventoryChangeLabel[record.changeType];
@@ -530,6 +579,8 @@ export function StaffInventoryPage() {
           </div>
         ) : null}
       </div>
+        </>
+      )}
 
       <Dialog
         open={adjustOpen}
@@ -541,7 +592,7 @@ export function StaffInventoryPage() {
           }
         }}
         title="库存调整"
-        description="选择一个已上架商品，填写大于 0 的整数数量。提交后会写入一条人工调整流水。"
+        description="选择商品并填写大于 0 的整数数量。提交后会写入一条人工调整流水。"
         size="md"
         footer={
           <div className="flex items-center justify-between gap-2">
@@ -573,14 +624,14 @@ export function StaffInventoryPage() {
                 id="adjust-product-search"
                 value={productKeyword}
                 onChange={(event) => setProductKeyword(event.target.value)}
-                placeholder="输入商品名称、花语或标签搜索"
+                placeholder="输入花名、花语、场景或节日搜索"
                 className="pl-8"
                 autoComplete="off"
                 data-autofocus
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
-              公开商品接口只返回已上架商品，因此这里无法选择已下架商品。
+              搜索使用店员库存商品接口，已上架和下架商品都可以调整库存。
             </p>
             {productKeyword.trim() ? (
               <div className="h-44 overflow-y-auto rounded-lg border border-border/60">
@@ -594,7 +645,7 @@ export function StaffInventoryPage() {
                     {getErrorMessage(productSearch.error)}
                   </p>
                 ) : (productSearch.data?.records.length ?? 0) === 0 ? (
-                  <p className="p-3 text-xs text-muted-foreground">没有找到已上架商品。</p>
+                  <p className="p-3 text-xs text-muted-foreground">没有找到匹配商品。</p>
                 ) : (
                   productSearch.data?.records.map((product) => {
                     const selected = adjust.product?.id === product.id;
@@ -776,5 +827,292 @@ export function StaffInventoryPage() {
         </div>
       </Dialog>
     </div>
+  );
+}
+
+function InventoryViewSwitch({
+  value,
+  onChange,
+}: {
+  value: InventoryView;
+  onChange: (view: InventoryView) => void;
+}) {
+  const options = [
+    { value: "cards" as const, label: "卡片", icon: LayoutGrid },
+    { value: "list" as const, label: "流水", icon: List },
+  ];
+
+  return (
+    <LayoutGroup id="inventory-view">
+      <div
+        className="flex rounded-lg border border-border bg-muted/40 p-0.5"
+        role="group"
+        aria-label="库存视图"
+      >
+        {options.map((option) => {
+          const active = value === option.value;
+          const Icon = option.icon;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "relative flex h-8 items-center gap-1.5 rounded-md px-3 text-[11px] font-medium transition-colors",
+                active
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {active ? (
+                <motion.span
+                  layoutId="inventory-view-pill"
+                  className="absolute inset-0 rounded-md bg-card shadow-sm"
+                  transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                />
+              ) : null}
+              <span className="relative z-10 inline-flex items-center gap-1.5">
+                <Icon className="h-3.5 w-3.5" />
+                {option.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </LayoutGroup>
+  );
+}
+
+function InventoryCardsSection({
+  draftKeyword,
+  keyword,
+  onDraftKeywordChange,
+  onSearch,
+  onClear,
+  page,
+  onPageChange,
+  query,
+  onAdjust,
+}: {
+  draftKeyword: string;
+  keyword: string;
+  onDraftKeywordChange: (value: string) => void;
+  onSearch: () => void;
+  onClear: () => void;
+  page: number;
+  onPageChange: (page: number) => void;
+  query: UseQueryResult<PageResult<ProductVO>, Error>;
+  onAdjust: (product: ProductVO) => void;
+}) {
+  const records = query.data?.records ?? [];
+  const hasKeyword = keyword.trim().length > 0;
+
+  return (
+    <>
+      <div className="ui-card p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="flex items-center gap-1.5 text-xs font-semibold">
+            <LayoutGrid className="h-3.5 w-3.5 text-primary" />
+            商品库存
+          </h2>
+          {hasKeyword ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11px] text-muted-foreground"
+              onClick={onClear}
+            >
+              <X className="h-3 w-3" />
+              清除筛选
+            </Button>
+          ) : null}
+        </div>
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSearch();
+          }}
+        >
+          <div className="relative w-full sm:w-64">
+            <Label htmlFor="inventory-card-keyword" className="sr-only">
+              搜索商品
+            </Label>
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="inventory-card-keyword"
+              value={draftKeyword}
+              onChange={(event) => onDraftKeywordChange(event.target.value)}
+              placeholder="搜索花名、花语、场景或节日"
+              className="h-9 pl-8 text-xs"
+            />
+          </div>
+          <Button type="submit" size="sm" className="h-9">
+            <Search className="h-3.5 w-3.5" />
+            筛选
+          </Button>
+        </form>
+      </div>
+
+      <div className="ui-card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <PackageOpen className="h-3.5 w-3.5" />
+            共 {formatNumber(query.data?.total)} 个商品 · 库存从低到高
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
+            库存 &lt; {LOW_STOCK_THRESHOLD}
+          </div>
+        </div>
+
+        {query.isLoading ? (
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <Skeleton key={index} className="h-72 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : query.isError ? (
+          <ErrorState
+            title="商品库存没送到"
+            description={getErrorMessage(query.error)}
+            onRetry={() => void query.refetch()}
+          />
+        ) : records.length === 0 ? (
+          <EmptyState
+            icon={PackageOpen}
+            title={hasKeyword ? "没有找到匹配商品" : "还没有商品"}
+            description={
+              hasKeyword
+                ? "试试换一个花名、花语、场景或节日。"
+                : "商品建档后会在这里显示库存。"
+            }
+            bare
+            action={
+              hasKeyword ? (
+                <Button variant="outline" size="sm" onClick={onClear}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {records.map((product) => (
+              <ProductStockCard key={product.id} product={product} onAdjust={onAdjust} />
+            ))}
+          </div>
+        )}
+
+        {records.length > 0 ? (
+          <div className="border-t border-border/60 px-4 py-3">
+            <Pagination
+              page={page}
+              pages={query.data?.pages ?? 1}
+              total={query.data?.total ?? 0}
+              pageSize={CARD_PAGE_SIZE}
+              onPageChange={onPageChange}
+            />
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function ProductStockCard({
+  product,
+  onAdjust,
+}: {
+  product: ProductVO;
+  onAdjust: (product: ProductVO) => void;
+}) {
+  const low = product.stock < LOW_STOCK_THRESHOLD;
+  const tags = [
+    ...(product.occasionTags?.split(",") ?? []),
+    ...(product.festivalTags?.split(",") ?? []),
+  ]
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-lg border border-border/70 bg-background transition-colors hover:border-primary/30">
+      <ProductImage
+        src={product.imageUrl}
+        alt={product.name}
+        seed={product.name}
+        className="h-44 w-full"
+        iconClassName="h-8 w-8"
+        overlay={
+          <div className="absolute inset-x-2 top-2 flex justify-between gap-2">
+            <Badge variant={product.status === "ON_SALE" ? "success" : "secondary"}>
+              {product.statusLabel}
+            </Badge>
+            <Badge variant="outline" className="bg-background/80 backdrop-blur-sm">
+              {product.seasonLabel}
+            </Badge>
+          </div>
+        }
+      />
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium" title={product.name}>
+              {product.name}
+            </p>
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              #{product.id} · {product.category}
+            </p>
+          </div>
+          <span
+            className={cn(
+              "shrink-0 text-sm font-semibold tabular",
+              low ? "text-destructive" : "text-foreground",
+            )}
+          >
+            {formatNumber(product.stock)}
+            <span className="ml-0.5 text-[10px] font-normal text-muted-foreground">件</span>
+          </span>
+        </div>
+        <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+          {product.flowerMeaning || "暂无花语"}
+        </p>
+        {tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <Badge
+                key={tag}
+                variant="outline"
+                className="px-1.5 py-0 text-[10px] text-muted-foreground"
+              >
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/50 pt-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span
+              className={cn(
+                "inline-block h-2 w-2 rounded-full",
+                low ? "bg-destructive" : "bg-emerald-500",
+              )}
+            />
+            {low ? "低库存" : "库存充足"}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px]"
+            onClick={() => onAdjust(product)}
+          >
+            <Plus className="h-3 w-3" />
+            调整
+          </Button>
+        </div>
+      </div>
+    </article>
   );
 }
