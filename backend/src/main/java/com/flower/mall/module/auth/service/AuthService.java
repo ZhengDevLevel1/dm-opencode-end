@@ -1,0 +1,101 @@
+package com.flower.mall.module.auth.service;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.flower.mall.common.enums.UserRole;
+import com.flower.mall.common.enums.UserStatus;
+import com.flower.mall.common.exception.BusinessException;
+import com.flower.mall.common.exception.ErrorCode;
+import com.flower.mall.module.user.dto.LoginRequest;
+import com.flower.mall.module.user.dto.LoginResponse;
+import com.flower.mall.module.user.dto.RegisterRequest;
+import com.flower.mall.module.user.dto.UserVO;
+import com.flower.mall.module.user.entity.User;
+import com.flower.mall.module.user.mapper.UserMapper;
+import com.flower.mall.security.AuthUser;
+import com.flower.mall.security.JwtService;
+import com.flower.mall.security.TokenStore;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.Duration;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
+    private final TokenStore tokenStore;
+
+    @Transactional
+    public UserVO register(RegisterRequest request) {
+        Long count = userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                .eq(User::getUsername, request.getUsername()));
+        if (count > 0) {
+            throw BusinessException.of(ErrorCode.USERNAME_EXISTS);
+        }
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
+        user.setPhone(blankToNull(request.getPhone()));
+        user.setEmail(blankToNull(request.getEmail()));
+        user.setRole(UserRole.CUSTOMER.name());
+        user.setStatus(UserStatus.ENABLED.name());
+        userMapper.insert(user);
+        return UserVO.from(userMapper.selectById(user.getId()));
+    }
+
+    public LoginResponse login(LoginRequest request) {
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+        } catch (DisabledException exception) {
+            throw BusinessException.of(ErrorCode.USER_DISABLED);
+        } catch (BadCredentialsException exception) {
+            throw BusinessException.of(ErrorCode.LOGIN_FAILED);
+        } catch (AuthenticationException exception) {
+            throw BusinessException.of(ErrorCode.LOGIN_FAILED);
+        }
+        AuthUser principal = (AuthUser) authentication.getPrincipal();
+        JwtService.TokenInfo tokenInfo =
+                jwtService.generateToken(principal.getId(), principal.getUsername(), principal.getRole());
+        tokenStore.store(tokenInfo.jti(), principal.getId(),
+                Duration.ofSeconds(tokenInfo.expiresInSeconds()));
+        User user = userMapper.selectById(principal.getId());
+        return LoginResponse.builder()
+                .token(tokenInfo.token())
+                .tokenType("Bearer")
+                .expiresIn(tokenInfo.expiresInSeconds())
+                .user(UserVO.from(user))
+                .build();
+    }
+
+    public void logout(String authorizationHeader) {
+        if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
+            return;
+        }
+        try {
+            String jti = jwtService.parse(authorizationHeader.substring(7).trim()).getId();
+            tokenStore.revoke(jti);
+        } catch (Exception ignored) {
+            // 令牌无效时无需处理会话
+        }
+    }
+
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value : null;
+    }
+}

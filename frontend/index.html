@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f7fafc" />
+    <title>花屿 Bloom Isle · 花店管理系统</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem("flower.theme");
+          var t = raw ? JSON.parse(raw) : {};
+          var state = t && t.state ? t.state : t;
+          var mode = state.mode || "system";
+          var dark = mode === "dark" || (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var root = document.documentElement;
+          root.classList.toggle("dark", dark);
+          root.style.colorScheme = dark ? "dark" : "light";
+          root.dataset.palette = state.palette || "default";
+          root.dataset.accent = state.accent || "sky";
+          root.dataset.radius = state.radius || "default";
+          root.dataset.density = state.density || "comfortable";
+          root.dataset.sidebar = state.sidebarStyle || "follow";
+          root.style.setProperty("--ui-scale", String(state.scale || 1));
+          if (state.reduceMotion) root.classList.add("reduce-motion");
+          if (state.highContrast) root.classList.add("high-contrast");
+          if (state.background && state.background !== "none") {
+            root.dataset.background = state.background;
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
