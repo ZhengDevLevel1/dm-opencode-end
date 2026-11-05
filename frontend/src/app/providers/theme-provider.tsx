@@ -83,6 +83,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const backgroundImage = useThemeStore((state) => state.backgroundImage);
   const backgroundOpacity = useThemeStore((state) => state.backgroundOpacity);
   const backgroundBlur = useThemeStore((state) => state.backgroundBlur);
+  const componentOpacity = useThemeStore((state) => state.componentOpacity);
 
   const [resolvedDark, setResolvedDark] = useState(false);
 
@@ -116,6 +117,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.dataset.background = background;
     root.style.setProperty("--app-bg-opacity", String(backgroundOpacity));
     root.style.setProperty("--app-bg-blur", `${backgroundBlur}px`);
+    root.style.setProperty("--ui-surface-opacity", String(componentOpacity));
     if (background === "image" && backgroundImage) {
       root.style.setProperty("--app-bg-image", `url("${backgroundImage}")`);
     } else {
@@ -140,6 +142,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     backgroundImage,
     backgroundOpacity,
     backgroundBlur,
+    componentOpacity,
   ]);
 
   return (

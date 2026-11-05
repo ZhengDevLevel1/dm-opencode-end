@@ -31,6 +31,8 @@ interface ImageUploadProps {
   fallback?: ReactNode;
   disabled?: boolean;
   showActions?: boolean;
+  /** 是否在上传区内展示已上传图片；关闭后只保留上传入口，供外部预览组件展示效果。 */
+  preview?: boolean;
   actionLabel?: string;
   title?: string;
   /** 裁剪窗口的宽高比，默认 1（正方形） */
@@ -46,6 +48,7 @@ export function ImageUpload({
   fallback,
   disabled = false,
   showActions = true,
+  preview = true,
   actionLabel = "选择本地图片",
   title,
   cropAspect = 1,
@@ -55,7 +58,7 @@ export function ImageUpload({
   const [broken, setBroken] = useState(false);
   const [cropSource, setCropSource] = useState<{ file: File; url: string } | null>(null);
   const resolved = resolveImageUrl(value);
-  const showImage = Boolean(resolved) && !broken;
+  const showImage = preview && Boolean(resolved) && !broken;
   const busy = uploading || disabled;
 
   useEffect(() => {
@@ -205,6 +208,7 @@ export function ImageUpload({
         fileName={cropSource?.file.name ?? ""}
         fileType={cropSource?.file.type ?? ""}
         aspect={cropAspect}
+        shape={shape === "circle" ? "circle" : "rect"}
         onClose={closeCropDialog}
         onUseOriginal={() => {
           const file = cropSource?.file;

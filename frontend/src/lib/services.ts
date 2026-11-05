@@ -6,6 +6,8 @@ import type {
   AdminUserUpdateRequest,
   AfterSaleHandleRequest,
   AfterSaleRequest,
+  AuthBackgroundRequest,
+  AuthBackgroundVO,
   CancelOrderRequest,
   CartAddRequest,
   CartItemVO,
@@ -56,6 +58,12 @@ import type {
   UpdateProfileRequest,
   UserVO,
 } from "@/types/api";
+
+export const appearanceService = {
+  authBackground: () => api.get<AuthBackgroundVO>("/appearance/auth-background"),
+  updateAuthBackground: (body: AuthBackgroundRequest) =>
+    api.put<AuthBackgroundVO>("/admin/appearance/auth-background", body),
+};
 
 export const authService = {
   login: (body: LoginRequest) =>

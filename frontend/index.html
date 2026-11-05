@@ -23,6 +23,9 @@
           root.dataset.density = state.density || "comfortable";
           root.dataset.sidebar = state.sidebarStyle || "follow";
           root.style.setProperty("--ui-scale", String(state.scale || 1));
+          root.style.setProperty("--ui-surface-opacity", String(state.componentOpacity == null ? 1 : state.componentOpacity));
+          root.style.setProperty("--app-bg-opacity", String(state.backgroundOpacity == null ? 0.82 : state.backgroundOpacity));
+          root.style.setProperty("--app-bg-blur", (state.backgroundBlur == null ? 0 : state.backgroundBlur) + "px");
           if (state.reduceMotion) root.classList.add("reduce-motion");
           if (state.highContrast) root.classList.add("high-contrast");
           if (state.background && state.background !== "none") {

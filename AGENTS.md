@@ -42,6 +42,7 @@
 | `dict` | Categories, order/payment/fulfillment status options |
 | `log` | AOP-based operation log recording and admin query |
 | `file` | MinIO image upload for avatars, product images, and appearance backgrounds |
+| `appearance` | Global login/register background (none/gradient/image) + mask/blur/card opacity (public read, admin write) |
 
 ## Repository layout
 
@@ -70,7 +71,8 @@
 - Filter/sort dropdowns on the product list, smart recommendation, staff inventory, and admin products/users/reviews pages use `frontend/src/components/ui/custom-select.tsx` (`CustomSelect`). It is a fully custom listbox with click-outside close, arrow-key/Enter/Escape navigation, selected check mark, and a spring open animation. Its panel is rendered through a portal with fixed positioning so it is not clipped inside dialogs.
 - Admin product/user dialogs use `CustomSelect` with `react-hook-form` via `Controller`; do not use native `register` with it.
 - Date filters on staff orders, staff inventory, admin operation logs, and the admin recommendation log use `frontend/src/components/ui/date-picker.tsx` (`DatePicker`), a custom calendar popover with Monday-first grid, month navigation, today/selected states, clear/today actions, keyboard navigation, and outside-click/Escape close.
-- Image uploads use `frontend/src/components/domain/image-upload.tsx` (`ImageUpload`), which posts multipart files through `fileService.uploadImage`, preloads the returned MinIO URL, and falls back to the provided placeholder when the URL is empty or broken.
+- Image uploads use `frontend/src/components/domain/image-upload.tsx` (`ImageUpload`), which posts multipart files through `fileService.uploadImage`, preloads the returned MinIO URL, and falls back to the provided placeholder when the URL is empty or broken. Pass `preview={false}` when a dedicated preview panel is shown above the uploader (both background sections do this).
+- Theme appearance (including `componentOpacity`, which fades card/popover surfaces via `--ui-surface-opacity`) is stored in `localStorage`; the login/register background, its mask opacity, blur, and login card opacity are server-side and configurable only by admins on the settings page (debounced auto-save after slider drags). `AuthLayout` renders the image full-screen for both auth pages.
 
 ## Core domain flows
 
@@ -91,7 +93,7 @@
 - Redis defaults to `localhost:6379`; disable or avoid depending on it with `APP_REDIS_ENABLED=false` during local development.
 - Product-detail and hot-product caches are controlled by `app.cache.*`; recommendation candidate limit is controlled by `app.recommendation.candidate-limit`.
 - MinIO uploads are controlled by `app.minio.*`; set `MINIO_ENABLED=true` and configure `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, and optionally `MINIO_PUBLIC_URL`. The backend auto-creates the bucket by default (`MINIO_AUTO_CREATE_BUCKET=true`) and applies a public-read policy (`MINIO_PUBLIC_READ=true`); the bucket must still be publicly reachable or fronted by a public CDN URL.
-- Existing MySQL installations need `backend/db/migration_20261104_add_user_avatar.sql` to add `sys_user.avatar_url`; fresh installs get it from `schema.sql`.
+- Existing MySQL installations need `backend/db/migration_20261104_add_user_avatar.sql` to add `sys_user.avatar_url`, and `backend/db/migration_20261105_add_appearance_setting.sql` to add the `appearance_setting` table; fresh installs get both from `schema.sql`.
 - Run from `backend/` with `mvn spring-boot:run`, or run the packaged jar `backend/target/flower-shop-backend-1.0.0.jar`.
 - Run from `frontend/` with Node.js 20+: `npm install`, copy `.env.example` to `.env`, then `npm run dev`. Vite serves `http://localhost:5173` and proxies `/api` to `http://localhost:8080`.
 - Frontend environment: `VITE_API_BASE_URL` defaults to `/api`; `VITE_IMAGE_BASE_URL` is optional for product images.
@@ -107,10 +109,10 @@
 
 ## Key API areas
 
-- Public: `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/products/**`, `GET /api/recommendations`, `GET /api/reviews/products/**`, `GET /api/dict/**`.
+- Public: `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/products/**`, `GET /api/recommendations`, `GET /api/reviews/products/**`, `GET /api/dict/**`, `GET /api/appearance/auth-background`.
 - Customer: `GET/PUT /api/auth/me`, `PUT /api/auth/password`, `POST /api/auth/logout`, `POST /api/files/images`, `/api/cart/**`, `/api/favorites/**`, `/api/orders/**`, `/api/payments/**`, `POST /api/reviews`, `GET /api/reviews/my`.
 - Staff: `/api/staff/orders/**`, `/api/staff/products/{id}/stock`, `GET /api/staff/inventory`.
-- Admin: `/api/admin/users/**`, `/api/admin/products/**`, `/api/admin/recommendations/**`, `/api/admin/reviews/**`, `/api/admin/stats/**`, `GET /api/admin/operation-logs`.
+- Admin: `/api/admin/users/**`, `/api/admin/products/**`, `/api/admin/recommendations/**`, `/api/admin/reviews/**`, `/api/admin/stats/**`, `GET /api/admin/operation-logs`, `PUT /api/admin/appearance/auth-background`.
 - Full frontend-oriented API reference: `docs/backend-api.md`.
 
 ## Agent skills
@@ -127,8 +129,8 @@ Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
 
 - Backend P0+P1 work is complete: recommendation behavior features, five personas, Top-10 metrics, `ALL` season matching, cache invalidation, invalid-season `400`, cart quantity cap, and rounded weight validation.
 - Image upload work is complete: MinIO storage service, `/api/files/images`, `sys_user.avatar_url`, and frontend avatar/product/background pickers with broken-URL fallbacks. A local MinIO smoke test passed for all three upload categories, public URL fetch, and avatar update/clear through `PUT /api/auth/me`.
-- `docs/backend-api.md` is complete; its endpoint table was checked against the source: 68 source endpoints and 68 documented endpoints match with no extras or omissions.
-- `mvn -B -ntp test` passes 32/32 tests.
+- `docs/backend-api.md` is complete; its endpoint table was checked against the source: 70 source endpoints and 70 documented endpoints match with no extras or omissions.
+- `mvn -B -ntp test` passes 35/35 tests (including the appearance background integration tests).
 - Run `mvn -B -ntp -DskipTests package` to build `backend\target\flower-shop-backend-1.0.0.jar`.
 - Frontend `npm run typecheck`, `npm run lint`, and `npm run build` pass. Lint reports 5 pre-existing `react-refresh/only-export-components` warnings (no errors).
 

@@ -5,9 +5,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
+  --color-card: color-mix(in oklab, var(--card) calc(var(--ui-surface-opacity, 1) * 100%), transparent);
   --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
+  --color-popover: color-mix(in oklab, var(--popover) calc(var(--ui-surface-opacity, 1) * 100%), transparent);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
@@ -481,22 +481,30 @@
     radial-gradient(48rem 28rem at -10% 110%, color-mix(in oklab, var(--flower-lilac) 10%, transparent), transparent 60%);
 }
 :root[data-background="image"] .app-background {
+  overflow: hidden;
+  isolation: isolate;
+}
+/* 图片单独成层，用 filter 模糊；模糊后放大裁切，避免边缘透出。 */
+:root[data-background="image"] .app-background::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--app-bg-blur, 0px) * -3);
+  z-index: 0;
   background-image: var(--app-bg-image);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  filter: blur(var(--app-bg-blur, 0px));
+  pointer-events: none;
 }
 :root[data-background="image"] .app-background::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 1;
   background: var(--background);
   opacity: var(--app-bg-opacity, 0.82);
-  backdrop-filter: blur(var(--app-bg-blur, 6px));
   pointer-events: none;
-  transition:
-    opacity var(--duration-base) var(--ease-standard),
-    backdrop-filter var(--duration-base) var(--ease-standard);
 }
 
 * {
@@ -667,7 +675,7 @@ button {
 .ui-card {
   border-radius: var(--radius);
   border: 1px solid color-mix(in oklab, var(--border) 60%, transparent);
-  background: var(--card);
+  background: color-mix(in oklab, var(--card) calc(var(--ui-surface-opacity, 1) * 100%), transparent);
   color: var(--card-foreground);
   box-shadow: var(--shadow-card);
 }

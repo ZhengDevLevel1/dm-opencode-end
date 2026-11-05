@@ -1,6 +1,7 @@
 export const queryKeys = {
   dict: ["dict"] as const,
   me: ["auth", "me"] as const,
+  authBackground: ["appearance", "auth-background"] as const,
   products: (params: object) => ["products", params] as const,
   product: (id: number) => ["product", id] as const,
   hotProducts: ["hot-products"] as const,

@@ -1,7 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
-import { cartService, dictService, favoriteService } from "@/lib/services";
+import { appearanceService, cartService, dictService, favoriteService } from "@/lib/services";
 import { useAuthStore } from "@/stores/auth";
+
+export function useAuthBackgroundQuery() {
+  return useQuery({
+    queryKey: queryKeys.authBackground,
+    queryFn: appearanceService.authBackground,
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 export function useDict() {
   return useQuery({

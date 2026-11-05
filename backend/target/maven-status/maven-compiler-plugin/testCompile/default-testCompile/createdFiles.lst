@@ -1,7 +1,0 @@
-com\flower\mall\module\order\OrderPaymentFlowIntegrationTest.class
-com\flower\mall\module\product\ProductCartIntegrationTest.class
-com\flower\mall\module\recommendation\service\RecommendationEngineTest.class
-com\flower\mall\module\stats\RecommendationAndStatsIntegrationTest.class
-com\flower\mall\module\file\FileUploadIntegrationTest.class
-com\flower\mall\module\inventory\InventoryFlowIntegrationTest.class
-com\flower\mall\module\search\SearchIntegrationTest.class

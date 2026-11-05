@@ -274,6 +274,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/auth/password` | 登录 | `ApiResponse<Void>` |
 | POST | `/api/files/images` | 登录 | `ApiResponse<FileUploadVO>` |
 | GET | `/api/dict/options` | 公开 | `ApiResponse<DictOptions>` |
+| GET | `/api/appearance/auth-background` | 公开 | `ApiResponse<AuthBackgroundVO>` |
 | GET | `/api/products` | 公开 | `ApiResponse<PageResult<ProductVO>>` |
 | GET | `/api/products/hot` | 公开 | `ApiResponse<ProductVO[]>` |
 | GET | `/api/products/{id}` | 公开 | `ApiResponse<ProductVO>` |
@@ -324,6 +325,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/reviews/{id}/status` | 管理员 | `ApiResponse<ReviewVO>` |
 | PUT | `/api/admin/reviews/{id}/reply` | 管理员 | `ApiResponse<ReviewVO>` |
 | GET | `/api/admin/operation-logs` | 管理员 | `ApiResponse<PageResult<OperationLog>>` |
+| PUT | `/api/admin/appearance/auth-background` | 管理员 | `ApiResponse<AuthBackgroundVO>` |
 | GET | `/api/admin/recommendations/weights` | 管理员 | `ApiResponse<RecommendationWeightsVO>` |
 | PUT | `/api/admin/recommendations/weights` | 管理员 | `ApiResponse<RecommendationWeightsVO>` |
 | GET | `/api/admin/recommendations/logs` | 管理员 | `ApiResponse<PageResult<RecommendationLogVO>>` |
@@ -453,6 +455,53 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 ```
 
 MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后需保证 `bucket` 可公开读取，或配置 `public-url` 指向可访问的对象前缀。
+
+### 4.6 登录页背景（外观设置）
+
+登录页与注册页共用一张全局背景图，由管理员统一配置，所有访客读取。
+
+`GET /api/appearance/auth-background`（公开）
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "backgroundType": "IMAGE",
+    "imageUrl": "http://localhost:9000/flower-shop/background/2026-11-05/xxx.jpg",
+    "backgroundOpacity": 0.78,
+    "backgroundBlur": 0,
+    "componentOpacity": 1,
+    "updatedAt": "2026-11-05T10:30:00"
+  },
+  "timestamp": 1760000000000
+}
+```
+
+- `backgroundType`：`NONE`（无背景）、`GRADIENT`（渐变光晕，与页面背景渐变一致）、`IMAGE`（自定义图片），默认 `NONE`；早期没有该字段的数据按是否有 `imageUrl` 推断为 `IMAGE`/`NONE`。
+- `imageUrl` 为空或不存在时，前端使用默认主题背景。
+- 图片地址由 `POST /api/files/images`（`category=background`）上传获得。
+- `backgroundOpacity`：遮罩不透明度，取值 `0.4–0.98`，默认 `0.78`，仅对 `IMAGE` 生效。
+- `backgroundBlur`：背景模糊像素，取值 `0–20`，默认 `0`（清晰），仅对 `IMAGE` 生效。
+- `componentOpacity`：登录卡片与左侧介绍栏的不透明度，取值 `0.4–1`，默认 `1`。
+
+`PUT /api/admin/appearance/auth-background`（管理员）
+
+```json
+{
+  "backgroundType": "IMAGE",
+  "imageUrl": "http://localhost:9000/flower-shop/background/2026-11-05/xxx.jpg",
+  "backgroundOpacity": 0.72,
+  "backgroundBlur": 4,
+  "componentOpacity": 0.9
+}
+```
+
+- `imageUrl` 传空字符串或空白字符表示清除背景，响应中 `imageUrl` 为 `null`。
+- `backgroundType` 省略时按 `imageUrl` 是否有值推断为 `IMAGE`/`NONE`；传 `GRADIENT` 时无需图片。
+- 三个调节参数均可省略；省略时保持服务端已有值，便于旧客户端只更新图片。
+- 最长 500 字符；更新会记录操作日志（模块「外观管理」）。
+- 数据保存在 `appearance_setting` 表单行记录（`id=1`），首次读取或更新时自动创建。
 
 ## 5. 商品浏览与字典
 

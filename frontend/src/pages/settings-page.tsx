@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
 import {
@@ -9,6 +10,7 @@ import {
   Download,
   Image as ImageIcon,
   KeyRound,
+  LogIn,
   LogOut,
   Monitor,
   Moon,
@@ -22,6 +24,7 @@ import {
 import {
   DEFAULT_BACKGROUND_BLUR,
   DEFAULT_BACKGROUND_OPACITY,
+  DEFAULT_COMPONENT_OPACITY,
   useThemeStore,
   type AccentId,
   type BackgroundId,
@@ -32,8 +35,12 @@ import {
   type ThemeMode,
 } from "@/stores/theme";
 import { useAuthStore } from "@/stores/auth";
-import { authService } from "@/lib/services";
+import { appearanceService, authService } from "@/lib/services";
+import { queryKeys } from "@/lib/query-keys";
+import { useAuthBackgroundQuery } from "@/hooks/queries";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
+import { resolveImageUrl } from "@/lib/image";
+import { AUTH_GRADIENT_BACKGROUND } from "@/lib/auth-background";
 import { runWithThemeTransition } from "@/lib/theme-transition";
 import { toast } from "@/stores/toast";
 import { cn } from "@/lib/cn";
@@ -132,7 +139,6 @@ const sidebars: Array<{ value: SidebarStyleId; label: string; hint: string }> = 
 ];
 
 const backgrounds: Array<{ value: BackgroundId; label: string }> = [
-  { value: "none", label: "无" },
   { value: "solid", label: "纯色" },
   { value: "gradient", label: "渐变光晕" },
   { value: "image", label: "自定义图片" },
@@ -173,6 +179,7 @@ export function SettingsPage() {
       importTheme: state.importTheme,
     })),
   );
+  const isAdmin = useAuthStore((state) => state.user?.role === "ADMIN");
   const fileRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState("appearance");
   const [resetOpen, setResetOpen] = useState(false);
@@ -222,7 +229,7 @@ export function SettingsPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">设置</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          外观设置保存在浏览器本地；账户设置会同步到后端。
+          外观设置保存在浏览器本地；登录页背景与账户设置会同步到后端。
         </p>
       </div>
 
@@ -479,12 +486,19 @@ export function SettingsPage() {
                         className="h-40 w-full"
                         actionLabel="上传背景图片"
                         cropAspect={16 / 9}
+                        preview={false}
                       />
                       <BackgroundSliders />
                     </>
                   ) : null}
+                  <ComponentOpacitySlider />
+                  <p className="text-[11px] text-muted-foreground">
+                    建议使用 16:9 横图（至少 1920×1080）；组件不透明度作用于卡片、面板与浮层。
+                  </p>
                 </div>
               </section>
+
+              {isAdmin ? <AuthBackgroundSection /> : null}
 
               <section className="ui-card p-5">
                 <SectionTitle
@@ -767,7 +781,7 @@ function ScaleControl() {
       <RangeSlider
         min={0.9}
         max={1.1}
-        step={0.01}
+        step={0.001}
         value={scale}
         onChange={(next) => set({ scale: next })}
         className="mt-2 w-full"
@@ -785,7 +799,7 @@ function BackgroundSliders() {
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
         <div>
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium">遮罩不透明度</span>
@@ -796,7 +810,7 @@ function BackgroundSliders() {
           <RangeSlider
             min={0.4}
             max={0.98}
-            step={0.01}
+            step={0.001}
             value={backgroundOpacity}
             onChange={(next) => set({ backgroundOpacity: next })}
             className="mt-2 w-full"
@@ -806,12 +820,14 @@ function BackgroundSliders() {
         <div>
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium">背景模糊</span>
-            <span className="text-muted-foreground tabular">{backgroundBlur}px</span>
+            <span className="text-muted-foreground tabular">
+              {Math.round(backgroundBlur)}px
+            </span>
           </div>
           <RangeSlider
             min={0}
             max={20}
-            step={1}
+            step={0.1}
             value={backgroundBlur}
             onChange={(next) => set({ backgroundBlur: next })}
             className="mt-2 w-full"
@@ -844,6 +860,358 @@ function BackgroundSliders() {
   );
 }
 
+function ComponentOpacitySlider() {
+  const componentOpacity = useThemeStore((state) => state.componentOpacity);
+  const set = useThemeStore((state) => state.set);
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/25 p-3">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium">组件不透明度</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground tabular">
+            {Math.round(componentOpacity * 100)}%
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[10px] text-muted-foreground"
+            onClick={() => set({ componentOpacity: DEFAULT_COMPONENT_OPACITY })}
+            disabled={componentOpacity === DEFAULT_COMPONENT_OPACITY}
+          >
+            <RotateCcw className="h-3 w-3" />
+            重置
+          </Button>
+        </div>
+      </div>
+      <RangeSlider
+        min={0.4}
+        max={1}
+        step={0.001}
+        value={componentOpacity}
+        onChange={(next) => set({ componentOpacity: next })}
+        className="mt-2 w-full"
+        aria-label="组件不透明度"
+      />
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        调整卡片、面板与浮层背景的透明度，文字保持不透明；建议不低于 60%。
+      </p>
+    </div>
+  );
+}
+
+type AuthBackgroundType = "none" | "gradient" | "image";
+
+interface AuthBackgroundDraft {
+  image: string;
+  opacity: number;
+  blur: number;
+  component: number;
+}
+
+const AUTH_BG_DEFAULTS: AuthBackgroundDraft = { image: "", opacity: 0.78, blur: 0, component: 1 };
+
+/** 服务端只接受整数模糊值，比较与提交前统一归一化，避免滑块反复触发保存。 */
+function serializeAuthDraft(draft: AuthBackgroundDraft, type: AuthBackgroundType) {
+  return JSON.stringify({
+    type,
+    image: draft.image,
+    opacity: Number(draft.opacity.toFixed(3)),
+    blur: Math.round(draft.blur),
+    component: Number(draft.component.toFixed(3)),
+  });
+}
+
+function AuthBackgroundSection() {
+  const queryClient = useQueryClient();
+  const { data, isLoading } = useAuthBackgroundQuery();
+  const [draft, setDraft] = useState<AuthBackgroundDraft>(AUTH_BG_DEFAULTS);
+  const [type, setType] = useState<AuthBackgroundType>("none");
+  const hydratedRef = useRef(false);
+  const savedRef = useRef(serializeAuthDraft(AUTH_BG_DEFAULTS, "none"));
+
+  useEffect(() => {
+    if (hydratedRef.current || !data) return;
+    const next: AuthBackgroundDraft = {
+      image: data.imageUrl ?? "",
+      opacity: data.backgroundOpacity ?? AUTH_BG_DEFAULTS.opacity,
+      blur: data.backgroundBlur ?? AUTH_BG_DEFAULTS.blur,
+      component: data.componentOpacity ?? AUTH_BG_DEFAULTS.component,
+    };
+    const storedType = (data.backgroundType ?? (next.image ? "IMAGE" : "NONE")).toLowerCase();
+    const nextType: AuthBackgroundType =
+      storedType === "gradient" ? "gradient" : storedType === "image" ? "image" : "none";
+    setDraft(next);
+    setType(nextType);
+    savedRef.current = serializeAuthDraft(next, nextType);
+    hydratedRef.current = true;
+  }, [data]);
+
+  const save = useMutation({
+    mutationFn: ({ next, mode }: { next: AuthBackgroundDraft; mode: AuthBackgroundType }) =>
+      appearanceService.updateAuthBackground({
+        backgroundType: mode === "none" ? "NONE" : mode === "gradient" ? "GRADIENT" : "IMAGE",
+        imageUrl: mode === "none" ? "" : next.image,
+        backgroundOpacity: next.opacity,
+        backgroundBlur: Math.round(next.blur),
+        componentOpacity: next.component,
+      }),
+    onSuccess: (result, variables) => {
+      queryClient.setQueryData(queryKeys.authBackground, result);
+      savedRef.current = serializeAuthDraft(
+        {
+          image: result.imageUrl ?? "",
+          opacity: result.backgroundOpacity ?? AUTH_BG_DEFAULTS.opacity,
+          blur: result.backgroundBlur ?? AUTH_BG_DEFAULTS.blur,
+          component: result.componentOpacity ?? AUTH_BG_DEFAULTS.component,
+        },
+        variables.mode,
+      );
+    },
+    onError: (error) => toast.error("登录页背景保存失败", getErrorMessage(error)),
+  });
+  const { mutate } = save;
+
+  // 滑块拖动时只更新本地预览，停顿 600ms 后整体同步到服务端。
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const payload = serializeAuthDraft(draft, type);
+    if (payload === savedRef.current) return;
+    const timer = setTimeout(() => mutate({ next: draft, mode: type }), 600);
+    return () => clearTimeout(timer);
+  }, [draft, type, mutate]);
+
+  const patchDraft = (patch: Partial<AuthBackgroundDraft>) =>
+    setDraft((current) => ({ ...current, ...patch }));
+
+  return (
+    <section className="ui-card p-5">
+      <SectionTitle
+        icon={LogIn}
+        title="登录页背景"
+        description="登录与注册页共用，对所有访客生效。"
+      />
+      <div className="mt-4 space-y-4">
+        <AuthBackgroundPreview draft={draft} type={type} />
+        <OptionRow label="背景类型">
+          <Pill active={type === "none"} onClick={() => setType("none")}>
+            纯色
+          </Pill>
+          <Pill active={type === "gradient"} onClick={() => setType("gradient")}>
+            渐变光晕
+          </Pill>
+          <Pill active={type === "image"} onClick={() => setType("image")}>
+            自定义图片
+          </Pill>
+        </OptionRow>
+        {type === "image" ? (
+          <>
+            <ImageUpload
+              value={draft.image}
+              onChange={(image) => patchDraft({ image })}
+              category="background"
+              className="h-40 w-full"
+              actionLabel="上传背景图片"
+              cropAspect={16 / 9}
+              preview={false}
+              disabled={isLoading}
+            />
+            <AuthBackgroundSliders draft={draft} onChange={patchDraft} />
+          </>
+        ) : null}
+        <AuthComponentOpacitySlider draft={draft} onChange={patchDraft} />
+        <p className="text-[11px] text-muted-foreground">
+          建议使用 16:9 横图（至少 1920×1080）；组件不透明度作用于登录卡片与左侧介绍栏。
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function AuthBackgroundPreview({
+  draft,
+  type,
+}: {
+  draft: AuthBackgroundDraft;
+  type: AuthBackgroundType;
+}) {
+  const image = resolveImageUrl(draft.image) ?? "";
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
+  const hasImage = type === "image" && image.length > 0 && image !== brokenUrl;
+  const label =
+    type === "none"
+      ? "纯色"
+      : type === "gradient"
+        ? "渐变光晕"
+        : hasImage
+          ? "自定义图片"
+          : "等待上传图片";
+
+  return (
+    <div className="relative h-40 overflow-hidden rounded-xl border border-border/60 bg-background">
+      {type === "gradient" ? (
+        <div
+          className="absolute inset-0"
+          style={{ backgroundImage: AUTH_GRADIENT_BACKGROUND }}
+        />
+      ) : null}
+      {hasImage ? (
+        <img
+          src={image}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{
+            filter: `blur(${draft.blur}px)`,
+            transform: draft.blur > 0 ? "scale(1.08)" : undefined,
+          }}
+          onError={() => setBrokenUrl(image)}
+        />
+      ) : null}
+      {type === "image" ? (
+        <div
+          className="absolute inset-0"
+          style={{ backgroundColor: "var(--background)", opacity: draft.opacity }}
+        />
+      ) : null}
+      <div className="relative z-10 flex h-full flex-col justify-between p-3">
+        <div className="flex items-start justify-between gap-3">
+          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur">
+            登录页背景
+          </span>
+          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+            {label}
+          </span>
+        </div>
+        <div
+          className="max-w-[72%] rounded-lg border border-border/60 p-2.5 shadow-sm backdrop-blur-sm"
+          style={{
+            backgroundColor: `color-mix(in oklab, var(--card) ${Math.round(
+              draft.component * 100,
+            )}%, transparent)`,
+          }}
+        >
+          <p className="text-[11px] font-semibold">登录页效果实时预览</p>
+          <div className="mt-1.5 h-1.5 w-24 rounded-full bg-muted" />
+          <div className="mt-1 h-1.5 w-16 rounded-full bg-muted" />
+          {type === "image" ? (
+            <p className="mt-1.5 text-[10px] text-muted-foreground tabular">
+              遮罩 {Math.round(draft.opacity * 100)}% · 模糊 {Math.round(draft.blur)}px ·
+              组件 {Math.round(draft.component * 100)}%
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AuthBackgroundSliders({
+  draft,
+  onChange,
+}: {
+  draft: AuthBackgroundDraft;
+  onChange: (patch: Partial<AuthBackgroundDraft>) => void;
+}) {
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium">遮罩不透明度</span>
+            <span className="text-muted-foreground tabular">
+              {Math.round(draft.opacity * 100)}%
+            </span>
+          </div>
+          <RangeSlider
+            min={0.4}
+            max={0.98}
+            step={0.001}
+            value={draft.opacity}
+            onChange={(opacity) => onChange({ opacity })}
+            className="mt-2 w-full"
+            aria-label="登录页遮罩不透明度"
+          />
+        </div>
+        <div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-medium">背景模糊</span>
+            <span className="text-muted-foreground tabular">{Math.round(draft.blur)}px</span>
+          </div>
+          <RangeSlider
+            min={0}
+            max={20}
+            step={0.1}
+            value={draft.blur}
+            onChange={(blur) => onChange({ blur })}
+            className="mt-2 w-full"
+            aria-label="登录页背景模糊"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-[11px] text-muted-foreground"
+          onClick={() => onChange({ opacity: AUTH_BG_DEFAULTS.opacity, blur: AUTH_BG_DEFAULTS.blur })}
+          disabled={
+            draft.opacity === AUTH_BG_DEFAULTS.opacity && draft.blur === AUTH_BG_DEFAULTS.blur
+          }
+        >
+          <RotateCcw className="h-3 w-3" />
+          重置遮罩与模糊
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function AuthComponentOpacitySlider({
+  draft,
+  onChange,
+}: {
+  draft: AuthBackgroundDraft;
+  onChange: (patch: Partial<AuthBackgroundDraft>) => void;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-muted/25 p-3">
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium">组件不透明度</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground tabular">
+            {Math.round(draft.component * 100)}%
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[10px] text-muted-foreground"
+            onClick={() => onChange({ component: AUTH_BG_DEFAULTS.component })}
+            disabled={draft.component === AUTH_BG_DEFAULTS.component}
+          >
+            <RotateCcw className="h-3 w-3" />
+            重置
+          </Button>
+        </div>
+      </div>
+      <RangeSlider
+        min={0.4}
+        max={1}
+        step={0.001}
+        value={draft.component}
+        onChange={(component) => onChange({ component })}
+        className="mt-2 w-full"
+        aria-label="登录页组件不透明度"
+      />
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        调整登录卡片与左侧介绍栏的透明度，文字保持不透明；改动会自动保存。
+      </p>
+    </div>
+  );
+}
+
 function BackgroundPreview({
   background,
   image,
@@ -855,15 +1223,13 @@ function BackgroundPreview({
   const blur = useThemeStore((state) => state.backgroundBlur);
   const hasImage = background === "image" && image.trim().length > 0;
   const label =
-    background === "none"
-      ? "无背景"
-      : background === "solid"
-        ? "纯色"
-        : background === "gradient"
-          ? "渐变光晕"
-          : hasImage
-            ? "自定义图片"
-            : "等待上传图片";
+    background === "solid"
+      ? "纯色"
+      : background === "gradient"
+        ? "渐变光晕"
+        : hasImage
+          ? "自定义图片"
+          : "等待上传图片";
 
   return (
     <div className="relative h-40 overflow-hidden rounded-xl border border-border/60 bg-background">
@@ -883,7 +1249,7 @@ function BackgroundPreview({
           <div className="mt-1 h-1.5 w-16 rounded-full bg-muted" />
           {background === "image" ? (
             <p className="mt-1.5 text-[10px] text-muted-foreground tabular">
-              遮罩 {Math.round(opacity * 100)}% · 模糊 {blur}px
+              遮罩 {Math.round(opacity * 100)}% · 模糊 {Math.round(blur)}px
             </p>
           ) : null}
         </div>

@@ -3,6 +3,7 @@ import { Check, RotateCcw, SkipForward, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { RangeSlider } from "@/components/ui/range-slider";
+import { cn } from "@/lib/cn";
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
@@ -14,6 +15,7 @@ interface ImageCropDialogProps {
   fileName: string;
   fileType: string;
   aspect: number;
+  shape?: "rect" | "circle";
   onClose: () => void;
   onUseOriginal: () => void;
   onConfirm: (file: File) => void;
@@ -29,10 +31,12 @@ export function ImageCropDialog({
   fileName,
   fileType,
   aspect,
+  shape = "rect",
   onClose,
   onUseOriginal,
   onConfirm,
 }: ImageCropDialogProps) {
+  const circular = shape === "circle";
   const containerRef = useRef<HTMLDivElement>(null);
   const windowRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -169,9 +173,18 @@ export function ImageCropDialog({
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
     context.drawImage(image, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+    if (circular) {
+      context.globalCompositeOperation = "destination-in";
+      context.beginPath();
+      context.arc(outW / 2, outH / 2, Math.min(outW, outH) / 2, 0, Math.PI * 2);
+      context.fill();
+      context.globalCompositeOperation = "source-over";
+    }
 
-    const supported = ["image/png", "image/jpeg", "image/webp"];
-    const mime = supported.includes(fileType) ? fileType : "image/jpeg";
+    const supported = circular
+      ? ["image/png"]
+      : ["image/png", "image/jpeg", "image/webp"];
+    const mime = supported.includes(fileType) ? fileType : "image/png";
     const extension = mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg";
     canvas.toBlob(
       (blob) => {
@@ -220,7 +233,10 @@ export function ImageCropDialog({
             <div
               ref={windowRef}
               style={{ width: viewport.width, height: viewport.height }}
-              className="relative cursor-grab touch-none overflow-hidden rounded-lg bg-foreground/[0.06] select-none active:cursor-grabbing"
+              className={cn(
+                "relative cursor-grab touch-none overflow-hidden bg-foreground/[0.06] select-none active:cursor-grabbing",
+                circular ? "rounded-full" : "rounded-lg",
+              )}
               onPointerDown={(event) => {
                 if (!imageReady) return;
                 event.preventDefault();
@@ -269,7 +285,12 @@ export function ImageCropDialog({
                 <div className="absolute top-0 bottom-0 left-2/3 w-px bg-white/30" />
               </div>
               {/* 裁剪框描边 */}
-              <div className="pointer-events-none absolute inset-0 rounded-lg ring-2 ring-white/80" />
+              <div
+                className={cn(
+                  "pointer-events-none absolute inset-0 ring-2 ring-white/80",
+                  circular ? "rounded-full" : "rounded-lg",
+                )}
+              />
             </div>
           ) : (
             <div className="text-xs text-muted-foreground">正在加载图片…</div>
@@ -284,7 +305,7 @@ export function ImageCropDialog({
           <RangeSlider
             min={MIN_ZOOM}
             max={MAX_ZOOM}
-            step={0.05}
+            step={0.001}
             value={zoom}
             onChange={handleZoom}
             className="flex-1"

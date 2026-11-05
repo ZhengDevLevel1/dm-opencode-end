@@ -1,9 +1,7 @@
 # ---------- Frontend ----------
+
 # 依赖
 node_modules/
-# 或者如果前端在子目录中：
-# frontend/node_modules/
-# web/node_modules/
 
 # 构建产物
 dist/
@@ -22,8 +20,30 @@ pnpm-debug.log*
 .env.local
 .env.*.local
 
+# ---------- Backend ----------
+
+# Maven 编译产物 / 打包结果
+target/
+backend/target/
+
+# 运行日志
+logs/
+backend/logs/
+*.log
+
+# ---------- 本地临时文件 ----------
+
+# 智能体/会话临时产物
+.scratch/
+session-*.md
+
 # 编辑器/系统文件
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
+
+# 其他
+*.class
+*.jar
+hs_err_pid*

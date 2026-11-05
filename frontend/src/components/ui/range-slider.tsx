@@ -43,6 +43,7 @@ export function RangeSlider({
     if (!input || draggingRef.current) return;
     const current = Number(input.value);
     if (!Number.isNaN(current) && current !== value) input.value = String(value);
+    reportedRef.current = value;
   }, [value]);
 
   useEffect(

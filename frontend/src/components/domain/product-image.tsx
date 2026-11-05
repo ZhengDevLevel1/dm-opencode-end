@@ -9,6 +9,7 @@ interface ProductImageProps {
   seed?: string;
   className?: string;
   iconClassName?: string;
+  fit?: "cover" | "contain";
   overlay?: ReactNode;
 }
 
@@ -18,6 +19,7 @@ export function ProductImage({
   seed,
   className,
   iconClassName,
+  fit = "cover",
   overlay,
 }: ProductImageProps) {
   const resolved = resolveImageUrl(src);
@@ -32,7 +34,10 @@ export function ProductImage({
           alt={alt}
           loading="lazy"
           onError={() => setBroken(true)}
-          className="h-full w-full object-cover"
+          className={cn(
+            "h-full w-full",
+            fit === "contain" ? "object-contain" : "object-cover",
+          )}
         />
       ) : (
         <div

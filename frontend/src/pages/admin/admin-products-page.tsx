@@ -899,7 +899,8 @@ function ProductEditorDialog({
               setValue("imageUrl", url, { shouldDirty: true, shouldValidate: true })
             }
             category="product"
-            className="h-36 w-full"
+            cropAspect={4 / 5}
+            className="aspect-[4/5] w-40"
             actionLabel="上传商品图片"
           />
         </div>

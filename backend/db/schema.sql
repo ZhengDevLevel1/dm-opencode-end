@@ -258,3 +258,15 @@ CREATE TABLE operation_log (
     KEY idx_op_log_module (module),
     KEY idx_op_log_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志表';
+
+CREATE TABLE appearance_setting (
+    id BIGINT NOT NULL,
+    auth_background_image VARCHAR(500) DEFAULT NULL,
+    background_type VARCHAR(20) DEFAULT NULL COMMENT 'NONE/GRADIENT/IMAGE',
+    background_opacity DOUBLE NOT NULL DEFAULT 0.78,
+    background_blur INT NOT NULL DEFAULT 0,
+    component_opacity DOUBLE NOT NULL DEFAULT 1,
+    updated_by BIGINT DEFAULT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='外观设置表';

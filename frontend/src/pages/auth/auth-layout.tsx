@@ -1,9 +1,12 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Flower2, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useResolvedDark } from "@/app/providers/theme-provider";
 import { useThemeStore } from "@/stores/theme";
 import { runWithThemeTransition, nextThemeMode } from "@/lib/theme-transition";
+import { useAuthBackgroundQuery } from "@/hooks/queries";
+import { resolveImageUrl } from "@/lib/image";
+import { AUTH_GRADIENT_BACKGROUND } from "@/lib/auth-background";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 
@@ -20,10 +23,62 @@ export function AuthLayout({
 }) {
   const dark = useResolvedDark();
   const setTheme = useThemeStore((state) => state.set);
+  const { data: authBackground } = useAuthBackgroundQuery();
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const resolvedImage = resolveImageUrl(authBackground?.imageUrl);
+  const backgroundImage = resolvedImage && resolvedImage !== failedUrl ? resolvedImage : null;
+  const backgroundType = (
+    authBackground?.backgroundType ?? (authBackground?.imageUrl ? "IMAGE" : "NONE")
+  ).toUpperCase();
+  const showGradient = backgroundType === "GRADIENT";
+  const showImage = backgroundType === "IMAGE" && Boolean(backgroundImage);
+  const hasBackdrop = showGradient || showImage;
+  const maskOpacity = authBackground?.backgroundOpacity ?? 0.78;
+  const blur = authBackground?.backgroundBlur ?? 0;
+  const surfaceOpacity = authBackground?.componentOpacity ?? 1;
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <aside className="relative hidden w-[44%] max-w-[640px] flex-col justify-between overflow-hidden border-r border-border/50 bg-sidebar p-10 lg:flex">
+    <div className="relative flex min-h-screen bg-background">
+      {showGradient ? (
+        <div
+          className="absolute inset-0 z-0"
+          style={{ backgroundImage: AUTH_GRADIENT_BACKGROUND }}
+          aria-hidden="true"
+        />
+      ) : null}
+      {showImage ? (
+        <div className="absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+          <img
+            src={backgroundImage ?? undefined}
+            alt=""
+            className="h-full w-full object-cover"
+            style={{
+              filter: `blur(${blur}px)`,
+              transform: blur > 0 ? "scale(1.08)" : undefined,
+            }}
+            onError={() => setFailedUrl(backgroundImage)}
+          />
+          <div
+            className="absolute inset-0"
+            style={{ backgroundColor: "var(--background)", opacity: maskOpacity }}
+          />
+        </div>
+      ) : null}
+      <aside
+        className={cn(
+          "relative z-[1] hidden w-[44%] max-w-[640px] flex-col justify-between overflow-hidden border-r border-border/50 p-10 lg:flex",
+          hasBackdrop ? "border-border/30" : "bg-sidebar",
+        )}
+        style={
+          hasBackdrop
+            ? {
+                backgroundColor: `color-mix(in oklab, var(--sidebar) ${Math.round(
+                  surfaceOpacity * 100,
+                )}%, transparent)`,
+              }
+            : undefined
+        }
+      >
         <div className="relative z-[1]">
           <Link to="/" className="inline-flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
@@ -79,7 +134,7 @@ export function AuthLayout({
         </div>
       </aside>
 
-      <main className="relative flex flex-1 flex-col">
+      <main className="relative z-[1] flex flex-1 flex-col">
         <div className="flex items-center justify-between p-5 lg:justify-end">
           <Link to="/" className="flex items-center gap-2 lg:hidden">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -105,7 +160,20 @@ export function AuthLayout({
               <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
               <p className="mt-1.5 text-sm text-muted-foreground">{description}</p>
             </div>
-            <div className="ui-card p-6">{children}</div>
+            <div
+              className="ui-card p-6"
+              style={
+                hasBackdrop
+                  ? {
+                      backgroundColor: `color-mix(in oklab, var(--card) ${Math.round(
+                        surfaceOpacity * 100,
+                      )}%, transparent)`,
+                    }
+                  : undefined
+              }
+            >
+              {children}
+            </div>
             {footer ? <div className="mt-4 text-center text-xs text-muted-foreground">{footer}</div> : null}
           </div>
         </div>

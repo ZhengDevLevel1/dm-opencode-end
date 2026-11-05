@@ -120,9 +120,8 @@ export function ProductCard({
             ) : null}
             {onAddToCart ? (
               <Button
-                variant={unavailable ? "ghost" : "secondary"}
+                variant="ghost"
                 size="icon-sm"
-                className="shadow-none"
                 aria-label="加入购物车"
                 disabled={unavailable || addPending}
                 onClick={(event) => {
@@ -134,7 +133,7 @@ export function ProductCard({
                 {addPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <ShoppingBag className="h-4 w-4" />
+                  <ShoppingBag className="h-4 w-4 text-muted-foreground" />
                 )}
               </Button>
             ) : null}

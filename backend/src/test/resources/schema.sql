@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS appearance_setting;
 DROP TABLE IF EXISTS operation_log;
 DROP TABLE IF EXISTS recommendation_log;
 DROP TABLE IF EXISTS recommendation_weight;
@@ -217,4 +218,15 @@ CREATE TABLE operation_log (
     ip VARCHAR(64),
     duration_ms BIGINT,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE appearance_setting (
+    id BIGINT PRIMARY KEY,
+    auth_background_image VARCHAR(500),
+    background_type VARCHAR(20),
+    background_opacity DOUBLE DEFAULT 0.78,
+    background_blur INT DEFAULT 0,
+    component_opacity DOUBLE DEFAULT 1,
+    updated_by BIGINT,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

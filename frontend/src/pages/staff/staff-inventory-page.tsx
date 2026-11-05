@@ -1043,7 +1043,8 @@ function ProductStockCard({
         src={product.imageUrl}
         alt={product.name}
         seed={product.name}
-        className="h-44 w-full"
+        fit="contain"
+        className="aspect-[4/5] w-full bg-muted/30"
         iconClassName="h-8 w-8"
         overlay={
           <div className="absolute inset-x-2 top-2 flex justify-between gap-2">

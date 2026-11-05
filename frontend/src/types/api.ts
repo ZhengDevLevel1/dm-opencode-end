@@ -94,6 +94,25 @@ export interface FileUploadVO {
   size: number;
 }
 
+export type AuthBackgroundType = "NONE" | "GRADIENT" | "IMAGE";
+
+export interface AuthBackgroundVO {
+  backgroundType?: AuthBackgroundType;
+  imageUrl?: string;
+  backgroundOpacity?: number;
+  backgroundBlur?: number;
+  componentOpacity?: number;
+  updatedAt?: string;
+}
+
+export interface AuthBackgroundRequest {
+  backgroundType?: AuthBackgroundType;
+  imageUrl: string;
+  backgroundOpacity?: number;
+  backgroundBlur?: number;
+  componentOpacity?: number;
+}
+
 export interface ChangePasswordRequest {
   oldPassword: string;
   newPassword: string;
