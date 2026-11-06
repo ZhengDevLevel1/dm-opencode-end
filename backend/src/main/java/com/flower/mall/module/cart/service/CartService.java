@@ -42,12 +42,17 @@ public class CartService {
     @Transactional
     public CartItemVO add(CartAddRequest request) {
         Long userId = SecurityUtils.currentUserId();
+
         Product product = productMapper.selectById(request.getProductId());
+
         validateProduct(product, request.getQuantity());
+
         CartItem existing = cartItemMapper.selectOne(Wrappers.<CartItem>lambdaQuery()
                 .eq(CartItem::getUserId, userId)
                 .eq(CartItem::getProductId, request.getProductId()));
+
         int targetQuantity = request.getQuantity();
+
         if (existing != null) {
             targetQuantity = existing.getQuantity() + request.getQuantity();
             validateStock(product, targetQuantity);
@@ -55,6 +60,7 @@ public class CartService {
             cartItemMapper.updateById(existing);
             return CartItemVO.from(existing, product);
         }
+
         CartItem item = new CartItem();
         item.setUserId(userId);
         item.setProductId(request.getProductId());
