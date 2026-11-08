@@ -80,12 +80,25 @@ export interface LoginRequest {
   password: string;
 }
 
+export type EmailCodeScene = "LOGIN" | "REGISTER";
+
+export interface EmailCodeRequest {
+  email: string;
+  scene: EmailCodeScene;
+}
+
+export interface EmailCodeLoginRequest {
+  email: string;
+  code: string;
+}
+
 export interface RegisterRequest {
   username: string;
   password: string;
   nickname?: string;
   phone?: string;
-  email?: string;
+  email: string;
+  emailCode: string;
 }
 
 export interface UpdateProfileRequest {
@@ -210,6 +223,7 @@ export interface ThemePreference {
   backgroundOpacity: number;
   backgroundBlur: number;
   componentOpacity: number;
+  sidebarPinned: boolean;
   updatedAt?: string;
 }
 

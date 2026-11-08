@@ -3,6 +3,7 @@ import { getErrorMessage } from "@/lib/api-client";
 import { preferenceService } from "@/lib/services";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore, type ThemeState } from "@/stores/theme";
+import { useUiStore } from "@/stores/ui";
 import { toast } from "@/stores/toast";
 import type { ThemePreference, ThemePreferenceRequest } from "@/types/api";
 
@@ -30,6 +31,7 @@ function toPayload(state: ThemeState): ThemePayload {
     backgroundOpacity: state.backgroundOpacity,
     backgroundBlur: state.backgroundBlur,
     componentOpacity: state.componentOpacity,
+    sidebarPinned: useUiStore.getState().sidebarPinned,
   };
 }
 
@@ -50,6 +52,7 @@ function normalize(preference: ThemePreference): ThemePayload {
     backgroundOpacity: preference.backgroundOpacity,
     backgroundBlur: preference.backgroundBlur,
     componentOpacity: preference.componentOpacity,
+    sidebarPinned: preference.sidebarPinned ?? false,
   };
 }
 
@@ -58,7 +61,9 @@ function serialize(payload: ThemePayload): string {
 }
 
 function applyPayload(payload: ThemePayload) {
-  useThemeStore.setState(payload);
+  const { sidebarPinned, ...theme } = payload;
+  useThemeStore.setState(theme);
+  useUiStore.getState().setSidebarPinned(sidebarPinned);
 }
 
 export function ThemePreferenceSync() {
@@ -91,6 +96,7 @@ export function ThemePreferenceSync() {
           useThemeStore.getState().reset();
           lastSyncedRef.current = "";
         }
+        useUiStore.getState().setSidebarPinned(false);
         prevUserIdRef.current = null;
         window.setTimeout(() => {
           applyingRef.current = false;
@@ -137,14 +143,17 @@ export function ThemePreferenceSync() {
 
   useEffect(() => {
     if (status !== "authenticated" || userId === null) return;
-    const unsubscribe = useThemeStore.subscribe((state) => {
-      if (applyingRef.current) return;
-      const payload = toPayload(state);
-      const serialized = serialize(payload);
-      if (serialized === lastSyncedRef.current) return;
+
+    const shouldSync = () => {
+      if (applyingRef.current) return false;
+      return serialize(toPayload(useThemeStore.getState())) !== lastSyncedRef.current;
+    };
+
+    const scheduleSave = () => {
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => {
         timerRef.current = null;
+        const payload = toPayload(useThemeStore.getState());
         void preferenceService
           .save(payload)
           .then((saved) => {
@@ -156,9 +165,20 @@ export function ThemePreferenceSync() {
             toast.error("外观偏好保存失败", getErrorMessage(error));
           });
       }, SAVE_DELAY);
+    };
+
+    const unsubscribeTheme = useThemeStore.subscribe(() => {
+      if (!shouldSync()) return;
+      scheduleSave();
     });
+    const unsubscribeUi = useUiStore.subscribe(() => {
+      if (!shouldSync()) return;
+      scheduleSave();
+    });
+
     return () => {
-      unsubscribe();
+      unsubscribeTheme();
+      unsubscribeUi();
       if (timerRef.current !== null) {
         window.clearTimeout(timerRef.current);
         timerRef.current = null;

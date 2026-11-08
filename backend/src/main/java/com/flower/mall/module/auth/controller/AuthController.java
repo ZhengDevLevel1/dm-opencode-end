@@ -1,6 +1,8 @@
 package com.flower.mall.module.auth.controller;
 
 import com.flower.mall.common.api.ApiResponse;
+import com.flower.mall.module.auth.dto.EmailCodeLoginRequest;
+import com.flower.mall.module.auth.dto.EmailCodeRequest;
 import com.flower.mall.module.auth.service.AuthService;
 import com.flower.mall.module.log.annotation.OperationLogRecord;
 import com.flower.mall.module.user.dto.ChangePasswordRequest;
@@ -31,6 +33,14 @@ public class AuthController {
     private final AuthService authService;
     private final UserService userService;
 
+    @Operation(summary = "发送邮箱验证码")
+    @PostMapping("/email-code")
+    @OperationLogRecord(module = "认证", operation = "发送邮箱验证码", saveParams = false)
+    public ApiResponse<Void> sendEmailCode(@Valid @RequestBody EmailCodeRequest request) {
+        authService.sendEmailCode(request);
+        return ApiResponse.ok();
+    }
+
     @Operation(summary = "会员注册")
     @PostMapping("/register")
     public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request) {
@@ -42,6 +52,13 @@ public class AuthController {
     @OperationLogRecord(module = "认证", operation = "用户登录", saveParams = false)
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ApiResponse.ok(authService.login(request));
+    }
+
+    @Operation(summary = "邮箱验证码登录")
+    @PostMapping("/login/email")
+    @OperationLogRecord(module = "认证", operation = "邮箱验证码登录", saveParams = false)
+    public ApiResponse<LoginResponse> loginByEmail(@Valid @RequestBody EmailCodeLoginRequest request) {
+        return ApiResponse.ok(authService.loginByEmail(request));
     }
 
     @Operation(summary = "退出登录")

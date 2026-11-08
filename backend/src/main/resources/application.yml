@@ -39,6 +39,29 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
+  # 邮件服务（QQ 邮箱 SMTP），用于登录/注册邮箱验证码；账号与授权码可用环境变量覆盖
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:3925442610@qq.com}
+    password: ${MAIL_PASSWORD:mjanwwtbshqscfcg}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          ssl:
+            enable: true
+          socketFactory:
+            port: 465
+            class: javax.net.ssl.SSLSocketFactory
+          connectiontimeout: 5000
+          timeout: 3000
+          writetimeout: 5000
 
 mybatis-plus:
   configuration:

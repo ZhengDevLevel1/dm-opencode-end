@@ -17,6 +17,11 @@ public enum ErrorCode {
     LOGIN_FAILED(1003, 401, "用户名或密码错误"),
     USER_DISABLED(1004, 403, "账号已被禁用"),
     PASSWORD_INCORRECT(1005, 400, "原密码不正确"),
+    EMAIL_CODE_INVALID(1006, 400, "验证码错误或已过期"),
+    EMAIL_CODE_TOO_FREQUENT(1007, 429, "验证码发送过于频繁，请稍后再试"),
+    EMAIL_NOT_REGISTERED(1008, 404, "该邮箱尚未注册"),
+    EMAIL_ALREADY_REGISTERED(1009, 409, "该邮箱已被注册"),
+    MAIL_SEND_FAILED(1010, 500, "验证码邮件发送失败，请稍后重试"),
 
     PRODUCT_NOT_FOUND(2001, 404, "商品不存在"),
     PRODUCT_OFF_SHELF(2002, 409, "商品已下架"),

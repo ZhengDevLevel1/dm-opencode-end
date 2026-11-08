@@ -147,6 +147,11 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | `1003` | `401` | 用户名或密码错误 | 登录失败 |
 | `1004` | `403` | 账号已被禁用 | 禁用账号登录 |
 | `1005` | `400` | 原密码不正确 | 修改密码 |
+| `1006` | `400` | 验证码错误或已过期 | 邮箱验证码错误、过期或尝试次数过多 |
+| `1007` | `429` | 验证码发送过于频繁，请稍后再试 | 同一邮箱同一场景 60 秒内重复发送 |
+| `1008` | `404` | 该邮箱尚未注册 | 邮箱验证码登录或登录场景发送验证码 |
+| `1009` | `409` | 该邮箱已被注册 | 注册场景发送验证码或提交注册 |
+| `1010` | `500` | 验证码邮件发送失败，请稍后重试 | SMTP 连接、鉴权或邮件写入失败 |
 | `2001` | `404` | 商品不存在 | 商品 ID 不存在或已删除 |
 | `2002` | `409` | 商品已下架 | 公开详情、收藏、购物车、下单 |
 | `2003` | `409` | 商品库存不足 | 加购、下单、库存调整 |
@@ -269,7 +274,9 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | 方法 | 路径 | 权限 | 响应 |
 | --- | --- | --- | --- |
 | POST | `/api/auth/register` | 公开 | `ApiResponse<UserVO>` |
+| POST | `/api/auth/email-code` | 公开 | `ApiResponse<Void>` |
 | POST | `/api/auth/login` | 公开 | `ApiResponse<LoginResponse>` |
+| POST | `/api/auth/login/email` | 公开 | `ApiResponse<LoginResponse>` |
 | POST | `/api/auth/logout` | 登录 | `ApiResponse<Void>` |
 | GET | `/api/auth/me` | 登录 | `ApiResponse<UserVO>` |
 | PUT | `/api/auth/me` | 登录 | `ApiResponse<UserVO>` |
@@ -330,7 +337,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<TagOptionVO>` |
 | DELETE | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<Void>` |
 | PUT | `/api/admin/tags/max-count` | 管理员 | `ApiResponse<{ maxCount: number }>` |
-![alt text](image.png)| GET | `/api/admin/metrics` | 管理员 | `ApiResponse<MetricConfigVO>` |
+| GET | `/api/admin/metrics` | 管理员 | `ApiResponse<MetricConfigVO>` |
 | PUT | `/api/admin/metrics` | 管理员 | `ApiResponse<MetricConfigVO>` |
 | GET | `/api/admin/reviews` | 管理员 | `ApiResponse<PageResult<ReviewVO>>` |
 | PUT | `/api/admin/reviews/{id}/status` | 管理员 | `ApiResponse<ReviewVO>` |
@@ -354,8 +361,10 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/api/auth/register` | 公开 | 注册消费者账号 |
-| POST | `/api/auth/login` | 公开 | 登录并获取 JWT |
+| POST | `/api/auth/register` | 公开 | 注册消费者账号（需邮箱验证码） |
+| POST | `/api/auth/email-code` | 公开 | 发送登录/注册邮箱验证码 |
+| POST | `/api/auth/login` | 公开 | 使用用户名密码登录并获取 JWT |
+| POST | `/api/auth/login/email` | 公开 | 使用邮箱验证码登录并获取 JWT |
 | POST | `/api/auth/logout` | 登录 | 吊销当前 JWT 会话 |
 | GET | `/api/auth/me` | 登录 | 获取当前用户资料 |
 | PUT | `/api/auth/me` | 登录 | 修改当前用户资料 |
@@ -373,7 +382,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | `password` | string | 是 | 6-32 位 |
 | `nickname` | string | 否 | 最长 30；为空时默认使用用户名 |
 | `phone` | string | 否 | 空字符串或中国大陆手机号 `1[3-9]xxxxxxxxx` |
-| `email` | string | 否 | 邮箱格式 |
+| `email` | string | 是 | 邮箱格式；注册后可作为邮箱验证码登录账号，不可与其他账号重复 |
+| `emailCode` | string | 是 | 6 位数字；需先调用 `POST /api/auth/email-code` 且 `scene=REGISTER` |
 
 `LoginRequest`
 
@@ -381,6 +391,27 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | --- | --- | --- |
 | `username` | string | 是 |
 | `password` | string | 是 |
+
+`EmailCodeRequest`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `email` | string | 是 | 接收验证码的邮箱 |
+| `scene` | string | 是 | `LOGIN` 或 `REGISTER`；两种场景的验证码互不通用 |
+
+发送规则：
+
+- 验证码为 6 位数字，有效期 5 分钟，同一邮箱同一场景 60 秒内只能发送一次。
+- `scene=REGISTER`：邮箱已注册时返回 `1009`。
+- `scene=LOGIN`：邮箱未注册返回 `1008`，账号被禁用返回 `1004`。
+- 连续输错 5 次后验证码失效，需要重新获取。
+
+`EmailCodeLoginRequest`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `email` | string | 是 | 已注册邮箱 |
+| `code` | string | 是 | 6 位数字验证码 |
 
 `UpdateProfileRequest`
 
@@ -541,7 +572,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
   "backgroundImage": "",
   "backgroundOpacity": 0.82,
   "backgroundBlur": 0,
-  "componentOpacity": 1
+  "componentOpacity": 1,
+  "sidebarPinned": true
 }
 ```
 
@@ -561,6 +593,7 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | `backgroundImage` | ≤ 500 字符 |
 | `backgroundOpacity` / `componentOpacity` | 0–1 |
 | `backgroundBlur` | 0–30 |
+| `sidebarPinned` | boolean，左侧菜单栏是否固定，按账号保存 |
 
 表结构：`user_theme_preference`，主键 `user_id`，外键关联 `sys_user.id`。
 - 最长 500 字符；更新会记录操作日志（模块「外观管理」）。
@@ -1301,8 +1334,8 @@ AFTER_SALE --店员拒绝--> COMPLETED
 
 ### 14.2 登录与个人中心
 
-1. 注册：`POST /api/auth/register`。
-2. 登录：`POST /api/auth/login`，保存 `data.token`。
+1. 注册：先 `POST /api/auth/email-code`（`scene=REGISTER`）获取邮箱验证码，再 `POST /api/auth/register` 提交 `email` 与 `emailCode`。
+2. 登录：`POST /api/auth/login`，保存 `data.token`；也可以先发送 `scene=LOGIN` 验证码，再调用 `POST /api/auth/login/email` 使用邮箱验证码登录。
 3. 后续请求加 `Authorization: Bearer <token>`。
 4. 进入个人中心前可调用 `GET /api/auth/me` 获取最新用户信息。
 5. 退出时调用 `POST /api/auth/logout`，然后清理本地 token。

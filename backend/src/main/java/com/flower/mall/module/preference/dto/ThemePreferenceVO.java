@@ -25,6 +25,7 @@ public class ThemePreferenceVO {
     private Double backgroundOpacity;
     private Integer backgroundBlur;
     private Double componentOpacity;
+    private Boolean sidebarPinned;
     private LocalDateTime updatedAt;
 
     public static ThemePreferenceVO from(UserThemePreference entity) {
@@ -44,6 +45,7 @@ public class ThemePreferenceVO {
                 .backgroundOpacity(entity.getBackgroundOpacity() == null ? 0.82 : entity.getBackgroundOpacity())
                 .backgroundBlur(entity.getBackgroundBlur() == null ? 0 : entity.getBackgroundBlur())
                 .componentOpacity(entity.getComponentOpacity() == null ? 1.0 : entity.getComponentOpacity())
+                .sidebarPinned(Boolean.TRUE.equals(entity.getSidebarPinned()))
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }

@@ -317,6 +317,7 @@ CREATE TABLE user_theme_preference (
     background_opacity DOUBLE NOT NULL DEFAULT 0.82,
     background_blur INT NOT NULL DEFAULT 0,
     component_opacity DOUBLE NOT NULL DEFAULT 1,
+    sidebar_pinned TINYINT NOT NULL DEFAULT 0,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id),
     CONSTRAINT fk_theme_pref_user FOREIGN KEY (user_id) REFERENCES sys_user (id)

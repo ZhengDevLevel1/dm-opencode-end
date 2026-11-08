@@ -18,6 +18,7 @@ interface AuthState {
   user: UserVO | null;
   status: AuthStatus;
   login: (username: string, password: string) => Promise<LoginResponse>;
+  loginByEmail: (email: string, code: string) => Promise<LoginResponse>;
   logout: () => Promise<void>;
   hydrate: () => Promise<void>;
   setUser: (user: UserVO) => void;
@@ -26,61 +27,68 @@ interface AuthState {
 
 let hydratePromise: Promise<void> | null = null;
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  token: getToken(),
-  user: getStoredUser(),
-  status: "idle",
-
-  login: async (username, password) => {
-    const result = await authService.login({ username, password });
+export const useAuthStore = create<AuthState>((set, get) => {
+  const applyLogin = (result: LoginResponse): LoginResponse => {
     setToken(result.token);
     setStoredUser(result.user);
     setTokenExpiry(result.expiresIn);
     set({ token: result.token, user: result.user, status: "authenticated" });
     queryClient.clear();
     return result;
-  },
+  };
 
-  logout: async () => {
-    try {
-      await authService.logout();
-    } catch {
-      /* 无论服务端是否成功，本地都必须清理 */
-    }
-    get().clearAuth();
-  },
+  return {
+    token: getToken(),
+    user: getStoredUser(),
+    status: "idle",
 
-  clearAuth: () => {
-    clearAuthStorage();
-    set({ token: null, user: null, status: "anonymous" });
-    queryClient.clear();
-  },
+    login: async (username, password) =>
+      applyLogin(await authService.login({ username, password })),
 
-  setUser: (user) => {
-    setStoredUser(user);
-    set({ user });
-  },
+    loginByEmail: async (email, code) =>
+      applyLogin(await authService.loginByEmail({ email, code })),
 
-  hydrate: async () => {
-    if (hydratePromise) return hydratePromise;
-    const token = getToken();
-    if (!token) {
-      set({ status: "anonymous", token: null, user: null });
-      return;
-    }
-    set({ status: "loading", token });
-    hydratePromise = (async () => {
+    logout: async () => {
       try {
-        const user = await authService.me();
-        setStoredUser(user);
-        set({ user, status: "authenticated" });
+        await authService.logout();
       } catch {
-        clearAuthStorage();
-        set({ token: null, user: null, status: "anonymous" });
-      } finally {
-        hydratePromise = null;
+        /* 无论服务端是否成功，本地都必须清理 */
       }
-    })();
-    return hydratePromise;
-  },
-}));
+      get().clearAuth();
+    },
+
+    clearAuth: () => {
+      clearAuthStorage();
+      set({ token: null, user: null, status: "anonymous" });
+      queryClient.clear();
+    },
+
+    setUser: (user) => {
+      setStoredUser(user);
+      set({ user });
+    },
+
+    hydrate: async () => {
+      if (hydratePromise) return hydratePromise;
+      const token = getToken();
+      if (!token) {
+        set({ status: "anonymous", token: null, user: null });
+        return;
+      }
+      set({ status: "loading", token });
+      hydratePromise = (async () => {
+        try {
+          const user = await authService.me();
+          setStoredUser(user);
+          set({ user, status: "authenticated" });
+        } catch {
+          clearAuthStorage();
+          set({ token: null, user: null, status: "anonymous" });
+        } finally {
+          hydratePromise = null;
+        }
+      })();
+      return hydratePromise;
+    },
+  };
+});

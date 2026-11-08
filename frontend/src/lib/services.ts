@@ -16,6 +16,8 @@ import type {
   ChangePasswordRequest,
   CreateOrderRequest,
   DictOptions,
+  EmailCodeLoginRequest,
+  EmailCodeRequest,
   FileUploadVO,
   FulfillmentRequest,
   FulfillmentVO,
@@ -74,6 +76,10 @@ export const appearanceService = {
 export const authService = {
   login: (body: LoginRequest) =>
     api.post<LoginResponse>("/auth/login", body, { skipAuthRedirect: true }),
+  loginByEmail: (body: EmailCodeLoginRequest) =>
+    api.post<LoginResponse>("/auth/login/email", body, { skipAuthRedirect: true }),
+  sendEmailCode: (body: EmailCodeRequest) =>
+    api.post<void>("/auth/email-code", body, { skipAuthRedirect: true }),
   register: (body: RegisterRequest) =>
     api.post<UserVO>("/auth/register", body, { skipAuthRedirect: true }),
   logout: () => api.post<void>("/auth/logout", undefined, { skipAuthRedirect: true }),

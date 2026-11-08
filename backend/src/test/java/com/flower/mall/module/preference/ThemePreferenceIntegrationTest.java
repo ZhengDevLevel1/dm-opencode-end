@@ -55,7 +55,8 @@ class ThemePreferenceIntegrationTest {
                   "backgroundImage": "",
                   "backgroundOpacity": 0.7,
                   "backgroundBlur": 8,
-                  "componentOpacity": 0.9
+                  "componentOpacity": 0.9,
+                  "sidebarPinned": true
                 }
                 """;
 
@@ -67,12 +68,14 @@ class ThemePreferenceIntegrationTest {
                 .andExpect(jsonPath("$.data.mode").value("dark"))
                 .andExpect(jsonPath("$.data.palette").value("rose-pine"))
                 .andExpect(jsonPath("$.data.scale").value(1.05))
-                .andExpect(jsonPath("$.data.componentOpacity").value(0.9));
+                .andExpect(jsonPath("$.data.componentOpacity").value(0.9))
+                .andExpect(jsonPath("$.data.sidebarPinned").value(true));
 
         mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(customer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mode").value("dark"))
-                .andExpect(jsonPath("$.data.radius").value("round"));
+                .andExpect(jsonPath("$.data.radius").value("round"))
+                .andExpect(jsonPath("$.data.sidebarPinned").value(true));
 
         mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(alice)))
                 .andExpect(status().isOk())
@@ -91,7 +94,8 @@ class ThemePreferenceIntegrationTest {
                                  "sidebarStyle":"panel","scale":2.0,"reduceMotion":true,
                                  "highContrast":false,"background":"gradient",
                                  "backgroundImage":"","backgroundOpacity":0.7,
-                                 "backgroundBlur":8,"componentOpacity":0.9}
+                                 "backgroundBlur":8,"componentOpacity":0.9,
+                                 "sidebarPinned":false}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));

@@ -75,4 +75,7 @@ public class ThemePreferenceRequest {
     @DecimalMin(value = "0", message = "组件不透明度不能小于0")
     @DecimalMax(value = "1", message = "组件不透明度不能大于1")
     private Double componentOpacity;
+
+    @NotNull(message = "侧栏固定状态不能为空")
+    private Boolean sidebarPinned;
 }

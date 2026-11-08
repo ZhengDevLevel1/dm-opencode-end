@@ -59,5 +59,6 @@ public class ThemePreferenceService {
         target.setBackgroundOpacity(source.getBackgroundOpacity());
         target.setBackgroundBlur(source.getBackgroundBlur());
         target.setComponentOpacity(source.getComponentOpacity());
+        target.setSidebarPinned(source.getSidebarPinned());
     }
 }

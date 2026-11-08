@@ -8,6 +8,7 @@ import { AuthLayout } from "./auth-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EmailCodeField } from "@/components/domain/email-code-field";
 import { authService } from "@/lib/services";
 import { ApiError } from "@/lib/api-client";
 import { toast } from "@/stores/toast";
@@ -17,10 +18,11 @@ const optionalPhone = z
   .trim()
   .refine((value) => value === "" || /^1[3-9]\d{9}$/.test(value), "请输入中国大陆手机号");
 
-const optionalEmail = z
+const emailSchema = z
   .string()
   .trim()
-  .refine((value) => value === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), "邮箱格式不正确");
+  .min(1, "请输入邮箱")
+  .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), "邮箱格式不正确");
 
 const schema = z
   .object({
@@ -31,7 +33,11 @@ const schema = z
       .regex(/^[a-zA-Z0-9_]+$/, "只允许字母、数字和下划线"),
     nickname: z.string().max(30, "昵称最多 30 位").optional(),
     phone: optionalPhone.optional(),
-    email: optionalEmail.optional(),
+    email: emailSchema,
+    emailCode: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, "请输入 6 位数字验证码"),
     password: z.string().min(6, "密码至少 6 位").max(32, "密码最多 32 位"),
     confirmPassword: z.string(),
   })
@@ -49,6 +55,7 @@ export function RegisterPage() {
     register,
     handleSubmit,
     setError,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -57,10 +64,13 @@ export function RegisterPage() {
       nickname: "",
       phone: "",
       email: "",
+      emailCode: "",
       password: "",
       confirmPassword: "",
     },
   });
+
+  const email = watch("email");
 
   const onSubmit = async (values: FormValues) => {
     setFormError("");
@@ -70,7 +80,8 @@ export function RegisterPage() {
         password: values.password,
         nickname: values.nickname?.trim() || undefined,
         phone: values.phone?.trim() || undefined,
-        email: values.email?.trim() || undefined,
+        email: values.email.trim(),
+        emailCode: values.emailCode.trim(),
       });
       toast.success("注册成功", "请使用刚创建的账号登录。");
       navigate("/login?registered=1", { replace: true });
@@ -78,6 +89,10 @@ export function RegisterPage() {
       if (error instanceof ApiError) {
         if (error.code === 1001) {
           setError("username", { message: "用户名已存在，请换一个" });
+        } else if (error.code === 1009) {
+          setError("email", { message: "该邮箱已被注册，请直接登录" });
+        } else if (error.code === 1006) {
+          setError("emailCode", { message: "验证码错误或已过期，请重新获取" });
         } else {
           setFormError(error.message);
         }
@@ -147,18 +162,37 @@ export function RegisterPage() {
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="email">邮箱</Label>
+          <Label htmlFor="email">邮箱 *</Label>
           <Input
             id="email"
             type="email"
             autoComplete="email"
-            placeholder="选填"
+            placeholder="用于接收验证码，注册后可用邮箱登录"
             aria-invalid={Boolean(errors.email)}
             {...register("email")}
           />
           {errors.email ? (
             <p className="text-xs text-destructive">{errors.email.message}</p>
           ) : null}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="emailCode">邮箱验证码 *</Label>
+          <EmailCodeField
+            id="emailCode"
+            email={email}
+            scene="REGISTER"
+            registration={register("emailCode")}
+            invalid={Boolean(errors.emailCode)}
+            onEmailInvalid={() => setError("email", { message: "请先填写正确的邮箱" })}
+            onError={setFormError}
+          />
+          {errors.emailCode ? (
+            <p className="text-xs text-destructive">{errors.emailCode.message}</p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground">
+              验证码 5 分钟内有效，若未收到请检查垃圾邮件。
+            </p>
+          )}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">

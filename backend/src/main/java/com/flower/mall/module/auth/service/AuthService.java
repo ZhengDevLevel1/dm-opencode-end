@@ -1,10 +1,13 @@
 package com.flower.mall.module.auth.service;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.flower.mall.common.enums.EmailCodeScene;
 import com.flower.mall.common.enums.UserRole;
 import com.flower.mall.common.enums.UserStatus;
 import com.flower.mall.common.exception.BusinessException;
 import com.flower.mall.common.exception.ErrorCode;
+import com.flower.mall.module.auth.dto.EmailCodeLoginRequest;
+import com.flower.mall.module.auth.dto.EmailCodeRequest;
 import com.flower.mall.module.user.dto.LoginRequest;
 import com.flower.mall.module.user.dto.LoginResponse;
 import com.flower.mall.module.user.dto.RegisterRequest;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +41,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final TokenStore tokenStore;
+    private final EmailCodeService emailCodeService;
 
     @Transactional
     public UserVO register(RegisterRequest request) {
@@ -45,16 +50,31 @@ public class AuthService {
         if (count > 0) {
             throw BusinessException.of(ErrorCode.USERNAME_EXISTS);
         }
+        String email = normalizeEmail(request.getEmail());
+        Long emailCount = userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                .eq(User::getEmail, email));
+        if (emailCount > 0) {
+            throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+        }
+        emailCodeService.verifyAndConsume(email, EmailCodeScene.REGISTER, request.getEmailCode());
+
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
         user.setPhone(blankToNull(request.getPhone()));
-        user.setEmail(blankToNull(request.getEmail()));
+        user.setEmail(email);
         user.setRole(UserRole.CUSTOMER.name());
         user.setStatus(UserStatus.ENABLED.name());
         userMapper.insert(user);
         return UserVO.from(userMapper.selectById(user.getId()));
+    }
+
+    /**
+     * 发送登录或注册场景的邮箱验证码。
+     */
+    public void sendEmailCode(EmailCodeRequest request) {
+        emailCodeService.sendCode(request.getEmail(), request.getScene());
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -70,11 +90,30 @@ public class AuthService {
             throw BusinessException.of(ErrorCode.LOGIN_FAILED);
         }
         AuthUser principal = (AuthUser) authentication.getPrincipal();
+        return issueToken(userMapper.selectById(principal.getId()));
+    }
+
+    /**
+     * 邮箱验证码登录：校验验证码后为已注册用户签发令牌。
+     */
+    public LoginResponse loginByEmail(EmailCodeLoginRequest request) {
+        String email = normalizeEmail(request.getEmail());
+        User user = emailCodeService.findUserByEmail(email);
+        if (user == null) {
+            throw BusinessException.of(ErrorCode.EMAIL_NOT_REGISTERED);
+        }
+        emailCodeService.verifyAndConsume(email, EmailCodeScene.LOGIN, request.getCode());
+        if (!UserStatus.ENABLED.name().equals(user.getStatus())) {
+            throw BusinessException.of(ErrorCode.USER_DISABLED);
+        }
+        return issueToken(user);
+    }
+
+    private LoginResponse issueToken(User user) {
         JwtService.TokenInfo tokenInfo =
-                jwtService.generateToken(principal.getId(), principal.getUsername(), principal.getRole());
-        tokenStore.store(tokenInfo.jti(), principal.getId(),
+                jwtService.generateToken(user.getId(), user.getUsername(), UserRole.valueOf(user.getRole()));
+        tokenStore.store(tokenInfo.jti(), user.getId(),
                 Duration.ofSeconds(tokenInfo.expiresInSeconds()));
-        User user = userMapper.selectById(principal.getId());
         return LoginResponse.builder()
                 .token(tokenInfo.token())
                 .tokenType("Bearer")
@@ -97,5 +136,9 @@ public class AuthService {
 
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value : null;
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 }

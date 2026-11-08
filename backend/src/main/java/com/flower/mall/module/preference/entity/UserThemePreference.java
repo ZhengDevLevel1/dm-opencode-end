@@ -46,6 +46,8 @@ public class UserThemePreference {
 
     private Double componentOpacity;
 
+    private Boolean sidebarPinned;
+
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 }

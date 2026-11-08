@@ -54,7 +54,8 @@ public class SecurityConfig {
                         .authenticationEntryPoint(restSecurityHandlers)
                         .accessDeniedHandler(restSecurityHandlers))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login", "/api/auth/login/email",
+                                "/api/auth/register", "/api/auth/email-code").permitAll()
                         .requestMatchers("/doc.html", "/webjars/**", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html", "/favicon.ico", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/recommendations/**",
