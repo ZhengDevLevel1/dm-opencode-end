@@ -362,7 +362,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
 | POST | `/api/auth/register` | 公开 | 注册消费者账号（需邮箱验证码） |
-| POST | `/api/auth/email-code` | 公开 | 发送登录/注册邮箱验证码 |
+| POST | `/api/auth/email-code` | 公开 | 发送邮箱验证码（登录/注册/修改密码/更换邮箱） |
 | POST | `/api/auth/login` | 公开 | 使用用户名密码登录并获取 JWT |
 | POST | `/api/auth/login/email` | 公开 | 使用邮箱验证码登录并获取 JWT |
 | POST | `/api/auth/logout` | 登录 | 吊销当前 JWT 会话 |
@@ -397,13 +397,15 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `email` | string | 是 | 接收验证码的邮箱 |
-| `scene` | string | 是 | `LOGIN` 或 `REGISTER`；两种场景的验证码互不通用 |
+| `scene` | string | 是 | `LOGIN`、`REGISTER`、`CHANGE_PASSWORD` 或 `CHANGE_EMAIL`；不同场景的验证码互不通用 |
 
 发送规则：
 
 - 验证码为 6 位数字，有效期 5 分钟，同一邮箱同一场景 60 秒内只能发送一次。
 - `scene=REGISTER`：邮箱已注册时返回 `1009`。
 - `scene=LOGIN`：邮箱未注册返回 `1008`，账号被禁用返回 `1004`。
+- `scene=CHANGE_PASSWORD`：验证码发送到当前账号绑定的邮箱；邮箱未注册返回 `1008`，账号被禁用返回 `1004`。
+- `scene=CHANGE_EMAIL`：验证码发送到要更换的新邮箱；新邮箱已被注册返回 `1009`。
 - 连续输错 5 次后验证码失效，需要重新获取。
 
 `EmailCodeLoginRequest`
@@ -419,14 +421,16 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | --- | --- | --- | --- |
 | `nickname` | string | 否 | 最长 30；不传则不变 |
 | `phone` | string | 否 | 传空字符串 `""` 可清空 |
-| `email` | string | 否 | 传空字符串 `""` 可清空 |
+| `email` | string | 否 | 传空字符串 `""` 可清空；改为新邮箱时必须同时提交 `emailCode` |
+| `emailCode` | string | 否 | 6 位数字；修改为新邮箱时必填，需先调用 `POST /api/auth/email-code` 且 `scene=CHANGE_EMAIL`，验证码发送到新邮箱 |
 | `avatarUrl` | string | 否 | 最长 500；传空字符串 `""` 可清空，恢复默认首字母头像 |
 
 `ChangePasswordRequest`
 
 | 字段 | 类型 | 必填 | 约束 |
 | --- | --- | --- | --- |
-| `oldPassword` | string | 是 | 原密码 |
+| `oldPassword` | string | 条件 | 原密码；与 `emailCode` 二选一 |
+| `emailCode` | string | 条件 | 6 位数字；发送到当前账号绑定邮箱，需 `scene=CHANGE_PASSWORD`；与 `oldPassword` 二选一 |
 | `newPassword` | string | 是 | 6-32 位 |
 
 ### 4.3 登录响应示例
@@ -471,6 +475,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 - 登录失败返回 `401/1003`；账号被禁用返回 `403/1004`。
 - `POST /api/auth/logout` 需要有效 JWT；控制器允许缺省 `Authorization` 头仅用于容错，实际没有有效令牌会在安全过滤器返回 `401`。令牌已失效时应直接清理本地状态。
 - `PUT /api/auth/me` 只更新传入的非 `null` 字段；手机号、邮箱、头像地址传空字符串会清空。
+- 邮箱改为新地址时必须提供发送到新邮箱的 `CHANGE_EMAIL` 验证码，否则返回 `400`；验证码错误或过期返回 `400/1006`，新邮箱被占用返回 `409/1009`。清空邮箱不需要验证码。
+- 修改密码支持原密码或邮箱验证码两种方式：两者都未提供返回 `400`；原密码错误返回 `400/1005`；验证码错误或过期返回 `400/1006`；未绑定邮箱时无法使用验证码方式。
 - 修改密码不会自动使当前 JWT 失效，前端可在成功后要求重新登录。
 
 ### 4.5 图片上传
@@ -1304,7 +1310,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 
 - `sales-trend` 的 `days` 默认 30，会被限制在 1-90；返回按日期升序、无数据日期补 0 的连续序列。
 - 销售类统计只计算状态为 `PAID`、`FULFILLING`、`COMPLETED`、`AFTER_SALE` 的订单，不包含待支付、取消、已退款订单。
-- `overview.pendingFulfillment` 统计 `PAID` 订单；`lowStockProducts` 统计在售且库存低于指标配置中低库存阈值的商品（默认 `<10`）；`averageRating` 基于可见评价。
+- `overview.pendingFulfillment` 统计 `PAID` 订单；`lowStockProducts` 统计在售且库存低于指标配置中低库存阈值的商品（默认 `<10`）；`overstockProducts` 统计在售且库存达到过量库存阈值的商品（默认 `≥50`）；`averageRating` 基于可见评价。
 - `order-status` 返回全部 7 种订单状态，即使数量为 0。
 - `top-products` 按销量降序，最多 10 条。
 
@@ -1465,6 +1471,7 @@ export interface UpdateProfileRequest {
   nickname?: string;
   phone?: string;
   email?: string;
+  emailCode?: string;
   avatarUrl?: string;
 }
 
@@ -1479,7 +1486,8 @@ export interface FileUploadVO {
 }
 
 export interface ChangePasswordRequest {
-  oldPassword: string;
+  oldPassword?: string;
+  emailCode?: string;
   newPassword: string;
 }
 
@@ -1877,6 +1885,7 @@ export interface OverviewStatsVO {
   todayOrders: number;
   pendingFulfillment: number;
   lowStockProducts: number;
+  overstockProducts: number;
   onSaleProducts: number;
   customerCount: number;
   totalReviews: number;

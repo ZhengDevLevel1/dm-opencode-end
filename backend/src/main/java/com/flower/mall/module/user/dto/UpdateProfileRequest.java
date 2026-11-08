@@ -17,6 +17,10 @@ public class UpdateProfileRequest {
     @Email(message = "邮箱格式不正确")
     private String email;
 
+    /** 修改为新邮箱时必填，验证码发送到新邮箱。 */
+    @Pattern(regexp = "^\\d{6}$", message = "验证码需为6位数字")
+    private String emailCode;
+
     @Size(max = 500, message = "头像地址长度不能超过500个字符")
     private String avatarUrl;
 }

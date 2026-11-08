@@ -82,7 +82,7 @@ export interface LoginRequest {
   password: string;
 }
 
-export type EmailCodeScene = "LOGIN" | "REGISTER";
+export type EmailCodeScene = "LOGIN" | "REGISTER" | "CHANGE_PASSWORD" | "CHANGE_EMAIL";
 
 export interface EmailCodeRequest {
   email: string;
@@ -107,6 +107,8 @@ export interface UpdateProfileRequest {
   nickname?: string;
   phone?: string;
   email?: string;
+  /** 修改为新邮箱时必填，验证码发送到新邮箱。 */
+  emailCode?: string;
   avatarUrl?: string;
 }
 
@@ -149,7 +151,10 @@ export interface AuthBackgroundRequest {
 }
 
 export interface ChangePasswordRequest {
-  oldPassword: string;
+  /** 原密码；与邮箱验证码二选一。 */
+  oldPassword?: string;
+  /** 发送到当前账号绑定邮箱的验证码；与原密码二选一。 */
+  emailCode?: string;
   newPassword: string;
 }
 
@@ -603,6 +608,7 @@ export interface OverviewStatsVO {
   todayOrders: number;
   pendingFulfillment: number;
   lowStockProducts: number;
+  overstockProducts: number;
   onSaleProducts: number;
   customerCount: number;
   totalReviews: number;

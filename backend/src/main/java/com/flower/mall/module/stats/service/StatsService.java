@@ -43,6 +43,7 @@ public class StatsService {
                 .todayOrders(statsMapper.todayOrders())
                 .pendingFulfillment(statsMapper.pendingFulfillment())
                 .lowStockProducts(statsMapper.lowStockProducts(metricConfigService.lowStockThreshold()))
+                .overstockProducts(statsMapper.overstockProducts(metricConfigService.highStockThreshold()))
                 .onSaleProducts(statsMapper.onSaleProducts())
                 .customerCount(statsMapper.customerCount())
                 .totalReviews(statsMapper.totalReviews())

@@ -141,6 +141,7 @@ class RecommendationAndStatsIntegrationTest {
                 .andExpect(jsonPath("$.data.totalOrders").value(5))
                 .andExpect(jsonPath("$.data.onSaleProducts").value(15))
                 .andExpect(jsonPath("$.data.lowStockProducts").value(1))
+                .andExpect(jsonPath("$.data.overstockProducts").value(10))
                 .andExpect(jsonPath("$.data.customerCount").value(4))
                 .andExpect(jsonPath("$.data.totalReviews").value(2))
                 .andExpect(jsonPath("$.data.totalSales").isNumber());

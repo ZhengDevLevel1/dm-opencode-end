@@ -3,11 +3,13 @@ package com.flower.mall.module.user.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.flower.mall.common.enums.EmailCodeScene;
 import com.flower.mall.common.enums.UserRole;
 import com.flower.mall.common.enums.UserStatus;
 import com.flower.mall.common.exception.BusinessException;
 import com.flower.mall.common.exception.ErrorCode;
 import com.flower.mall.common.util.SecurityUtils;
+import com.flower.mall.module.auth.service.EmailCodeService;
 import com.flower.mall.module.user.dto.AdminUserCreateRequest;
 import com.flower.mall.module.user.dto.AdminUserUpdateRequest;
 import com.flower.mall.module.user.dto.ChangePasswordRequest;
@@ -21,12 +23,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Locale;
+
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
+    private final EmailCodeService emailCodeService;
 
     public IPage<User> page(long page, long size, String keyword, String role, String status) {
         return userMapper.selectPage(new Page<>(page, size), Wrappers.<User>lambdaQuery()
@@ -116,7 +121,23 @@ public class UserService {
             user.setPhone(blankToNull(request.getPhone()));
         }
         if (request.getEmail() != null) {
-            user.setEmail(blankToNull(request.getEmail()));
+            String nextEmail = normalizeEmail(request.getEmail());
+            String currentEmail = normalizeEmail(user.getEmail());
+            if (nextEmail == null) {
+                user.setEmail(null);
+            } else if (!nextEmail.equals(currentEmail)) {
+                Long exists = userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                        .eq(User::getEmail, nextEmail)
+                        .ne(User::getId, userId));
+                if (exists > 0) {
+                    throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+                }
+                if (!StringUtils.hasText(request.getEmailCode())) {
+                    throw BusinessException.of(ErrorCode.BAD_REQUEST, "修改邮箱需要验证码");
+                }
+                emailCodeService.verifyAndConsume(nextEmail, EmailCodeScene.CHANGE_EMAIL, request.getEmailCode());
+                user.setEmail(nextEmail);
+            }
         }
         if (request.getAvatarUrl() != null) {
             user.setAvatarUrl(StringUtils.hasText(request.getAvatarUrl())
@@ -130,8 +151,18 @@ public class UserService {
     @Transactional
     public void changePassword(ChangePasswordRequest request) {
         User user = getRequired(SecurityUtils.currentUserId());
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
-            throw BusinessException.of(ErrorCode.PASSWORD_INCORRECT);
+        if (StringUtils.hasText(request.getOldPassword())) {
+            if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+                throw BusinessException.of(ErrorCode.PASSWORD_INCORRECT);
+            }
+        } else if (StringUtils.hasText(request.getEmailCode())) {
+            if (!StringUtils.hasText(user.getEmail())) {
+                throw BusinessException.of(ErrorCode.BAD_REQUEST, "当前账号未绑定邮箱，无法使用验证码修改密码");
+            }
+            emailCodeService.verifyAndConsume(
+                    user.getEmail(), EmailCodeScene.CHANGE_PASSWORD, request.getEmailCode());
+        } else {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "请提供原密码或邮箱验证码");
         }
         User update = new User();
         update.setId(user.getId());
@@ -141,5 +172,9 @@ public class UserService {
 
     private String blankToNull(String value) {
         return StringUtils.hasText(value) ? value : null;
+    }
+
+    private String normalizeEmail(String value) {
+        return StringUtils.hasText(value) ? value.trim().toLowerCase(Locale.ROOT) : null;
     }
 }

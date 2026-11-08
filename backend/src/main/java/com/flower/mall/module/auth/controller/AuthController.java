@@ -77,7 +77,7 @@ public class AuthController {
 
     @Operation(summary = "修改个人资料")
     @PutMapping("/me")
-    @OperationLogRecord(module = "用户", operation = "修改个人资料")
+    @OperationLogRecord(module = "用户", operation = "修改个人资料", saveParams = false)
     public ApiResponse<UserVO> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         return ApiResponse.ok(userService.updateProfile(request));
     }

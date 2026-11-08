@@ -27,7 +27,7 @@
 
 | Module | Responsibility |
 | --- | --- |
-| `auth` | Login/logout, JWT issuance, current user, email verification codes for login/registration |
+| `auth` | Login/logout, JWT issuance, current user, email verification codes for login/registration/password change/email change |
 | `user` | Profile, password change, admin user management |
 | `product` | Public catalog/search/filter/detail, admin CRUD and status |
 | `inventory` | Manual stock adjustment and stock movement records |
@@ -93,7 +93,7 @@
 - Redis defaults to `localhost:6379`; disable or avoid depending on it with `APP_REDIS_ENABLED=false` during local development.
 - Product-detail and hot-product caches are controlled by `app.cache.*`; recommendation candidate limit is controlled by `app.recommendation.candidate-limit`.
 - MinIO uploads are controlled by `app.minio.*`; set `MINIO_ENABLED=true` and configure `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, and optionally `MINIO_PUBLIC_URL`. The backend auto-creates the bucket by default (`MINIO_AUTO_CREATE_BUCKET=true`) and applies a public-read policy (`MINIO_PUBLIC_READ=true`); the bucket must still be publicly reachable or fronted by a public CDN URL.
-- Email verification codes use Spring Mail over QQ SMTP (`smtp.qq.com`); override `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, and `MAIL_PASSWORD` (authorization code) as needed. Codes are held in memory for 5 minutes with a 60-second resend interval and 5 failed attempts per code. Login/registration send codes with `POST /api/auth/email-code` (`scene=LOGIN|REGISTER`).
+- Email verification codes use Spring Mail over QQ SMTP (`smtp.qq.com`); override `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, and `MAIL_PASSWORD` (authorization code) as needed. Codes are held in memory for 5 minutes with a 60-second resend interval and 5 failed attempts per code. `POST /api/auth/email-code` supports `scene=LOGIN|REGISTER|CHANGE_PASSWORD|CHANGE_EMAIL`; password changes accept either the old password or a `CHANGE_PASSWORD` code, and changing the email requires a `CHANGE_EMAIL` code sent to the new address.
 - Existing MySQL installations need `backend/db/migration_20261104_add_user_avatar.sql` to add `sys_user.avatar_url`, `backend/db/migration_20261105_add_appearance_setting.sql` to add the `appearance_setting` table, `backend/db/migration_20261108_add_user_theme_preference.sql` to add the per-user `user_theme_preference` table plus the `tag_option` / `tag_type_setting` tag management tables and `metric_config` metrics table, and `backend/db/migration_20261108_add_sidebar_pinned.sql` to add `user_theme_preference.sidebar_pinned`, and `backend/db/migration_20261108_add_auth_appearance_theme.sql` to add `appearance_setting.auth_palette`, `auth_accent`, and `auth_custom_accent` for the admin-managed login-page palette and accent; fresh installs get all from `schema.sql`.
 - Run from `backend/` with `mvn spring-boot:run`, or run the packaged jar `backend/target/flower-shop-backend-1.0.0.jar`.
 - Run from `frontend/` with Node.js 20+: `npm install`, copy `.env.example` to `.env`, then `npm run dev`. Vite serves `http://localhost:5173` and proxies `/api` to `http://localhost:8080`.
@@ -130,9 +130,9 @@ Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
 
 - Backend P0+P1 work is complete: recommendation behavior features, five personas, Top-10 metrics, `ALL` season matching, cache invalidation, invalid-season `400`, cart quantity cap, and rounded weight validation.
 - Image upload work is complete: MinIO storage service, `/api/files/images`, `sys_user.avatar_url`, and frontend avatar/product/background pickers with broken-URL fallbacks. A local MinIO smoke test passed for all three upload categories, public URL fetch, and avatar update/clear through `PUT /api/auth/me`.
-- Email verification code work is complete: Spring Mail/QQ SMTP configuration, `POST /api/auth/email-code`, `POST /api/auth/login/email`, registration email-code validation, 5-minute TTL, 60-second resend interval, and matching login/register UI components.
+- Email verification code work is complete: Spring Mail/QQ SMTP configuration, `POST /api/auth/email-code`, `POST /api/auth/login/email`, registration email-code validation, 5-minute TTL, 60-second resend interval, and matching login/register UI components. Account security also supports changing the password with a `CHANGE_PASSWORD` code sent to the bound email, and the profile page requires a `CHANGE_EMAIL` code sent to the new address before changing the email.
 - `docs/backend-api.md` is complete; its endpoint table was checked against the source: 72 source endpoints and 72 documented endpoints match with no extras or omissions.
-- `mvn -B -ntp test` passes 42/42 tests (including appearance background palette/accent and auth email-code integration tests).
+- `mvn -B -ntp test` passes 44/44 tests (including appearance background palette/accent and auth email-code integration tests).
 - Run `mvn -B -ntp -DskipTests package` to build `backend\target\flower-shop-backend-1.0.0.jar`.
 - Frontend `npm run typecheck`, `npm run lint`, and `npm run build` pass. Lint reports 5 pre-existing `react-refresh/only-export-components` warnings (no errors).
 

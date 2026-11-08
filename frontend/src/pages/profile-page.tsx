@@ -19,11 +19,12 @@ import {
 import { authService, orderService, reviewService } from "@/lib/services";
 import { useAuthStore } from "@/stores/auth";
 import { useFavoritesQuery } from "@/hooks/queries";
-import { getErrorMessage } from "@/lib/api-client";
+import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDate, formatNumber, maskPhone } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import { ImageUpload } from "@/components/domain/image-upload";
+import { EmailCodeField } from "@/components/domain/email-code-field";
 import { UserAvatar } from "@/components/domain/user-avatar";
 import { StatCard } from "@/components/domain/stat-card";
 import { UserStatusBadge } from "@/components/domain/status-badge";
@@ -47,6 +48,7 @@ const schema = z.object({
       (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
       "请输入正确的邮箱地址",
     ),
+  emailCode: z.string().trim().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -80,6 +82,8 @@ export function ProfilePage() {
     register,
     handleSubmit,
     reset,
+    setError,
+    watch,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -87,8 +91,15 @@ export function ProfilePage() {
       nickname: profile?.nickname ?? "",
       phone: profile?.phone ?? "",
       email: profile?.email ?? "",
+      emailCode: "",
     },
   });
+
+  const emailValue = watch("email") ?? "";
+  const currentEmail = (profile?.email ?? "").trim().toLowerCase();
+  const nextEmail = emailValue.trim().toLowerCase();
+  const emailEmpty = nextEmail.length === 0;
+  const emailChanged = !emailEmpty && nextEmail !== currentEmail;
 
   useEffect(() => {
     if (!profile) return;
@@ -96,6 +107,7 @@ export function ProfilePage() {
       nickname: profile.nickname ?? "",
       phone: profile.phone ?? "",
       email: profile.email ?? "",
+      emailCode: "",
     });
   }, [profile, reset]);
 
@@ -105,6 +117,7 @@ export function ProfilePage() {
         nickname: values.nickname?.trim() || undefined,
         phone: values.phone.trim(),
         email: values.email.trim(),
+        emailCode: emailChanged ? values.emailCode?.trim() || undefined : undefined,
       }),
     onSuccess: (user) => {
       setUser(user);
@@ -113,11 +126,36 @@ export function ProfilePage() {
         nickname: user.nickname ?? "",
         phone: user.phone ?? "",
         email: user.email ?? "",
+        emailCode: "",
       });
       toast.success("资料已更新", "新的联系方式已经保存。");
     },
-    onError: (error) => toast.error("资料更新失败", getErrorMessage(error)),
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        if (error.code === 1006) {
+          setError("emailCode", { message: "验证码错误或已过期，请重新获取" });
+          return;
+        }
+        if (error.code === 1009) {
+          setError("email", { message: "该邮箱已被其他账号使用" });
+          return;
+        }
+      }
+      toast.error("资料更新失败", getErrorMessage(error));
+    },
   });
+
+  const submitProfile = (values: FormValues) => {
+    if (emailEmpty) {
+      setError("email", { message: "邮箱不能为空" });
+      return;
+    }
+    if (emailChanged && !/^\d{6}$/.test(values.emailCode?.trim() ?? "")) {
+      setError("emailCode", { message: "请输入发送到新邮箱的 6 位验证码" });
+      return;
+    }
+    updateProfile.mutate(values);
+  };
 
   const updateAvatar = useMutation({
     mutationFn: (avatarUrl: string) => authService.updateProfile({ avatarUrl }),
@@ -302,10 +340,10 @@ export function ProfilePage() {
         <section className="ui-card p-5 md:p-6">
           <h2 className="text-base font-semibold tracking-tight">编辑资料</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            手机号与邮箱可以留空以清空；昵称留空不会提交变更。
+            手机号可以留空以清空；邮箱不能为空，修改邮箱需要通过新邮箱验证码校验。
           </p>
           <form
-            onSubmit={handleSubmit((values) => updateProfile.mutate(values))}
+            onSubmit={handleSubmit(submitProfile)}
             noValidate
             className="mt-5 space-y-4"
           >
@@ -355,14 +393,40 @@ export function ProfilePage() {
                 ) : null}
               </div>
             </div>
+            {emailChanged || emailEmpty ? (
+              <div className="space-y-1.5 rounded-xl border border-border/70 bg-muted/30 p-3">
+                <Label htmlFor="emailCode">邮箱验证码 *</Label>
+                <div className="max-w-sm">
+                  <EmailCodeField
+                    id="emailCode"
+                    email={emailValue}
+                    scene="CHANGE_EMAIL"
+                    registration={register("emailCode")}
+                    invalid={Boolean(errors.emailCode)}
+                    onEmailInvalid={() =>
+                      setError("emailCode", { message: "请先填写正确的邮箱地址" })
+                    }
+                    onError={(message) => toast.error("验证码发送失败", message)}
+                  />
+                </div>
+                {errors.emailCode ? (
+                  <p className="text-xs text-destructive">{errors.emailCode.message}</p>
+                ) : null}
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {emailEmpty
+                    ? "请先填写邮箱，验证码将发送到该邮箱；邮箱为空时无法保存修改。"
+                    : `验证码将发送到新邮箱 ${emailValue.trim()}，5 分钟内有效。`}
+                </p>
+              </div>
+            ) : null}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
               <p className="text-[11px] text-muted-foreground">
-                修改成功后当前页面的昵称会立即更新。
+                修改成功后当前页面的资料会立即更新。
               </p>
               <Button
                 type="submit"
                 loading={isSubmitting || updateProfile.isPending}
-                disabled={!isDirty}
+                disabled={!isDirty || emailEmpty}
               >
                 <Save className="h-4 w-4" />
                 保存修改

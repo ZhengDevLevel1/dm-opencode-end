@@ -54,6 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ImageUpload } from "@/components/domain/image-upload";
 import { AuthThemeScope } from "@/components/domain/auth-theme-scope";
+import { EmailCodeField } from "@/components/domain/email-code-field";
 
 const modes: Array<{ value: ThemeMode; label: string; icon: LucideIcon }> = [
   { value: "light", label: "浅色", icon: Sun },
@@ -147,7 +148,8 @@ const backgrounds: Array<{ value: BackgroundId; label: string }> = [
 
 const passwordSchema = z
   .object({
-    oldPassword: z.string().min(1, "请输入原密码"),
+    oldPassword: z.string().optional(),
+    emailCode: z.string().optional(),
     newPassword: z.string().min(6, "新密码至少 6 位").max(32, "新密码最多 32 位"),
     confirmPassword: z.string().min(1, "请再次输入新密码"),
   })
@@ -157,6 +159,7 @@ const passwordSchema = z
   });
 
 type PasswordValues = z.infer<typeof passwordSchema>;
+type PasswordMode = "password" | "email";
 
 export function SettingsPage() {
   // 仅订阅页面渲染需要的字段；缩放、遮罩、模糊由各自小组件独立订阅，
@@ -640,16 +643,39 @@ function AccountSettings() {
     handleSubmit,
     reset,
     setError,
+    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm<PasswordValues>({
     resolver: zodResolver(passwordSchema),
-    defaultValues: { oldPassword: "", newPassword: "", confirmPassword: "" },
+    defaultValues: { oldPassword: "", emailCode: "", newPassword: "", confirmPassword: "" },
   });
+  const [mode, setMode] = useState<PasswordMode>("password");
+  const email = user?.email ?? "";
+
+  const switchMode = (next: PasswordMode) => {
+    setMode(next);
+    clearErrors(["oldPassword", "emailCode"]);
+  };
 
   const changePassword = async (values: PasswordValues) => {
+    if (mode === "password" && !values.oldPassword?.trim()) {
+      setError("oldPassword", { type: "manual", message: "请输入原密码" });
+      return;
+    }
+    if (mode === "email") {
+      if (!email) {
+        toast.error("当前账号未绑定邮箱", "请先在个人中心绑定邮箱后再使用验证码修改密码。");
+        return;
+      }
+      if (!/^\d{6}$/.test(values.emailCode ?? "")) {
+        setError("emailCode", { type: "manual", message: "请输入 6 位数字验证码" });
+        return;
+      }
+    }
     try {
       await authService.changePassword({
-        oldPassword: values.oldPassword,
+        oldPassword: mode === "password" ? values.oldPassword : undefined,
+        emailCode: mode === "email" ? values.emailCode : undefined,
         newPassword: values.newPassword,
       });
       toast.success("密码已更新", "请使用新密码重新登录。");
@@ -659,6 +685,10 @@ function AccountSettings() {
     } catch (error) {
       if (error instanceof ApiError && error.code === 1005) {
         setError("oldPassword", { type: "server", message: "原密码不正确" });
+        return;
+      }
+      if (error instanceof ApiError && error.code === 1006) {
+        setError("emailCode", { type: "server", message: "验证码错误或已过期，请重新获取" });
         return;
       }
       toast.error("密码修改失败", getErrorMessage(error));
@@ -683,26 +713,67 @@ function AccountSettings() {
           修改密码
         </h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          新密码长度为 6-32 位。修改成功后当前登录会失效，需要重新登录。
+          可使用原密码，或通过绑定邮箱的验证码修改密码。修改成功后当前登录会失效，需要重新登录。
         </p>
         <form
           onSubmit={handleSubmit(changePassword)}
           noValidate
           className="mt-5 max-w-md space-y-4"
         >
-          <div className="space-y-1.5">
-            <Label htmlFor="oldPassword">原密码 *</Label>
-            <Input
-              id="oldPassword"
-              type="password"
-              autoComplete="current-password"
-              aria-invalid={Boolean(errors.oldPassword)}
-              {...register("oldPassword")}
-            />
-            {errors.oldPassword ? (
-              <p className="text-xs text-destructive">{errors.oldPassword.message}</p>
-            ) : null}
-          </div>
+          <OptionRow label="验证方式">
+            <Pill active={mode === "password"} onClick={() => switchMode("password")}>
+              原密码
+            </Pill>
+            <Pill active={mode === "email"} onClick={() => switchMode("email")}>
+              邮箱验证码
+            </Pill>
+          </OptionRow>
+          {mode === "password" ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="oldPassword">原密码 *</Label>
+              <Input
+                id="oldPassword"
+                type="password"
+                autoComplete="current-password"
+                aria-invalid={Boolean(errors.oldPassword)}
+                {...register("oldPassword")}
+              />
+              {errors.oldPassword ? (
+                <p className="text-xs text-destructive">{errors.oldPassword.message}</p>
+              ) : null}
+            </div>
+          ) : email ? (
+            <>
+              <div className="space-y-1.5">
+                <Label>绑定邮箱</Label>
+                <div className="flex h-10 items-center rounded-lg border border-border bg-muted/30 px-3 text-xs text-muted-foreground">
+                  {email}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emailCode">邮箱验证码 *</Label>
+                <EmailCodeField
+                  id="emailCode"
+                  email={email}
+                  scene="CHANGE_PASSWORD"
+                  registration={register("emailCode")}
+                  invalid={Boolean(errors.emailCode)}
+                  onEmailInvalid={() => setError("emailCode", { message: "当前邮箱不可用" })}
+                  onError={(message) => toast.error("验证码发送失败", message)}
+                />
+                {errors.emailCode ? (
+                  <p className="text-xs text-destructive">{errors.emailCode.message}</p>
+                ) : null}
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                验证码将发送到当前账号绑定的邮箱，5 分钟内有效。
+              </p>
+            </>
+          ) : (
+            <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[11px] leading-relaxed text-warning">
+              当前账号未绑定邮箱，请先在个人中心绑定邮箱后再使用验证码修改密码。
+            </p>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="newPassword">新密码 *</Label>
             <Input

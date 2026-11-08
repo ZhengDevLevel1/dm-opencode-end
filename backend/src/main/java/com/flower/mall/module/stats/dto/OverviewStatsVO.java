@@ -15,6 +15,7 @@ public class OverviewStatsVO {
     private long todayOrders;
     private long pendingFulfillment;
     private long lowStockProducts;
+    private long overstockProducts;
     private long onSaleProducts;
     private long customerCount;
     private long totalReviews;

@@ -47,7 +47,7 @@ public class EmailCodeService {
     private final Map<String, CodeEntry> codes = new ConcurrentHashMap<>();
 
     /**
-     * 发送验证码。注册场景要求邮箱未注册，登录场景要求邮箱已注册且账号未禁用。
+     * 发送验证码。注册与更换邮箱场景要求邮箱未注册，登录与修改密码场景要求邮箱已注册且账号未禁用。
      */
     public void sendCode(String email, EmailCodeScene scene) {
         String normalized = normalize(email);
@@ -105,7 +105,7 @@ public class EmailCodeService {
 
     private void assertSceneAllowed(String email, EmailCodeScene scene) {
         User user = findUserByEmail(email);
-        if (scene == EmailCodeScene.REGISTER) {
+        if (scene == EmailCodeScene.REGISTER || scene == EmailCodeScene.CHANGE_EMAIL) {
             if (user != null) {
                 throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
             }
@@ -127,7 +127,7 @@ public class EmailCodeService {
     }
 
     private void sendMail(String email, EmailCodeScene scene, String code) {
-        String action = scene == EmailCodeScene.LOGIN ? "登录" : "注册";
+        String action = sceneAction(scene);
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
@@ -158,6 +158,15 @@ public class EmailCodeService {
                   <p style="max-width:480px;margin:16px auto 0;text-align:center;font-size:11px;color:#a39692;">此邮件由系统自动发送，请勿直接回复。</p>
                 </div>
                 """.formatted(action, action, code);
+    }
+
+    private String sceneAction(EmailCodeScene scene) {
+        return switch (scene) {
+            case LOGIN -> "登录";
+            case REGISTER -> "注册";
+            case CHANGE_PASSWORD -> "修改密码";
+            case CHANGE_EMAIL -> "更换邮箱";
+        };
     }
 
     private void cleanupExpired(Instant now) {

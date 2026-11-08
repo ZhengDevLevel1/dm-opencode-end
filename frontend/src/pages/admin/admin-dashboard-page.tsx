@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import {
   ArrowUpRight,
+  Boxes,
   CalendarDays,
   ChevronDown,
   CircleDollarSign,
@@ -305,7 +306,7 @@ export function AdminDashboardPage() {
             display: widgetHidden("metrics") ? "none" : undefined,
           }}
         >
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatCard
           icon={CircleDollarSign}
           label="总销售额"
@@ -333,6 +334,13 @@ export function AdminDashboardPage() {
           value={formatNumber(data?.lowStockProducts)}
           hint={`库存低于 ${dict.data?.metrics?.stockLowThreshold ?? 10} 件`}
           onClick={() => navigate("/staff/inventory?lowStock=1")}
+        />
+        <StatCard
+          icon={Boxes}
+          label="过量库存商品"
+          value={formatNumber(data?.overstockProducts)}
+          hint={`库存达到 ${dict.data?.metrics?.stockHighThreshold ?? 50} 件`}
+          onClick={() => navigate("/staff/inventory?stockLevel=OVERSTOCK")}
         />
       </section>
 
