@@ -28,4 +28,17 @@ public class AuthBackgroundRequest {
     @DecimalMin(value = "0.4", message = "组件不透明度不能低于0.4")
     @DecimalMax(value = "1.0", message = "组件不透明度不能高于1")
     private Double componentOpacity;
+
+    @Pattern(
+            regexp = "(?i)^(default|rose-pine-dawn|catppuccin-latte|everforest-light|rose-pine)$",
+            message = "表面配色不合法")
+    private String palette;
+
+    @Pattern(
+            regexp = "(?i)^(sky|blue|violet|rose|emerald|amber|orange|custom)$",
+            message = "强调色不合法")
+    private String accent;
+
+    @Pattern(regexp = "^#[0-9a-fA-F]{6}$", message = "自定义强调色需为6位十六进制颜色")
+    private String customAccent;
 }

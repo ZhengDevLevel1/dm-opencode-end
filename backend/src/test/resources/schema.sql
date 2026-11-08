@@ -231,6 +231,9 @@ CREATE TABLE appearance_setting (
     background_opacity DOUBLE DEFAULT 0.78,
     background_blur INT DEFAULT 0,
     component_opacity DOUBLE DEFAULT 1,
+    auth_palette VARCHAR(32) DEFAULT 'default',
+    auth_accent VARCHAR(32) DEFAULT 'sky',
+    auth_custom_accent VARCHAR(16) DEFAULT '#38bdf8',
     updated_by BIGINT,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

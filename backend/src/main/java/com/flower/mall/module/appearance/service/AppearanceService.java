@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.Locale;
+
 @Service
 @RequiredArgsConstructor
 public class AppearanceService {
@@ -41,6 +43,16 @@ public class AppearanceService {
         setting.setComponentOpacity(request.getComponentOpacity() != null
                 ? request.getComponentOpacity()
                 : setting.getComponentOpacity());
+        // 配色字段同样支持省略，旧客户端只更新背景时不会重置配色
+        if (request.getPalette() != null) {
+            setting.setAuthPalette(request.getPalette().toLowerCase(Locale.ROOT));
+        }
+        if (request.getAccent() != null) {
+            setting.setAuthAccent(request.getAccent().toLowerCase(Locale.ROOT));
+        }
+        if (request.getCustomAccent() != null) {
+            setting.setAuthCustomAccent(request.getCustomAccent().toLowerCase(Locale.ROOT));
+        }
         setting.setUpdatedBy(SecurityUtils.currentUserId());
         setting.setUpdatedAt(null);
         settingMapper.updateById(setting);

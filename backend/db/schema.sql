@@ -266,6 +266,9 @@ CREATE TABLE appearance_setting (
     background_opacity DOUBLE NOT NULL DEFAULT 0.78,
     background_blur INT NOT NULL DEFAULT 0,
     component_opacity DOUBLE NOT NULL DEFAULT 1,
+    auth_palette VARCHAR(32) NOT NULL DEFAULT 'default' COMMENT '默认表面配色',
+    auth_accent VARCHAR(32) NOT NULL DEFAULT 'sky' COMMENT '登录页强调色',
+    auth_custom_accent VARCHAR(16) NOT NULL DEFAULT '#38bdf8' COMMENT '自定义强调色 #RRGGBB',
     updated_by BIGINT DEFAULT NULL,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id)

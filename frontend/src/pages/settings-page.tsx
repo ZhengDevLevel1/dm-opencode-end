@@ -53,6 +53,7 @@ import { RangeSlider } from "@/components/ui/range-slider";
 import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ImageUpload } from "@/components/domain/image-upload";
+import { AuthThemeScope } from "@/components/domain/auth-theme-scope";
 
 const modes: Array<{ value: ThemeMode; label: string; icon: LucideIcon }> = [
   { value: "light", label: "浅色", icon: Sun },
@@ -229,7 +230,7 @@ export function SettingsPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">设置</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          外观设置保存在浏览器本地；登录页背景与账户设置会同步到后端。
+          个人外观偏好会同步到当前账号；登录页外观由管理员单独配置。
         </p>
       </div>
 
@@ -241,6 +242,14 @@ export function SettingsPage() {
               外观风格
             </span>
           </TabsTrigger>
+          {isAdmin ? (
+            <TabsTrigger value="auth-appearance">
+              <span className="inline-flex items-center gap-1.5">
+                <LogIn className="h-3.5 w-3.5" />
+                登录页外观风格
+              </span>
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="account">
             <span className="inline-flex items-center gap-1.5">
               <KeyRound className="h-3.5 w-3.5" />
@@ -251,7 +260,7 @@ export function SettingsPage() {
 
         <TabsContent value="appearance" className="mt-4">
           <p className="mb-4 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-            登录后外观偏好会保存到当前账号，换设备自动恢复；未登录时仅保存在本机浏览器。登录页背景由管理员统一设置，所有用户共用。
+            登录后外观偏好会保存到当前账号，换设备自动恢复；未登录时仅保存在本机浏览器。
           </p>
           <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
             <div className="space-y-5">
@@ -501,8 +510,6 @@ export function SettingsPage() {
                 </div>
               </section>
 
-              {isAdmin ? <AuthBackgroundSection /> : null}
-
               <section className="ui-card p-5">
                 <SectionTitle
                   icon={SlidersHorizontal}
@@ -605,6 +612,15 @@ export function SettingsPage() {
             }}
           />
         </TabsContent>
+
+        {isAdmin ? (
+          <TabsContent value="auth-appearance" className="mt-4">
+            <p className="mb-4 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              登录页外观仅管理员可见和可编辑，统一作用于登录与注册页，对所有访客生效；修改后自动保存。
+            </p>
+            <AuthBackgroundSection />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="account" className="mt-4">
           <AccountSettings />
@@ -911,9 +927,22 @@ interface AuthBackgroundDraft {
   opacity: number;
   blur: number;
   component: number;
+  palette: PaletteId;
+  accent: AccentId;
+  customAccent: string;
 }
 
-const AUTH_BG_DEFAULTS: AuthBackgroundDraft = { image: "", opacity: 0.78, blur: 0, component: 1 };
+const AUTH_BG_DEFAULTS: AuthBackgroundDraft = {
+  image: "",
+  opacity: 0.78,
+  blur: 0,
+  component: 1,
+  palette: "default",
+  accent: "sky",
+  customAccent: "#38bdf8",
+};
+
+const AUTH_CUSTOM_ACCENT_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 /** 服务端只接受整数模糊值，比较与提交前统一归一化，避免滑块反复触发保存。 */
 function serializeAuthDraft(draft: AuthBackgroundDraft, type: AuthBackgroundType) {
@@ -923,6 +952,9 @@ function serializeAuthDraft(draft: AuthBackgroundDraft, type: AuthBackgroundType
     opacity: Number(draft.opacity.toFixed(3)),
     blur: Math.round(draft.blur),
     component: Number(draft.component.toFixed(3)),
+    palette: draft.palette,
+    accent: draft.accent,
+    customAccent: draft.accent === "custom" ? draft.customAccent.toLowerCase() : "",
   });
 }
 
@@ -931,8 +963,13 @@ function AuthBackgroundSection() {
   const { data, isLoading } = useAuthBackgroundQuery();
   const [draft, setDraft] = useState<AuthBackgroundDraft>(AUTH_BG_DEFAULTS);
   const [type, setType] = useState<AuthBackgroundType>("none");
+  const [hexDraft, setHexDraft] = useState(AUTH_BG_DEFAULTS.customAccent);
   const hydratedRef = useRef(false);
   const savedRef = useRef(serializeAuthDraft(AUTH_BG_DEFAULTS, "none"));
+
+  useEffect(() => {
+    setHexDraft(draft.customAccent);
+  }, [draft.customAccent]);
 
   useEffect(() => {
     if (hydratedRef.current || !data) return;
@@ -941,6 +978,9 @@ function AuthBackgroundSection() {
       opacity: data.backgroundOpacity ?? AUTH_BG_DEFAULTS.opacity,
       blur: data.backgroundBlur ?? AUTH_BG_DEFAULTS.blur,
       component: data.componentOpacity ?? AUTH_BG_DEFAULTS.component,
+      palette: data.palette ?? AUTH_BG_DEFAULTS.palette,
+      accent: data.accent ?? AUTH_BG_DEFAULTS.accent,
+      customAccent: data.customAccent ?? AUTH_BG_DEFAULTS.customAccent,
     };
     const storedType = (data.backgroundType ?? (next.image ? "IMAGE" : "NONE")).toLowerCase();
     const nextType: AuthBackgroundType =
@@ -959,6 +999,11 @@ function AuthBackgroundSection() {
         backgroundOpacity: next.opacity,
         backgroundBlur: Math.round(next.blur),
         componentOpacity: next.component,
+        palette: next.palette,
+        accent: next.accent,
+        customAccent: AUTH_CUSTOM_ACCENT_PATTERN.test(next.customAccent)
+          ? next.customAccent.toLowerCase()
+          : undefined,
       }),
     onSuccess: (result, variables) => {
       queryClient.setQueryData(queryKeys.authBackground, result);
@@ -968,17 +1013,22 @@ function AuthBackgroundSection() {
           opacity: result.backgroundOpacity ?? AUTH_BG_DEFAULTS.opacity,
           blur: result.backgroundBlur ?? AUTH_BG_DEFAULTS.blur,
           component: result.componentOpacity ?? AUTH_BG_DEFAULTS.component,
+          palette: result.palette ?? AUTH_BG_DEFAULTS.palette,
+          accent: result.accent ?? AUTH_BG_DEFAULTS.accent,
+          customAccent: result.customAccent ?? AUTH_BG_DEFAULTS.customAccent,
         },
         variables.mode,
       );
     },
-    onError: (error) => toast.error("登录页背景保存失败", getErrorMessage(error)),
+    onError: (error) => toast.error("登录页外观保存失败", getErrorMessage(error)),
   });
   const { mutate } = save;
 
   // 滑块拖动时只更新本地预览，停顿 600ms 后整体同步到服务端。
   useEffect(() => {
     if (!hydratedRef.current) return;
+    // 自定义强调色尚未输入完整时不提交，避免服务端校验失败。
+    if (draft.accent === "custom" && !AUTH_CUSTOM_ACCENT_PATTERN.test(draft.customAccent)) return;
     const payload = serializeAuthDraft(draft, type);
     if (payload === savedRef.current) return;
     const timer = setTimeout(() => mutate({ next: draft, mode: type }), 600);
@@ -988,47 +1038,211 @@ function AuthBackgroundSection() {
   const patchDraft = (patch: Partial<AuthBackgroundDraft>) =>
     setDraft((current) => ({ ...current, ...patch }));
 
+  const handleHexChange = (value: string) => {
+    setHexDraft(value);
+    if (AUTH_CUSTOM_ACCENT_PATTERN.test(value)) {
+      patchDraft({ accent: "custom", customAccent: value });
+    }
+  };
+
   return (
-    <section className="ui-card p-5">
-      <SectionTitle
-        icon={LogIn}
-        title="登录页背景"
-        description="登录与注册页共用，对所有访客生效。"
-      />
-      <div className="mt-4 space-y-4">
-        <AuthBackgroundPreview draft={draft} type={type} />
-        <OptionRow label="背景类型">
-          <Pill active={type === "none"} onClick={() => setType("none")}>
-            纯色
-          </Pill>
-          <Pill active={type === "gradient"} onClick={() => setType("gradient")}>
-            渐变光晕
-          </Pill>
-          <Pill active={type === "image"} onClick={() => setType("image")}>
-            自定义图片
-          </Pill>
-        </OptionRow>
-        {type === "image" ? (
-          <>
-            <ImageUpload
-              value={draft.image}
-              onChange={(image) => patchDraft({ image })}
-              category="background"
-              className="h-40 w-full"
-              actionLabel="上传背景图片"
-              cropAspect={16 / 9}
-              preview={false}
-              disabled={isLoading}
-            />
-            <AuthBackgroundSliders draft={draft} onChange={patchDraft} />
-          </>
-        ) : null}
-        <AuthComponentOpacitySlider draft={draft} onChange={patchDraft} />
-        <p className="text-[11px] text-muted-foreground">
-          建议使用 16:9 横图（至少 1920×1080）；组件不透明度作用于登录卡片与左侧介绍栏。
-        </p>
+    <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
+      <div className="space-y-5">
+        <section className="ui-card p-5">
+          <SectionTitle
+            icon={Palette}
+            title="表面配色"
+            description="登录页与注册页共用的整体色彩气质，不影响访客个人偏好。"
+          />
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {palettes.map((palette) => {
+              const active = draft.palette === palette.value;
+              return (
+                <button
+                  key={palette.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => patchDraft({ palette: palette.value })}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border p-2.5 text-left transition-colors",
+                    active
+                      ? "border-primary/40 bg-primary/[0.04]"
+                      : "border-border hover:bg-muted/40",
+                  )}
+                >
+                  <span
+                    className="flex h-12 w-14 shrink-0 items-end gap-1 rounded-lg p-1.5 ring-1 ring-black/5"
+                    style={{ background: palette.background }}
+                  >
+                    <span
+                      className="h-6 w-4 rounded-sm shadow-sm"
+                      style={{ background: palette.surface }}
+                    />
+                    <span
+                      className="h-8 w-4 rounded-sm shadow-sm"
+                      style={{ background: palette.primary }}
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5 text-xs font-medium">
+                      {palette.label}
+                      {active ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                      {palette.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="ui-card p-5">
+          <SectionTitle
+            icon={Palette}
+            title="强调色"
+            description="用于登录页的按钮、链接与选中状态。"
+          />
+          <div className="mt-4 flex flex-wrap gap-2">
+            {accents.map((accent) => {
+              const active = draft.accent === accent.value;
+              return (
+                <button
+                  key={accent.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => patchDraft({ accent: accent.value })}
+                  className={cn(
+                    "flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors",
+                    active
+                      ? "border-primary/40 bg-primary/[0.06]"
+                      : "border-border hover:bg-muted/40",
+                  )}
+                >
+                  <span
+                    className="h-3.5 w-3.5 rounded-full"
+                    style={{ background: accent.color }}
+                  />
+                  {accent.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              aria-pressed={draft.accent === "custom"}
+              onClick={() => patchDraft({ accent: "custom" })}
+              className={cn(
+                "flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs transition-colors",
+                draft.accent === "custom"
+                  ? "border-primary/40 bg-primary/[0.06]"
+                  : "border-border hover:bg-muted/40",
+              )}
+            >
+              <span
+                className="h-3.5 w-3.5 rounded-full ring-1 ring-border"
+                style={{ background: draft.customAccent }}
+              />
+              自定义
+            </button>
+          </div>
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="auth-custom-accent">自定义颜色</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="auth-custom-accent"
+                  type="color"
+                  value={AUTH_CUSTOM_ACCENT_PATTERN.test(draft.customAccent) ? draft.customAccent : "#38bdf8"}
+                  onChange={(event) =>
+                    patchDraft({ accent: "custom", customAccent: event.target.value })
+                  }
+                  className="h-9 w-12 cursor-pointer rounded-md border border-border bg-card p-1"
+                />
+                <Input
+                  value={hexDraft}
+                  onChange={(event) => handleHexChange(event.target.value.trim())}
+                  onBlur={() => {
+                    if (!AUTH_CUSTOM_ACCENT_PATTERN.test(hexDraft)) setHexDraft(draft.customAccent);
+                  }}
+                  className="w-32 font-mono-ui"
+                  aria-label="登录页自定义强调色十六进制值"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              输入 6 位十六进制颜色后立即生效。
+            </p>
+          </div>
+        </section>
+
+        <section className="ui-card p-5">
+          <SectionTitle
+            icon={LogIn}
+            title="登录页背景"
+            description="登录与注册页共用，对所有访客生效。"
+          />
+          <div className="mt-4 space-y-4">
+            <OptionRow label="背景类型">
+              <Pill active={type === "none"} onClick={() => setType("none")}>
+                纯色
+              </Pill>
+              <Pill active={type === "gradient"} onClick={() => setType("gradient")}>
+                渐变光晕
+              </Pill>
+              <Pill active={type === "image"} onClick={() => setType("image")}>
+                自定义图片
+              </Pill>
+            </OptionRow>
+            {type === "image" ? (
+              <>
+                <ImageUpload
+                  value={draft.image}
+                  onChange={(image) => patchDraft({ image })}
+                  category="background"
+                  className="h-40 w-full"
+                  actionLabel="上传背景图片"
+                  cropAspect={16 / 9}
+                  preview={false}
+                  disabled={isLoading}
+                />
+                <AuthBackgroundSliders draft={draft} onChange={patchDraft} />
+              </>
+            ) : null}
+            <AuthComponentOpacitySlider draft={draft} onChange={patchDraft} />
+            <p className="text-[11px] text-muted-foreground">
+              建议使用 16:9 横图（至少 1920×1080）；组件不透明度作用于登录卡片与左侧介绍栏。
+            </p>
+          </div>
+        </section>
+
+        <section className="ui-card p-5">
+          <SectionTitle
+            icon={Monitor}
+            title="生效说明"
+            description="登录页外观是全局配置，仅管理员可以修改。"
+          />
+          <ul className="mt-4 space-y-2 text-xs leading-relaxed text-muted-foreground">
+            <li>· 表面配色与强调色只作用于登录 / 注册页，不会改变已登录用户自己的外观偏好。</li>
+            <li>· 同时作用于登录页与注册页的背景区域，所有访客共享。</li>
+            <li>· 自定义图片会先上传到图床，再作为背景地址保存。</li>
+            <li>· 拖动滑块后约 0.6 秒自动保存，无需手动提交。</li>
+          </ul>
+        </section>
       </div>
-    </section>
+
+      <aside className="space-y-4 xl:sticky xl:top-20">
+        <section className="ui-card p-4">
+          <h2 className="text-sm font-semibold tracking-tight">效果预览</h2>
+          <div className="mt-3">
+            <AuthBackgroundPreview draft={draft} type={type} />
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            预览与登录页使用同一套配色、背景、遮罩与模糊参数。
+          </p>
+        </section>
+      </aside>
+    </div>
   );
 }
 
@@ -1052,7 +1266,12 @@ function AuthBackgroundPreview({
           : "等待上传图片";
 
   return (
-    <div className="relative h-40 overflow-hidden rounded-xl border border-border/60 bg-background">
+    <AuthThemeScope
+      palette={draft.palette}
+      accent={draft.accent}
+      customAccent={draft.customAccent}
+      className="relative h-40 overflow-hidden rounded-xl border border-border/60 bg-background"
+    >
       {type === "gradient" ? (
         <div
           className="absolute inset-0"
@@ -1097,6 +1316,9 @@ function AuthBackgroundPreview({
           <p className="text-[11px] font-semibold">登录页效果实时预览</p>
           <div className="mt-1.5 h-1.5 w-24 rounded-full bg-muted" />
           <div className="mt-1 h-1.5 w-16 rounded-full bg-muted" />
+          <span className="mt-2 inline-flex rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground">
+            主按钮
+          </span>
           {type === "image" ? (
             <p className="mt-1.5 text-[10px] text-muted-foreground tabular">
               遮罩 {Math.round(draft.opacity * 100)}% · 模糊 {Math.round(draft.blur)}px ·
@@ -1105,7 +1327,7 @@ function AuthBackgroundPreview({
           ) : null}
         </div>
       </div>
-    </div>
+    </AuthThemeScope>
   );
 }
 

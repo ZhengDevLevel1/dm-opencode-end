@@ -15,6 +15,12 @@ public class AuthBackgroundVO {
     public static final int DEFAULT_BLUR = 0;
     /** 默认组件不透明度 */
     public static final double DEFAULT_COMPONENT_OPACITY = 1.0;
+    /** 默认表面配色 */
+    public static final String DEFAULT_PALETTE = "default";
+    /** 默认强调色 */
+    public static final String DEFAULT_ACCENT = "sky";
+    /** 默认自定义强调色 */
+    public static final String DEFAULT_CUSTOM_ACCENT = "#38bdf8";
 
     /** NONE / GRADIENT / IMAGE */
     private String backgroundType;
@@ -27,6 +33,15 @@ public class AuthBackgroundVO {
 
     private Double componentOpacity;
 
+    /** 登录页表面配色 */
+    private String palette;
+
+    /** 登录页强调色 */
+    private String accent;
+
+    /** 自定义强调色，#RRGGBB */
+    private String customAccent;
+
     private LocalDateTime updatedAt;
 
     public static AuthBackgroundVO from(AppearanceSetting setting) {
@@ -35,6 +50,9 @@ public class AuthBackgroundVO {
         vo.setBackgroundOpacity(DEFAULT_OPACITY);
         vo.setBackgroundBlur(DEFAULT_BLUR);
         vo.setComponentOpacity(DEFAULT_COMPONENT_OPACITY);
+        vo.setPalette(DEFAULT_PALETTE);
+        vo.setAccent(DEFAULT_ACCENT);
+        vo.setCustomAccent(DEFAULT_CUSTOM_ACCENT);
         if (setting != null) {
             vo.setImageUrl(setting.getAuthBackgroundImage());
             vo.setUpdatedAt(setting.getUpdatedAt());
@@ -47,6 +65,15 @@ public class AuthBackgroundVO {
             }
             if (setting.getComponentOpacity() != null) {
                 vo.setComponentOpacity(setting.getComponentOpacity());
+            }
+            if (StringUtils.hasText(setting.getAuthPalette())) {
+                vo.setPalette(setting.getAuthPalette());
+            }
+            if (StringUtils.hasText(setting.getAuthAccent())) {
+                vo.setAccent(setting.getAuthAccent());
+            }
+            if (StringUtils.hasText(setting.getAuthCustomAccent())) {
+                vo.setCustomAccent(setting.getAuthCustomAccent());
             }
         }
         return vo;

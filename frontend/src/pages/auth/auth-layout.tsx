@@ -8,6 +8,7 @@ import { useAuthBackgroundQuery } from "@/hooks/queries";
 import { resolveImageUrl } from "@/lib/image";
 import { AUTH_GRADIENT_BACKGROUND } from "@/lib/auth-background";
 import { Button } from "@/components/ui/button";
+import { AuthThemeScope } from "@/components/domain/auth-theme-scope";
 import { cn } from "@/lib/cn";
 
 export function AuthLayout({
@@ -38,7 +39,12 @@ export function AuthLayout({
   const surfaceOpacity = authBackground?.componentOpacity ?? 1;
 
   return (
-    <div className="relative flex min-h-screen bg-background">
+    <AuthThemeScope
+      palette={authBackground?.palette ?? "default"}
+      accent={authBackground?.accent ?? "sky"}
+      customAccent={authBackground?.customAccent ?? "#38bdf8"}
+      className="relative flex min-h-screen bg-background"
+    >
       {showGradient ? (
         <div
           className="absolute inset-0 z-0"
@@ -178,6 +184,6 @@ export function AuthLayout({
           </div>
         </div>
       </main>
-    </div>
+    </AuthThemeScope>
   );
 }

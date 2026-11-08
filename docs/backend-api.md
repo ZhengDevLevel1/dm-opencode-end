@@ -516,6 +516,9 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
     "backgroundOpacity": 0.78,
     "backgroundBlur": 0,
     "componentOpacity": 1,
+    "palette": "rose-pine-dawn",
+    "accent": "custom",
+    "customAccent": "#b4637a",
     "updatedAt": "2026-11-05T10:30:00"
   },
   "timestamp": 1760000000000
@@ -528,6 +531,10 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 - `backgroundOpacity`：遮罩不透明度，取值 `0.4–0.98`，默认 `0.78`，仅对 `IMAGE` 生效。
 - `backgroundBlur`：背景模糊像素，取值 `0–20`，默认 `0`（清晰），仅对 `IMAGE` 生效。
 - `componentOpacity`：登录卡片与左侧介绍栏的不透明度，取值 `0.4–1`，默认 `1`。
+- `palette`：登录页表面配色，可选 `default` / `rose-pine-dawn` / `catppuccin-latte` / `everforest-light` / `rose-pine`，默认 `default`。
+- `accent`：登录页强调色，可选 `sky` / `blue` / `violet` / `rose` / `emerald` / `amber` / `orange` / `custom`，默认 `sky`。
+- `customAccent`：`accent` 为 `custom` 时使用的 `#RRGGBB` 颜色，默认 `#38bdf8`。
+- 配色仅作用于登录页与注册页，不改变已登录用户本机的个人外观偏好。
 
 `PUT /api/admin/appearance/auth-background`（管理员）
 
@@ -537,17 +544,21 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
   "imageUrl": "http://localhost:9000/flower-shop/background/2026-11-05/xxx.jpg",
   "backgroundOpacity": 0.72,
   "backgroundBlur": 4,
-  "componentOpacity": 0.9
+  "componentOpacity": 0.9,
+  "palette": "rose-pine-dawn",
+  "accent": "custom",
+  "customAccent": "#b4637a"
 }
 ```
 
 - `imageUrl` 传空字符串或空白字符表示清除背景，响应中 `imageUrl` 为 `null`。
 - `backgroundType` 省略时按 `imageUrl` 是否有值推断为 `IMAGE`/`NONE`；传 `GRADIENT` 时无需图片。
-- 三个调节参数均可省略；省略时保持服务端已有值，便于旧客户端只更新图片。
+- 三个调节参数与配色字段均可省略；省略时保持服务端已有值，便于旧客户端只更新图片。
+- 配色字段取值非法或 `customAccent` 不是 `#RRGGBB` 时返回 `400`。
 
 ### 4.7 用户外观偏好
 
-外观偏好按账号保存，登录后读取、修改后自动同步；登录页背景仍是 4.6 的全局配置。
+外观偏好按账号保存，登录后读取、修改后自动同步；登录页背景与配色（`palette` / `accent` / `customAccent`）仍是 4.6 的全局配置。
 
 `GET /api/auth/preferences`（登录）
 

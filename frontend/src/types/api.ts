@@ -1,3 +1,5 @@
+import type { AccentId, PaletteId } from "@/stores/theme";
+
 export interface ApiResponse<T> {
   code: number;
   message: string;
@@ -126,6 +128,12 @@ export interface AuthBackgroundVO {
   backgroundOpacity?: number;
   backgroundBlur?: number;
   componentOpacity?: number;
+  /** 登录页表面配色 */
+  palette?: PaletteId;
+  /** 登录页强调色 */
+  accent?: AccentId;
+  /** 自定义强调色 #RRGGBB */
+  customAccent?: string;
   updatedAt?: string;
 }
 
@@ -135,6 +143,9 @@ export interface AuthBackgroundRequest {
   backgroundOpacity?: number;
   backgroundBlur?: number;
   componentOpacity?: number;
+  palette?: PaletteId;
+  accent?: AccentId;
+  customAccent?: string;
 }
 
 export interface ChangePasswordRequest {

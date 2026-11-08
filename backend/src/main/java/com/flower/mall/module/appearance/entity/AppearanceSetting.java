@@ -34,6 +34,18 @@ public class AppearanceSetting {
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Double componentOpacity;
 
+    /** 登录页表面配色：default / rose-pine-dawn / catppuccin-latte / everforest-light / rose-pine */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String authPalette;
+
+    /** 登录页强调色：sky / blue / violet / rose / emerald / amber / orange / custom */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String authAccent;
+
+    /** 自定义强调色，#RRGGBB */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String authCustomAccent;
+
     private Long updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

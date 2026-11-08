@@ -37,7 +37,10 @@ class AppearanceIntegrationTest {
         mockMvc.perform(get("/api/appearance/auth-background"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.backgroundType").value("NONE"))
-                .andExpect(jsonPath("$.data.imageUrl").doesNotExist());
+                .andExpect(jsonPath("$.data.imageUrl").doesNotExist())
+                .andExpect(jsonPath("$.data.palette").value("default"))
+                .andExpect(jsonPath("$.data.accent").value("sky"))
+                .andExpect(jsonPath("$.data.customAccent").value("#38bdf8"));
     }
 
     @Test
@@ -49,7 +52,8 @@ class AppearanceIntegrationTest {
                         .content("""
                                 {"imageUrl":"https://example.com/login-background.jpg",
                                  "backgroundType":"IMAGE",
-                                 "backgroundOpacity":0.62,"backgroundBlur":12,"componentOpacity":0.85}
+                                 "backgroundOpacity":0.62,"backgroundBlur":12,"componentOpacity":0.85,
+                                 "palette":"rose-pine-dawn","accent":"custom","customAccent":"#B4637A"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.backgroundType").value("IMAGE"))
@@ -57,13 +61,19 @@ class AppearanceIntegrationTest {
                         .value("https://example.com/login-background.jpg"))
                 .andExpect(jsonPath("$.data.backgroundOpacity").value(0.62))
                 .andExpect(jsonPath("$.data.backgroundBlur").value(12))
-                .andExpect(jsonPath("$.data.componentOpacity").value(0.85));
+                .andExpect(jsonPath("$.data.componentOpacity").value(0.85))
+                .andExpect(jsonPath("$.data.palette").value("rose-pine-dawn"))
+                .andExpect(jsonPath("$.data.accent").value("custom"))
+                .andExpect(jsonPath("$.data.customAccent").value("#b4637a"));
 
         mockMvc.perform(get("/api/appearance/auth-background"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.imageUrl")
-                        .value("https://example.com/login-background.jpg"));
+                        .value("https://example.com/login-background.jpg"))
+                .andExpect(jsonPath("$.data.palette").value("rose-pine-dawn"))
+                .andExpect(jsonPath("$.data.accent").value("custom"));
 
+        // 只更新图片时保留已保存的配色
         mockMvc.perform(put("/api/admin/appearance/auth-background")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -71,7 +81,30 @@ class AppearanceIntegrationTest {
                                 {"imageUrl":"  "}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.imageUrl").doesNotExist());
+                .andExpect(jsonPath("$.data.imageUrl").doesNotExist())
+                .andExpect(jsonPath("$.data.palette").value("rose-pine-dawn"))
+                .andExpect(jsonPath("$.data.accent").value("custom"))
+                .andExpect(jsonPath("$.data.customAccent").value("#b4637a"));
+    }
+
+    @Test
+    void rejectsInvalidPaletteOrAccent() throws Exception {
+        String token = login("admin", "admin123");
+        mockMvc.perform(put("/api/admin/appearance/auth-background")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"imageUrl":"","palette":"neon","accent":"pink"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/admin/appearance/auth-background")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"imageUrl":"","accent":"custom","customAccent":"red"}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
