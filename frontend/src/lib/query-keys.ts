@@ -31,6 +31,7 @@ export const queryKeys = {
   adminUsers: (params: object) => ["admin", "users", params] as const,
   adminUser: (id: number) => ["admin", "user", id] as const,
   adminReviews: (params: object) => ["admin", "reviews", params] as const,
+  adminTags: ["admin", "tags"] as const,
   adminLogs: (params: object) => ["admin", "logs", params] as const,
   adminRecommendationWeights: ["admin", "recommendation-weights"] as const,
   adminRecommendationLogs: (params: object) =>

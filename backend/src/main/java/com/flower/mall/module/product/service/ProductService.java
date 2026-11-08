@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.flower.mall.common.enums.ProductStatus;
 import com.flower.mall.common.enums.SeasonSuitability;
+import com.flower.mall.common.enums.TagType;
 import com.flower.mall.common.exception.BusinessException;
 import com.flower.mall.common.exception.ErrorCode;
 import com.flower.mall.config.AppProperties;
@@ -16,6 +17,7 @@ import com.flower.mall.module.product.dto.ProductSaveRequest;
 import com.flower.mall.module.product.dto.ProductVO;
 import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.tag.service.TagService;
 import com.flower.mall.support.CacheKeys;
 import com.flower.mall.support.CacheService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +38,7 @@ public class ProductService {
     private final InventoryService inventoryService;
     private final CacheService cacheService;
     private final AppProperties properties;
+    private final TagService tagService;
 
     public IPage<Product> page(ProductQuery query, boolean adminView) {
         long page = Math.max(query.getPage(), 1);
@@ -185,6 +188,9 @@ public class ProductService {
     }
 
     private void applyRequest(Product product, ProductSaveRequest request) {
+        tagService.validateSelection(TagType.OCCASION, request.getOccasionTags());
+        tagService.validateSelection(TagType.FESTIVAL, request.getFestivalTags());
+        tagService.validateSelection(TagType.MEANING, request.getFlowerMeaning());
         product.setName(request.getName());
         product.setCategory(request.getCategory());
         product.setFlowerMeaning(request.getFlowerMeaning());

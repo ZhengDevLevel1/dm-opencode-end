@@ -8,6 +8,7 @@ import { useDict, useFavoritesQuery } from "@/hooks/queries";
 import { useLoginGuard } from "@/hooks/use-login-guard";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatPercent } from "@/lib/format";
+import { FESTIVAL_TAG_OPTIONS } from "@/lib/product-tags";
 import { toast } from "@/stores/toast";
 import type { RecommendationItemVO, SeasonSuitability } from "@/types/api";
 import { RecommendationCard } from "@/components/domain/recommendation-card";
@@ -55,10 +56,15 @@ export function RecommendationsPage() {
     () => (dict.data?.seasons ?? []).map((item) => ({ value: item.value, label: item.label })),
     [dict.data?.seasons],
   );
-  const festivalOptions = useMemo(
-    () => (dict.data?.festivals ?? []).map((item) => ({ value: item, label: item })),
-    [dict.data?.festivals],
-  );
+  const festivalOptions = useMemo(() => {
+    const items: Array<{ value: string; label: string }> = (
+      dict.data?.festivals ?? FESTIVAL_TAG_OPTIONS
+    ).map((item) => ({ value: item, label: item }));
+    if (festival && !items.some((item) => item.value === festival)) {
+      items.unshift({ value: festival, label: festival });
+    }
+    return items;
+  }, [dict.data?.festivals, festival]);
 
   const query = useMemo(
     () => ({ limit, festival, season, scene: "home" }),

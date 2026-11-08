@@ -20,6 +20,7 @@ import {
 import { useDict, useFavoritesQuery } from "@/hooks/queries";
 import { useLoginGuard } from "@/hooks/use-login-guard";
 import { getErrorMessage } from "@/lib/api-client";
+import { OCCASION_TAG_OPTIONS } from "@/lib/product-tags";
 import { toast } from "@/stores/toast";
 import { ProductCard } from "@/components/domain/product-card";
 import { RecommendationCard } from "@/components/domain/recommendation-card";
@@ -142,7 +143,7 @@ export function HomePage() {
 
   const heroRec = recommendations.data?.items[0];
   const categories = dict.data?.categories ?? [];
-  const occasions = (dict.data?.occasions ?? []).slice(0, 8);
+  const occasions = (dict.data?.occasions ?? OCCASION_TAG_OPTIONS).slice(0, 8);
   const recData = recommendations.data;
   const coldStart = recData?.coldStart ?? !isLoggedIn;
 
@@ -463,7 +464,7 @@ export function HomePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {(dict.data?.occasions ?? []).slice(0, 6).map((occasion) => (
+          {occasions.slice(0, 6).map((occasion) => (
             <Link
               key={occasion}
               to={`/products?occasion=${encodeURIComponent(occasion)}`}

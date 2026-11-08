@@ -4,6 +4,7 @@ import { Flower2 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { toast } from "@/stores/toast";
 import { getToken, getTokenExpiry } from "@/lib/storage";
+import { ThemePreferenceSync } from "./theme-preference-sync";
 
 function BootSplash() {
   return (
@@ -70,5 +71,10 @@ export function AuthEvents({ children }: { children: ReactNode }) {
   }, [status, clearAuth, navigate, location.pathname, location.search]);
 
   if (status === "idle" || status === "loading") return <BootSplash />;
-  return <>{children}</>;
+  return (
+    <>
+      <ThemePreferenceSync />
+      {children}
+    </>
+  );
 }

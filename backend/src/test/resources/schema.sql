@@ -1,3 +1,6 @@
+DROP TABLE IF EXISTS tag_option;
+DROP TABLE IF EXISTS tag_type_setting;
+DROP TABLE IF EXISTS user_theme_preference;
 DROP TABLE IF EXISTS appearance_setting;
 DROP TABLE IF EXISTS operation_log;
 DROP TABLE IF EXISTS recommendation_log;
@@ -229,4 +232,41 @@ CREATE TABLE appearance_setting (
     component_opacity DOUBLE DEFAULT 1,
     updated_by BIGINT,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE tag_option (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    tag_type VARCHAR(20) NOT NULL,
+    name VARCHAR(30) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_tag_type_name UNIQUE (tag_type, name)
+);
+
+CREATE TABLE tag_type_setting (
+    tag_type VARCHAR(20) PRIMARY KEY,
+    max_select_count INT NOT NULL DEFAULT 8,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE user_theme_preference (
+    user_id BIGINT PRIMARY KEY,
+    mode VARCHAR(20) NOT NULL DEFAULT 'system',
+    palette VARCHAR(40) NOT NULL DEFAULT 'default',
+    accent VARCHAR(20) NOT NULL DEFAULT 'sky',
+    custom_accent VARCHAR(20) NOT NULL DEFAULT '#38bdf8',
+    radius VARCHAR(20) NOT NULL DEFAULT 'default',
+    density VARCHAR(20) NOT NULL DEFAULT 'comfortable',
+    sidebar_style VARCHAR(20) NOT NULL DEFAULT 'follow',
+    scale DOUBLE NOT NULL DEFAULT 1,
+    reduce_motion TINYINT NOT NULL DEFAULT 0,
+    high_contrast TINYINT NOT NULL DEFAULT 0,
+    background VARCHAR(20) NOT NULL DEFAULT 'solid',
+    background_image VARCHAR(500),
+    background_opacity DOUBLE NOT NULL DEFAULT 0.82,
+    background_blur INT NOT NULL DEFAULT 0,
+    component_opacity DOUBLE NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_theme_pref_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
 );

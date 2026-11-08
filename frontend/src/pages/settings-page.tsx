@@ -250,6 +250,9 @@ export function SettingsPage() {
         </TabsList>
 
         <TabsContent value="appearance" className="mt-4">
+          <p className="mb-4 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+            登录后外观偏好会保存到当前账号，换设备自动恢复；未登录时仅保存在本机浏览器。登录页背景由管理员统一设置，所有用户共用。
+          </p>
           <div className="grid gap-5 xl:grid-cols-[1fr_300px]">
             <div className="space-y-5">
               <section className="ui-card p-5">

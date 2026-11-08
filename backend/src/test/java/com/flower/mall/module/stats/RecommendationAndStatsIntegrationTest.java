@@ -131,7 +131,7 @@ class RecommendationAndStatsIntegrationTest {
     void dictAndStatsEndpointsReturnData() throws Exception {
         mockMvc.perform(get("/api/dict/options"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.categories.length()").value(9))
+                .andExpect(jsonPath("$.data.categories.length()").value(10))
                 .andExpect(jsonPath("$.data.orderStatuses.length()").value(7));
 
         String token = login("admin", "admin123");

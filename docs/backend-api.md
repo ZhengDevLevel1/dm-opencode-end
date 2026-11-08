@@ -244,9 +244,11 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
   "code": 200,
   "message": "success",
   "data": {
-    "categories": ["玫瑰", "百合", "康乃馨", "向日葵", "郁金香", "混合花束", "永生花", "绿植", "礼盒"],
-    "occasions": ["生日", "表白", "求婚", "婚礼", "纪念日", "母亲节", "教师节", "情人节", "七夕", "探望", "开业", "毕业季", "日常", "办公"],
-    "festivals": ["元旦", "春节", "情人节", "妇女节", "母亲节", "520", "儿童节", "毕业季", "七夕", "教师节", "国庆节", "圣诞节"],
+    "categories": ["玫瑰", "百合", "康乃馨", "向日葵", "郁金香", "混合花束", "永生花", "绿植", "满天星", "礼盒"],
+    "occasions": ["表白", "生日", "纪念日", "求婚", "婚礼", "母亲节", "教师节", "毕业季", "情人节", "七夕", "日常", "办公", "探望", "开业", "乔迁", "聚会", "商务", "感谢", "祝福", "道歉", "鼓励", "思念", "订婚", "结婚", "结婚纪念", "约会", "满月", "百日", "寿宴", "升学", "升职", "退休", "周年庆", "慰问", "探病", "康复祝福", "圣诞派对", "新年", "告白"],
+    "festivals": ["情人节", "七夕", "520", "元宵节", "妇女节", "母亲节", "父亲节", "儿童节", "端午节", "教师节", "中秋节", "国庆节", "重阳节", "感恩节", "平安夜", "圣诞节", "元旦", "春节", "毕业季", "周年庆"],
+    "flowerMeanings": ["热烈爱情", "至死不渝", "天长地久", "只此一人", "永恒的爱", "永不凋零", "浪漫星河", "只为你来", "爱的告白", "优雅浪漫", "纯洁的爱", "默默守护", "深情不变", "心动瞬间", "温暖祝福", "日日欢喜", "平安顺遂", "节日祝福", "温暖团圆", "幸福启程", "幸福美满", "岁岁平安", "心想事成", "前程似锦", "事业有成", "开业大吉", "乔迁之喜", "学业进步", "金榜题名", "感恩母爱", "温柔守护", "感恩祝福", "感恩每一天", "感谢有你", "真诚祝福", "纯洁高雅", "百年好合", "阳光忠诚", "勇敢追梦", "生机陪伴", "清新每一天", "思念守望", "温柔星河", "友谊长存", "健康平安", "康复祝福"],
+    "tagMaxCounts": { "occasions": 8, "festivals": 6, "flowerMeanings": 6 },
     "priceBands": ["平价", "中端", "高端"],
     "seasons": [{ "value": "SPRING", "label": "春季" }, { "value": "ALL", "label": "四季" }],
     "roles": [{ "value": "CUSTOMER", "label": "消费者/会员" }],
@@ -260,7 +262,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 }
 ```
 
-注意：`categories`、`occasions`、`festivals`、`priceBands` 是字符串数组；其余枚举项是 `{ value, label }` 数组。示例中的枚举数组只展示了部分项，完整值见 2.1 枚举表或接口实际返回；前端不要写死这些选项。
+注意：`categories`、`occasions`、`festivals`、`flowerMeanings`、`priceBands` 是字符串数组；其余枚举项是 `{ value, label }` 数组。`tagMaxCounts` 是三类标签各自允许商品选择的最大个数。场景、节日、花语以数据库 `tag_option` 为唯一来源，管理员在「标签管理」中增删改后，商品编辑选择器与各页面搜索下拉都读取最新列表；`frontend/src/lib/product-tags.ts` 只作为接口未返回时的兜底常量。其他枚举从接口读取，不要另行写死。
 
 ## 3. 接口总览
 
@@ -272,6 +274,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | GET | `/api/auth/me` | 登录 | `ApiResponse<UserVO>` |
 | PUT | `/api/auth/me` | 登录 | `ApiResponse<UserVO>` |
 | PUT | `/api/auth/password` | 登录 | `ApiResponse<Void>` |
+| GET | `/api/auth/preferences` | 登录 | `ApiResponse<ThemePreferenceVO>` |
+| PUT | `/api/auth/preferences` | 登录 | `ApiResponse<ThemePreferenceVO>` |
 | POST | `/api/files/images` | 登录 | `ApiResponse<FileUploadVO>` |
 | GET | `/api/dict/options` | 公开 | `ApiResponse<DictOptions>` |
 | GET | `/api/appearance/auth-background` | 公开 | `ApiResponse<AuthBackgroundVO>` |
@@ -321,6 +325,11 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/products/{id}` | 管理员 | `ApiResponse<ProductVO>` |
 | PUT | `/api/admin/products/{id}/status` | 管理员 | `ApiResponse<ProductVO>` |
 | DELETE | `/api/admin/products/{id}` | 管理员 | `ApiResponse<Void>` |
+| GET | `/api/admin/tags` | 管理员 | `ApiResponse<TagOverviewVO>` |
+| POST | `/api/admin/tags` | 管理员 | `ApiResponse<TagOptionVO>` |
+| PUT | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<TagOptionVO>` |
+| DELETE | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<Void>` |
+| PUT | `/api/admin/tags/max-count` | 管理员 | `ApiResponse<{ maxCount: number }>` |
 | GET | `/api/admin/reviews` | 管理员 | `ApiResponse<PageResult<ReviewVO>>` |
 | PUT | `/api/admin/reviews/{id}/status` | 管理员 | `ApiResponse<ReviewVO>` |
 | PUT | `/api/admin/reviews/{id}/reply` | 管理员 | `ApiResponse<ReviewVO>` |
@@ -349,6 +358,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | GET | `/api/auth/me` | 登录 | 获取当前用户资料 |
 | PUT | `/api/auth/me` | 登录 | 修改当前用户资料 |
 | PUT | `/api/auth/password` | 登录 | 修改当前用户密码 |
+| GET | `/api/auth/preferences` | 登录 | 获取当前账号的外观偏好 |
+| PUT | `/api/auth/preferences` | 登录 | 保存当前账号的外观偏好 |
 
 ### 4.2 请求体
 
@@ -500,6 +511,56 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 - `imageUrl` 传空字符串或空白字符表示清除背景，响应中 `imageUrl` 为 `null`。
 - `backgroundType` 省略时按 `imageUrl` 是否有值推断为 `IMAGE`/`NONE`；传 `GRADIENT` 时无需图片。
 - 三个调节参数均可省略；省略时保持服务端已有值，便于旧客户端只更新图片。
+
+### 4.7 用户外观偏好
+
+外观偏好按账号保存，登录后读取、修改后自动同步；登录页背景仍是 4.6 的全局配置。
+
+`GET /api/auth/preferences`（登录）
+
+- 已保存：返回 `ApiResponse<ThemePreferenceVO>`；
+- 未保存：`data` 为空（响应中省略），前端可用当前本地主题初始化并调用 `PUT`。
+
+`PUT /api/auth/preferences`（登录）
+
+```json
+{
+  "mode": "dark",
+  "palette": "rose-pine",
+  "accent": "rose",
+  "customAccent": "#c25b6a",
+  "radius": "round",
+  "density": "comfortable",
+  "sidebarStyle": "follow",
+  "scale": 1,
+  "reduceMotion": false,
+  "highContrast": false,
+  "background": "gradient",
+  "backgroundImage": "",
+  "backgroundOpacity": 0.82,
+  "backgroundBlur": 0,
+  "componentOpacity": 1
+}
+```
+
+字段约束：
+
+| 字段 | 取值 |
+| --- | --- |
+| `mode` | `light` / `dark` / `system` |
+| `palette` | `default` / `rose-pine-dawn` / `catppuccin-latte` / `everforest-light` / `rose-pine` |
+| `accent` | `sky` / `blue` / `violet` / `rose` / `emerald` / `amber` / `orange` / `custom` |
+| `customAccent` | `#RRGGBB` |
+| `radius` | `compact` / `default` / `comfortable` / `round` |
+| `density` | `compact` / `comfortable` |
+| `sidebarStyle` | `follow` / `panel` / `accent` |
+| `scale` | 0.8–1.2 |
+| `background` | `solid` / `gradient` / `image` |
+| `backgroundImage` | ≤ 500 字符 |
+| `backgroundOpacity` / `componentOpacity` | 0–1 |
+| `backgroundBlur` | 0–30 |
+
+表结构：`user_theme_preference`，主键 `user_id`，外键关联 `sys_user.id`。
 - 最长 500 字符；更新会记录操作日志（模块「外观管理」）。
 - 数据保存在 `appearance_setting` 表单行记录（`id=1`），首次读取或更新时自动创建。
 
@@ -1384,6 +1445,7 @@ export interface DictOptions {
   categories: string[];
   occasions: string[];
   festivals: string[];
+  flowerMeanings: string[];
   priceBands: string[];
   seasons: OptionItem[];
   roles: OptionItem[];

@@ -4,14 +4,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.temporal.TemporalAdjusters;
-import java.util.List;
 import java.util.Optional;
 
 public final class FestivalCalendar {
-
-    public static final List<String> SUPPORTED_FESTIVALS = List.of(
-            "元旦", "春节", "情人节", "妇女节", "母亲节", "520", "儿童节",
-            "毕业季", "七夕", "教师节", "国庆节", "圣诞节");
 
     private FestivalCalendar() {
     }
@@ -44,11 +39,20 @@ public final class FestivalCalendar {
         if (month == Month.OCTOBER && day == 1) {
             return Optional.of("国庆节");
         }
+        if (month == Month.DECEMBER && day == 24) {
+            return Optional.of("平安夜");
+        }
         if (month == Month.DECEMBER && day == 25) {
             return Optional.of("圣诞节");
         }
-        if (month == Month.MAY && isNthSunday(date, 2)) {
+        if (month == Month.MAY && isNthWeekday(date, DayOfWeek.SUNDAY, 2)) {
             return Optional.of("母亲节");
+        }
+        if (month == Month.JUNE && isNthWeekday(date, DayOfWeek.SUNDAY, 3)) {
+            return Optional.of("父亲节");
+        }
+        if (month == Month.NOVEMBER && isNthWeekday(date, DayOfWeek.THURSDAY, 4)) {
+            return Optional.of("感恩节");
         }
         LocalDate springStart = LocalDate.of(date.getYear(), 1, 20);
         LocalDate springEnd = LocalDate.of(date.getYear(), 2, 20);
@@ -61,11 +65,11 @@ public final class FestivalCalendar {
         return Optional.empty();
     }
 
-    private static boolean isNthSunday(LocalDate date, int nth) {
-        if (date.getDayOfWeek() != DayOfWeek.SUNDAY) {
+    private static boolean isNthWeekday(LocalDate date, DayOfWeek dayOfWeek, int nth) {
+        if (date.getDayOfWeek() != dayOfWeek) {
             return false;
         }
-        LocalDate firstSunday = date.with(TemporalAdjusters.firstInMonth(DayOfWeek.SUNDAY));
-        return firstSunday.plusWeeks(nth - 1L).equals(date);
+        LocalDate first = date.with(TemporalAdjusters.firstInMonth(dayOfWeek));
+        return first.plusWeeks(nth - 1L).equals(date);
     }
 }

@@ -50,6 +50,12 @@ import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { TagPicker } from "@/components/ui/tag-picker";
+import {
+  FESTIVAL_TAG_OPTIONS,
+  FLOWER_MEANING_OPTIONS,
+  OCCASION_TAG_OPTIONS,
+} from "@/lib/product-tags";
 
 const PAGE_SIZE = 10;
 
@@ -152,11 +158,11 @@ export function AdminProductsPage() {
     [dict.data?.categories],
   );
   const occasionFilterOptions = useMemo(
-    () => (dict.data?.occasions ?? []).map((item) => ({ value: item, label: item })),
+    () => (dict.data?.occasions ?? OCCASION_TAG_OPTIONS).map((item) => ({ value: item, label: item })),
     [dict.data?.occasions],
   );
   const festivalFilterOptions = useMemo(
-    () => (dict.data?.festivals ?? []).map((item) => ({ value: item, label: item })),
+    () => (dict.data?.festivals ?? FESTIVAL_TAG_OPTIONS).map((item) => ({ value: item, label: item })),
     [dict.data?.festivals],
   );
 
@@ -857,36 +863,74 @@ function ProductEditorDialog({
 
         <div className="space-y-1.5">
           <Label htmlFor="product-meaning">花语</Label>
-          <textarea
-            id="product-meaning"
-            rows={2}
-            maxLength={200}
-            placeholder="例如：热烈而克制的爱意"
-            className="flex w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
-            {...register("flowerMeaning")}
+          <Controller
+            control={control}
+            name="flowerMeaning"
+            render={({ field }) => (
+              <TagPicker
+                id="product-meaning"
+                value={field.value ?? ""}
+                onChange={field.onChange}
+                options={dict.data?.flowerMeanings ?? FLOWER_MEANING_OPTIONS}
+                joinWith="，"
+                maxSelected={dict.data?.tagMaxCounts?.flowerMeanings}
+                placeholder="点击选择花语短语"
+                invalid={Boolean(errors.flowerMeaning)}
+                describedBy="product-meaning-hint"
+              />
+            )}
           />
+          <p id="product-meaning-hint" className="text-[11px] text-muted-foreground">
+            可多选，最多 {dict.data?.tagMaxCounts?.flowerMeanings ?? 6} 个；保存时按「，」拼接，推荐算法会拆分后参与内容相似度。
+          </p>
           <FieldError message={errors.flowerMeaning?.message} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="product-occasions">场景标签</Label>
-            <Input
-              id="product-occasions"
-              placeholder="表白,纪念日（逗号分隔）"
-              maxLength={200}
-              {...register("occasionTags")}
+            <Controller
+              control={control}
+              name="occasionTags"
+              render={({ field }) => (
+                <TagPicker
+                  id="product-occasions"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  options={dict.data?.occasions ?? OCCASION_TAG_OPTIONS}
+                  maxSelected={dict.data?.tagMaxCounts?.occasions}
+                  placeholder="点击选择场景"
+                  invalid={Boolean(errors.occasionTags)}
+                  describedBy="product-occasions-hint"
+                />
+              )}
             />
+            <p id="product-occasions-hint" className="text-[11px] text-muted-foreground">
+              用于推荐算法的场景匹配，最多选 {dict.data?.tagMaxCounts?.occasions ?? 8} 个。
+            </p>
             <FieldError message={errors.occasionTags?.message} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="product-festivals">节日标签</Label>
-            <Input
-              id="product-festivals"
-              placeholder="情人节,七夕（逗号分隔）"
-              maxLength={200}
-              {...register("festivalTags")}
+            <Controller
+              control={control}
+              name="festivalTags"
+              render={({ field }) => (
+                <TagPicker
+                  id="product-festivals"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  options={dict.data?.festivals ?? FESTIVAL_TAG_OPTIONS}
+                  maxSelected={dict.data?.tagMaxCounts?.festivals}
+                  placeholder="点击选择节日"
+                  invalid={Boolean(errors.festivalTags)}
+                  describedBy="product-festivals-hint"
+                />
+              )}
             />
+            <p id="product-festivals-hint" className="text-[11px] text-muted-foreground">
+              用于推荐算法的节日匹配，最多选 {dict.data?.tagMaxCounts?.festivals ?? 6} 个。
+            </p>
             <FieldError message={errors.festivalTags?.message} />
           </div>
         </div>

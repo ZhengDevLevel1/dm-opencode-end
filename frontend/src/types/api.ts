@@ -144,10 +144,34 @@ export interface OptionItem {
   label: string;
 }
 
+export type TagType = "OCCASION" | "FESTIVAL" | "MEANING";
+
+export interface TagOptionVO {
+  id: number;
+  name: string;
+}
+
+export interface TagOverview {
+  occasions: TagOptionVO[];
+  festivals: TagOptionVO[];
+  flowerMeanings: TagOptionVO[];
+  maxCounts: {
+    occasions: number;
+    festivals: number;
+    flowerMeanings: number;
+  };
+}
+
 export interface DictOptions {
   categories: string[];
   occasions: string[];
   festivals: string[];
+  flowerMeanings: string[];
+  tagMaxCounts: {
+    occasions: number;
+    festivals: number;
+    flowerMeanings: number;
+  };
   priceBands: string[];
   seasons: OptionItem[];
   roles: OptionItem[];
@@ -157,6 +181,27 @@ export interface DictOptions {
   fulfillmentNodes: OptionItem[];
   inventoryChangeTypes: OptionItem[];
 }
+
+export interface ThemePreference {
+  mode: "light" | "dark" | "system";
+  palette: "default" | "rose-pine-dawn" | "catppuccin-latte" | "everforest-light" | "rose-pine";
+  accent: "sky" | "blue" | "violet" | "rose" | "emerald" | "amber" | "orange" | "custom";
+  customAccent: string;
+  radius: "compact" | "default" | "comfortable" | "round";
+  density: "compact" | "comfortable";
+  sidebarStyle: "follow" | "panel" | "accent";
+  scale: number;
+  reduceMotion: boolean;
+  highContrast: boolean;
+  background: "solid" | "gradient" | "image";
+  backgroundImage?: string | null;
+  backgroundOpacity: number;
+  backgroundBlur: number;
+  componentOpacity: number;
+  updatedAt?: string;
+}
+
+export type ThemePreferenceRequest = Omit<ThemePreference, "updatedAt">;
 
 export interface ProductVO {
   id: number;

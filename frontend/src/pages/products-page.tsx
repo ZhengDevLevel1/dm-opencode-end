@@ -7,6 +7,7 @@ import { cartService, favoriteService, productService } from "@/lib/services";
 import { useDict, useFavoritesQuery } from "@/hooks/queries";
 import { useLoginGuard } from "@/hooks/use-login-guard";
 import { getErrorMessage } from "@/lib/api-client";
+import { FESTIVAL_TAG_OPTIONS, OCCASION_TAG_OPTIONS } from "@/lib/product-tags";
 import { toast } from "@/stores/toast";
 import type { ProductQuery, ProductSort, ProductVO, SeasonSuitability } from "@/types/api";
 import { ProductCard } from "@/components/domain/product-card";
@@ -162,19 +163,31 @@ export function ProductsPage() {
   };
 
   const seasonLabel = dict.data?.seasons.find((item) => item.value === season)?.label;
+  const occasion = params.get("occasion");
+  const festival = params.get("festival");
 
   const categoryOptions = useMemo(
     () => (dict.data?.categories ?? []).map((item) => ({ value: item, label: item })),
     [dict.data],
   );
-  const occasionOptions = useMemo(
-    () => (dict.data?.occasions ?? []).map((item) => ({ value: item, label: item })),
-    [dict.data],
-  );
-  const festivalOptions = useMemo(
-    () => (dict.data?.festivals ?? []).map((item) => ({ value: item, label: item })),
-    [dict.data],
-  );
+  const occasionOptions = useMemo(() => {
+    const items: Array<{ value: string; label: string }> = (
+      dict.data?.occasions ?? OCCASION_TAG_OPTIONS
+    ).map((item) => ({ value: item, label: item }));
+    if (occasion && !items.some((item) => item.value === occasion)) {
+      items.unshift({ value: occasion, label: occasion });
+    }
+    return items;
+  }, [dict.data?.occasions, occasion]);
+  const festivalOptions = useMemo(() => {
+    const items: Array<{ value: string; label: string }> = (
+      dict.data?.festivals ?? FESTIVAL_TAG_OPTIONS
+    ).map((item) => ({ value: item, label: item }));
+    if (festival && !items.some((item) => item.value === festival)) {
+      items.unshift({ value: festival, label: festival });
+    }
+    return items;
+  }, [dict.data?.festivals, festival]);
   const seasonOptions = useMemo(
     () => (dict.data?.seasons ?? []).map((item) => ({ value: item.value, label: item.label })),
     [dict.data],
@@ -183,8 +196,6 @@ export function ProductsPage() {
   const activeChips: Array<{ key: string; label: string; onRemove: () => void }> = [];
   const keyword = params.get("keyword");
   const category = params.get("category");
-  const occasion = params.get("occasion");
-  const festival = params.get("festival");
   const minPrice = params.get("minPrice");
   const maxPrice = params.get("maxPrice");
   if (keyword) activeChips.push({ key: "keyword", label: `关键词：${keyword}`, onRemove: () => updateParams({ keyword: undefined }) });

@@ -48,8 +48,13 @@ import type {
   ResetPasswordRequest,
   ReviewCreateRequest,
   ReviewPageQuery,
+  ThemePreference,
+  ThemePreferenceRequest,
   ReviewReplyRequest,
   ReviewStatus,
+  TagOptionVO,
+  TagOverview,
+  TagType,
   ReviewVO,
   SalesTrendVO,
   StaffOrderQuery,
@@ -87,6 +92,12 @@ export const fileService = {
 
 export const dictService = {
   options: () => api.get<DictOptions>("/dict/options"),
+};
+
+export const preferenceService = {
+  get: () => api.get<ThemePreference | null>("/auth/preferences"),
+  save: (body: ThemePreferenceRequest) =>
+    api.put<ThemePreference>("/auth/preferences", body),
 };
 
 export const productService = {
@@ -202,6 +213,15 @@ export const adminService = {
     api.get<RecommendationEvaluationVO>("/admin/recommendations/evaluation"),
   recommendationStats: () =>
     api.get<RecommendationStatsVO>("/admin/recommendations/stats"),
+
+  tagOverview: () => api.get<TagOverview>("/admin/tags"),
+  createTag: (type: TagType, name: string) =>
+    api.post<TagOptionVO>("/admin/tags", { type, name }),
+  renameTag: (id: number, name: string) =>
+    api.put<TagOptionVO>(`/admin/tags/${id}`, { name }),
+  deleteTag: (id: number) => api.delete<void>(`/admin/tags/${id}`),
+  updateTagMaxCount: (type: TagType, maxCount: number) =>
+    api.put<{ maxCount: number }>("/admin/tags/max-count", { type, maxCount }),
 
   overview: () => api.get<OverviewStatsVO>("/admin/stats/overview"),
   salesTrend: (days: number) =>
