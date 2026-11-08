@@ -45,6 +45,7 @@ import { runWithThemeTransition } from "@/lib/theme-transition";
 import { toast } from "@/stores/toast";
 import { cn } from "@/lib/cn";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useBloomTransition } from "@/components/domain/bloom-transition";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -637,6 +638,7 @@ function AccountSettings() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
+  const bloom = useBloomTransition();
   const [loggingOut, setLoggingOut] = useState(false);
   const {
     register,
@@ -680,8 +682,12 @@ function AccountSettings() {
       });
       toast.success("密码已更新", "请使用新密码重新登录。");
       reset();
-      await logout();
-      navigate("/login", { replace: true });
+      bloom.play({
+        run: async () => {
+          await logout();
+          navigate("/login", { replace: true });
+        },
+      });
     } catch (error) {
       if (error instanceof ApiError && error.code === 1005) {
         setError("oldPassword", { type: "server", message: "原密码不正确" });
@@ -695,14 +701,15 @@ function AccountSettings() {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     setLoggingOut(true);
-    try {
-      await logout();
-      navigate("/login", { replace: true });
-    } finally {
-      setLoggingOut(false);
-    }
+    bloom.play({
+      run: async () => {
+        await logout();
+        navigate("/login", { replace: true });
+      },
+      onComplete: () => setLoggingOut(false),
+    });
   };
 
   return (

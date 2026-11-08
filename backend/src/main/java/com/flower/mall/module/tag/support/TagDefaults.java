@@ -7,6 +7,10 @@ public final class TagDefaults {
     private TagDefaults() {
     }
 
+    public static final List<String> CATEGORIES = List.of(
+            "玫瑰", "百合", "康乃馨", "向日葵", "郁金香", "混合花束",
+            "永生花", "绿植", "满天星", "礼盒");
+
     public static final List<String> OCCASIONS = List.of(
             "表白", "生日", "纪念日", "求婚", "婚礼", "母亲节", "教师节", "毕业季",
             "情人节", "七夕", "日常", "办公", "探望", "开业", "乔迁", "聚会",

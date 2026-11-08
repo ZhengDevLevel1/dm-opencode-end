@@ -9,7 +9,7 @@ import lombok.Data;
 public class TagCreateRequest {
 
     @NotBlank(message = "标签类型不能为空")
-    @Pattern(regexp = "OCCASION|FESTIVAL|MEANING", message = "标签类型不合法")
+    @Pattern(regexp = "CATEGORY|OCCASION|FESTIVAL|MEANING", message = "标签类型不合法")
     private String type;
 
     @NotBlank(message = "标签名称不能为空")

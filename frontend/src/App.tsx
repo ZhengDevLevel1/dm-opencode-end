@@ -1,7 +1,12 @@
 import { AppRoutes } from "@/app/router";
+import { BloomTransitionProvider } from "@/components/domain/bloom-transition";
 
 export function App() {
-  return <AppRoutes />;
+  return (
+    <BloomTransitionProvider>
+      <AppRoutes />
+    </BloomTransitionProvider>
+  );
 }
 
 export default App;

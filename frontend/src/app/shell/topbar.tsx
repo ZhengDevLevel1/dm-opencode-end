@@ -33,6 +33,7 @@ import {
   DropdownSeparator,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/domain/user-avatar";
+import { useBloomTransition } from "@/components/domain/bloom-transition";
 import { Badge } from "@/components/ui/badge";
 import { getRouteMeta } from "./nav";
 
@@ -54,6 +55,7 @@ export function Topbar() {
   const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
   const setCommandOpen = useUiStore((state) => state.setCommandOpen);
   const setTheme = useThemeStore((state) => state.set);
+  const bloom = useBloomTransition();
   const resolvedDark = useResolvedDark();
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<Date>(new Date());
@@ -92,10 +94,14 @@ export function Topbar() {
     runWithThemeTransition(() => setTheme({ mode: next }));
   };
 
-  const handleLogout = async () => {
-    await logout();
-    toast.success("已退出登录", "期待下次再见。");
-    navigate("/login", { replace: true });
+  const handleLogout = () => {
+    bloom.play({
+      run: async () => {
+        await logout();
+        toast.success("已退出登录", "期待下次再见。");
+        navigate("/login", { replace: true });
+      },
+    });
   };
 
   return (

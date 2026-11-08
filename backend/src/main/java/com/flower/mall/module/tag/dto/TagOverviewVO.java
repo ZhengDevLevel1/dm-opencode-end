@@ -10,6 +10,7 @@ import java.util.Map;
 @Builder
 public class TagOverviewVO {
 
+    private List<TagOptionVO> categories;
     private List<TagOptionVO> occasions;
     private List<TagOptionVO> festivals;
     private List<TagOptionVO> flowerMeanings;

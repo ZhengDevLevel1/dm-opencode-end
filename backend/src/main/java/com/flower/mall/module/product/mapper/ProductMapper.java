@@ -35,6 +35,18 @@ public interface ProductMapper extends BaseMapper<Product> {
 
     @Update("""
             UPDATE product
+            SET status = 'OFF_SHELF',
+                version = version + 1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{productId}
+              AND stock = 0
+              AND status = 'ON_SALE'
+              AND deleted = 0
+            """)
+    int offShelfIfSoldOut(@Param("productId") Long productId);
+
+    @Update("""
+            UPDATE product
             SET stock = stock + #{delta},
                 version = version + 1,
                 updated_at = CURRENT_TIMESTAMP

@@ -2,6 +2,7 @@ package com.flower.mall.common.enums;
 
 public enum TagType {
 
+    CATEGORY("categories", "品类标签"),
     OCCASION("occasions", "场景标签"),
     FESTIVAL("festivals", "节日标签"),
     MEANING("flowerMeanings", "花语标签");

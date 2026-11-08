@@ -279,11 +279,14 @@ CREATE TABLE tag_option (
     tag_type VARCHAR(20) NOT NULL,
     name VARCHAR(30) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
+    home_visible TINYINT NOT NULL DEFAULT 1 COMMENT '是否在商城首页展示',
+    home_sort_order INT NOT NULL DEFAULT 0 COMMENT '商城首页展示排序',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_tag_type_name (tag_type, name),
-    KEY idx_tag_type_sort (tag_type, sort_order)
+    KEY idx_tag_type_sort (tag_type, sort_order),
+    KEY idx_tag_home (tag_type, home_visible, home_sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品标签选项表';
 
 CREATE TABLE tag_type_setting (

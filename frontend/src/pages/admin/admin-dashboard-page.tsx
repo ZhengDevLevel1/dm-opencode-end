@@ -333,7 +333,7 @@ export function AdminDashboardPage() {
           label="低库存商品"
           value={formatNumber(data?.lowStockProducts)}
           hint={`库存低于 ${dict.data?.metrics?.stockLowThreshold ?? 10} 件`}
-          onClick={() => navigate("/staff/inventory?lowStock=1")}
+          onClick={() => navigate("/staff/inventory?stockLevel=LOW")}
         />
         <StatCard
           icon={Boxes}

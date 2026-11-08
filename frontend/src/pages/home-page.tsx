@@ -142,8 +142,9 @@ export function HomePage() {
   };
 
   const heroRec = recommendations.data?.items[0];
-  const categories = dict.data?.categories ?? [];
-  const occasions = (dict.data?.occasions ?? OCCASION_TAG_OPTIONS).slice(0, 8);
+  const categories = dict.data?.homeCategories ?? dict.data?.categories ?? [];
+  const occasions =
+    dict.data?.homeOccasions ?? (dict.data?.occasions ?? OCCASION_TAG_OPTIONS).slice(0, 6);
   const recData = recommendations.data;
   const coldStart = recData?.coldStart ?? !isLoggedIn;
 
@@ -181,7 +182,7 @@ export function HomePage() {
               </Button>
             </div>
             <div className="mt-6 flex flex-wrap gap-1.5">
-              {occasions.slice(0, 6).map((occasion) => (
+              {occasions.map((occasion) => (
                 <Link
                   key={occasion}
                   to={`/products?occasion=${encodeURIComponent(occasion)}`}
@@ -258,6 +259,10 @@ export function HomePage() {
             description="品类选项没有加载成功。"
             onRetry={() => void dict.refetch()}
           />
+        ) : categories.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
+            首页暂未配置品类展示，可在「标签管理 → 品类标签」中开启。
+          </p>
         ) : (
           <div className="mt-4 grid grid-cols-3 gap-2.5 sm:grid-cols-5 lg:grid-cols-9">
             {categories.map((category, index) => (
@@ -464,7 +469,7 @@ export function HomePage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5">
-          {occasions.slice(0, 6).map((occasion) => (
+          {occasions.map((occasion) => (
             <Link
               key={occasion}
               to={`/products?occasion=${encodeURIComponent(occasion)}`}

@@ -10,11 +10,15 @@ public class TagOptionVO {
 
     private Long id;
     private String name;
+    private Boolean homeVisible;
+    private Integer homeSortOrder;
 
     public static TagOptionVO from(TagOption option) {
         return TagOptionVO.builder()
                 .id(option.getId())
                 .name(option.getName())
+                .homeVisible(Boolean.TRUE.equals(option.getHomeVisible()))
+                .homeSortOrder(option.getHomeSortOrder() == null ? 0 : option.getHomeSortOrder())
                 .build();
     }
 }

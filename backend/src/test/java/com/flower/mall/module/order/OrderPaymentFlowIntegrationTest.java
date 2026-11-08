@@ -331,6 +331,7 @@ class OrderPaymentFlowIntegrationTest {
         cartItemMapper.insert(stale);
 
         String aliceToken = login("alice", "alice123");
+        assertThat(productMapper.selectById(16L).getStatus()).isEqualTo("OFF_SHELF");
         mockMvc.perform(post("/api/orders")
                         .header("Authorization", bearer(aliceToken))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -339,7 +340,7 @@ class OrderPaymentFlowIntegrationTest {
                                  "receiverAddress":"上海市静安区测试路1号"}
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value(2003));
+                .andExpect(jsonPath("$.code").value(2002));
         assertThat(productMapper.selectById(16L).getStock()).isZero();
     }
 

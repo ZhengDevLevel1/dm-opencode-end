@@ -626,12 +626,16 @@ export function AdminProductsPage() {
                         </DropdownItem>
                         <DropdownItem
                           disabled={statusMutation.isPending}
-                          onClick={() =>
+                          onClick={() => {
+                            if (product.status !== "ON_SALE" && product.stock <= 0) {
+                              toast.info("库存为0，请先补充库存再上架", product.name);
+                              return;
+                            }
                             statusMutation.mutate({
                               product,
                               next: product.status === "ON_SALE" ? "OFF_SHELF" : "ON_SALE",
-                            })
-                          }
+                            });
+                          }}
                         >
                           {product.status === "ON_SALE" ? (
                             <>
@@ -903,6 +907,9 @@ function ProductEditorDialog({
                 />
               )}
             />
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              库存为 0 时保存会自动下架，补充库存后可重新上架。
+            </p>
           </div>
         </div>
 

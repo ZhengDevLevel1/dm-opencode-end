@@ -243,6 +243,8 @@ CREATE TABLE tag_option (
     tag_type VARCHAR(20) NOT NULL,
     name VARCHAR(30) NOT NULL,
     sort_order INT NOT NULL DEFAULT 0,
+    home_visible TINYINT NOT NULL DEFAULT 1,
+    home_sort_order INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_tag_type_name UNIQUE (tag_type, name)

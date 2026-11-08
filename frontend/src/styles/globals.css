@@ -36,9 +36,12 @@
   --color-flower-leaf: var(--flower-leaf);
   --color-flower-amber: var(--flower-amber);
   --color-flower-lilac: var(--flower-lilac);
+  --color-bloom: var(--bloom);
 
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-display: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC",
+    "SimSun", Georgia, serif;
   --font-mono: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas,
     "Liberation Mono", monospace;
 
@@ -94,6 +97,7 @@
   --flower-leaf: oklch(64% 0.16 162);
   --flower-amber: oklch(72% 0.17 70);
   --flower-lilac: oklch(60% 0.12 300);
+  --bloom: oklch(25.5% 0.048 168);
 
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
@@ -151,6 +155,7 @@
   --flower-leaf: oklch(74% 0.15 162);
   --flower-amber: oklch(78% 0.16 70);
   --flower-lilac: oklch(74% 0.13 300);
+  --bloom: oklch(24% 0.045 168);
 }
 
 /* ---------- surface palettes ---------- */
@@ -920,5 +925,120 @@ html.reduce-motion::view-transition-new(root) {
 @media (max-width: 767px) {
   input, textarea, select {
     font-size: 16px;
+  }
+}
+
+/* ---------- auth ambience ---------- */
+
+.glass-panel {
+  background: color-mix(in oklab, var(--card) 62%, transparent);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  border: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 45%, transparent) inset,
+    0 26px 60px -32px color-mix(in oklab, var(--foreground) 38%, transparent);
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+.hairline {
+  background: color-mix(in oklab, var(--border) 70%, transparent);
+}
+
+.kenburns {
+  animation: kenburns 38s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes kenburns {
+  from {
+    transform: scale(1.02) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.14) translate3d(-1.5%, -1.5%, 0);
+  }
+}
+
+.floaty {
+  animation: floaty 6.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* 转场遮罩期间暂停登录页背景动画，避免全屏合成层持续重绘造成掉帧 */
+html.bloom-transition-active .kenburns,
+html.bloom-transition-active .petal-fall,
+html.bloom-transition-active .petal-sway,
+html.bloom-transition-active .floaty {
+  animation-play-state: paused !important;
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(6deg);
+  }
+}
+
+.petal-fall {
+  animation: petal-fall linear infinite;
+  will-change: transform, opacity;
+}
+
+.petal-sway {
+  animation: petal-sway ease-in-out infinite alternate;
+}
+
+@keyframes petal-fall {
+  0% {
+    transform: translate3d(0, -8vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  6% {
+    opacity: var(--petal-opacity, 0.7);
+  }
+  94% {
+    opacity: var(--petal-opacity, 0.7);
+  }
+  100% {
+    transform: translate3d(var(--petal-drift, 6vw), 108vh, 0)
+      rotate(var(--petal-spin, 300deg));
+    opacity: 0;
+  }
+}
+
+@keyframes petal-sway {
+  from {
+    transform: translateX(-12px) rotate(-16deg);
+  }
+  to {
+    transform: translateX(12px) rotate(16deg);
+  }
+}
+
+html.reduce-motion .kenburns,
+html.reduce-motion .floaty,
+html.reduce-motion .petal-fall,
+html.reduce-motion .petal-sway {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kenburns,
+  .floaty,
+  .petal-fall,
+  .petal-sway {
+    animation: none !important;
   }
 }

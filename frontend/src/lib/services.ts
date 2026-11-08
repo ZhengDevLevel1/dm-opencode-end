@@ -233,6 +233,10 @@ export const adminService = {
   deleteTag: (id: number) => api.delete<void>(`/admin/tags/${id}`),
   updateTagMaxCount: (type: TagType, maxCount: number) =>
     api.put<{ maxCount: number }>("/admin/tags/max-count", { type, maxCount }),
+  updateTagHomeDisplay: (
+    type: TagType,
+    items: Array<{ id: number; visible: boolean }>,
+  ) => api.put<void>("/admin/tags/home-display", { type, items }),
 
   overview: () => api.get<OverviewStatsVO>("/admin/stats/overview"),
   salesTrend: (days: number) =>

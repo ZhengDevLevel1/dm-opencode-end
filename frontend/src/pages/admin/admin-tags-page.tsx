@@ -4,8 +4,12 @@ import { LayoutGroup, motion } from "framer-motion";
 import {
   CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   Flower2,
   Heart,
+  Home,
+  LayoutGrid,
   Pencil,
   Plus,
   SlidersHorizontal,
@@ -19,6 +23,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { getErrorMessage } from "@/lib/api-client";
 import { queryKeys } from "@/lib/query-keys";
 import { adminService } from "@/lib/services";
@@ -29,16 +34,22 @@ import type { TagOptionVO, TagType } from "@/types/api";
 const TYPE_META: Record<
   TagType,
   {
-    key: "occasions" | "festivals" | "flowerMeanings";
+    key: "categories" | "occasions" | "festivals" | "flowerMeanings";
     label: string;
     hint: string;
     icon: LucideIcon;
   }
 > = {
+  CATEGORY: {
+    key: "categories",
+    label: "品类标签",
+    hint: "商品所属的大类，例如玫瑰、百合、绿植；同时决定首页「按品类挑花」的展示。",
+    icon: LayoutGrid,
+  },
   OCCASION: {
     key: "occasions",
     label: "场景标签",
-    hint: "商品适合的使用场景，例如表白、生日、乔迁。",
+    hint: "商品适合的使用场景，例如表白、生日、乔迁；可配置首页场景标签展示。",
     icon: Heart,
   },
   FESTIVAL: {
@@ -55,25 +66,55 @@ const TYPE_META: Record<
   },
 };
 
+const EMPTY_TAGS: TagOptionVO[] = [];
+
+type HomeDraftItem = { id: number; name: string; visible: boolean };
+
 export function AdminTagsPage() {
   const queryClient = useQueryClient();
-  const [activeType, setActiveType] = useState<TagType>("OCCASION");
+  const [activeType, setActiveType] = useState<TagType>("CATEGORY");
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<{ id: number; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TagOptionVO | null>(null);
   const [maxCount, setMaxCount] = useState("8");
+  const [homeDraft, setHomeDraft] = useState<HomeDraftItem[]>([]);
 
   const meta = TYPE_META[activeType];
+  const isCategory = activeType === "CATEGORY";
+  const supportsHome = activeType === "CATEGORY" || activeType === "OCCASION";
   const overview = useQuery({
     queryKey: queryKeys.adminTags,
     queryFn: adminService.tagOverview,
   });
-  const tags = overview.data?.[meta.key] ?? [];
-  const currentMax = overview.data?.maxCounts?.[meta.key] ?? 8;
+  const tags = overview.data?.[meta.key] ?? EMPTY_TAGS;
+  const currentMax = isCategory
+    ? 0
+    : overview.data?.maxCounts?.[
+        activeType === "OCCASION"
+          ? "occasions"
+          : activeType === "FESTIVAL"
+            ? "festivals"
+            : "flowerMeanings"
+      ] ?? 8;
 
   useEffect(() => {
     setMaxCount(String(currentMax));
   }, [currentMax, activeType]);
+
+  const orderedTags = useMemo(
+    () => [...tags].sort((a, b) => (a.homeSortOrder ?? 0) - (b.homeSortOrder ?? 0)),
+    [tags],
+  );
+
+  useEffect(() => {
+    setHomeDraft(
+      orderedTags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        visible: tag.homeVisible !== false,
+      })),
+    );
+  }, [orderedTags]);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.adminTags });
@@ -119,14 +160,51 @@ export function AdminTagsPage() {
     onError: (error) => toast.error("保存上限失败", getErrorMessage(error)),
   });
 
+  const homeMutation = useMutation({
+    mutationFn: () =>
+      adminService.updateTagHomeDisplay(
+        activeType,
+        homeDraft.map((item) => ({ id: item.id, visible: item.visible })),
+      ),
+    onSuccess: () => {
+      toast.success("首页展示已保存", `${meta.label}的展示与顺序已更新。`);
+      refresh();
+    },
+    onError: (error) => toast.error("保存首页展示失败", getErrorMessage(error)),
+  });
+
   const counts = useMemo(
     () => ({
-      OCCASION: overview.data?.occasions.length ?? 0,
-      FESTIVAL: overview.data?.festivals.length ?? 0,
-      MEANING: overview.data?.flowerMeanings.length ?? 0,
+      CATEGORY: overview.data?.categories?.length ?? 0,
+      OCCASION: overview.data?.occasions?.length ?? 0,
+      FESTIVAL: overview.data?.festivals?.length ?? 0,
+      MEANING: overview.data?.flowerMeanings?.length ?? 0,
     }),
     [overview.data],
   );
+
+  const homeDirty =
+    homeDraft.length !== orderedTags.length ||
+    homeDraft.some((item, index) => {
+      const tag = orderedTags[index];
+      return !tag || tag.id !== item.id || (tag.homeVisible !== false) !== item.visible;
+    });
+
+  const moveHomeItem = (index: number, direction: -1 | 1) => {
+    setHomeDraft((current) => {
+      const target = index + direction;
+      if (target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const toggleHomeItem = (id: number, visible: boolean) => {
+    setHomeDraft((current) =>
+      current.map((item) => (item.id === id ? { ...item, visible } : item)),
+    );
+  };
 
   const sendAdd = () => {
     const name = newName.trim();
@@ -164,7 +242,7 @@ export function AdminTagsPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">标签管理</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            维护商品可选的场景、节日与花语标签，并限制商品编辑时每类标签最多选择的个数。
+            维护商品可选的品类、场景、节日与花语标签，并配置首页品类与场景展示。
           </p>
         </div>
         <TagTypeSwitch value={activeType} counts={counts} onChange={setActiveType} />
@@ -253,45 +331,66 @@ export function AdminTagsPage() {
         </section>
 
         <aside className="space-y-4">
-          <section className="ui-card p-4 sm:p-5">
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4 text-primary" />
-              <h2 className="text-sm font-semibold">最大可选数量</h2>
-            </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-              商品编辑时，{meta.label}最多可以选择多少个。设置后前端选择器会阻止继续添加，后端保存时也会再次校验。
-            </p>
-            <div className="mt-4 flex items-end gap-2">
-              <div className="space-y-1.5">
-                <label htmlFor="tag-max-count" className="text-[11px] font-medium text-muted-foreground">
-                  最多可选
-                </label>
-                <Input
-                  id="tag-max-count"
-                  type="number"
-                  min={1}
-                  max={30}
-                  value={maxCount}
-                  onChange={(event) => setMaxCount(event.target.value)}
-                  className="w-24"
-                />
+          {supportsHome ? (
+            <HomeDisplayPanel
+              type={activeType}
+              items={homeDraft}
+              loading={overview.isLoading}
+              dirty={homeDirty}
+              saving={homeMutation.isPending}
+              onToggle={toggleHomeItem}
+              onMove={moveHomeItem}
+              onSave={() => {
+                if (!homeDirty) return;
+                homeMutation.mutate();
+              }}
+            />
+          ) : null}
+
+          {!isCategory ? (
+            <section className="ui-card p-4 sm:p-5">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold">最大可选数量</h2>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="mb-0"
-                disabled={maxInvalid}
-                loading={maxMutation.isPending}
-                onClick={() => maxMutation.mutate()}
-              >
-                保存
-              </Button>
-            </div>
-            <div className="mt-4 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-              当前上限：<span className="font-semibold text-foreground">{currentMax}</span> 个。
-              已选超过上限的旧商品不会被自动修改，再次编辑保存时需要先删到上限以内。
-            </div>
-          </section>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                商品编辑时，{meta.label}最多可以选择多少个。设置后前端选择器会阻止继续添加，后端保存时也会再次校验。
+              </p>
+              <div className="mt-4 flex items-end gap-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="tag-max-count"
+                    className="text-[11px] font-medium text-muted-foreground"
+                  >
+                    最多可选
+                  </label>
+                  <Input
+                    id="tag-max-count"
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={maxCount}
+                    onChange={(event) => setMaxCount(event.target.value)}
+                    className="w-24"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mb-0"
+                  disabled={maxInvalid}
+                  loading={maxMutation.isPending}
+                  onClick={() => maxMutation.mutate()}
+                >
+                  保存
+                </Button>
+              </div>
+              <div className="mt-4 rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                当前上限：<span className="font-semibold text-foreground">{currentMax}</span> 个。
+                已选超过上限的旧商品不会被自动修改，再次编辑保存时需要先删到上限以内。
+              </div>
+            </section>
+          ) : null}
 
           <section className="ui-card p-4 text-[11px] leading-relaxed text-muted-foreground">
             <div className="flex items-center gap-2 text-foreground">
@@ -300,9 +399,11 @@ export function AdminTagsPage() {
             </div>
             <ul className="mt-2 space-y-1.5">
               <li>· 新增、重命名、删除会立即同步到商品编辑与搜索下拉。</li>
+              <li>· 品类标签是商品分类的唯一来源，并控制首页「按品类挑花」的展示。</li>
+              <li>· 场景标签可控制首页「把今天的花，送给在意的人」下方的场景展示。</li>
+              <li>· 关闭首页展示不会影响商品筛选、编辑与已有商品数据。</li>
               <li>· 删除标签不会清空商品里已经保存的旧值。</li>
               <li>· 花语标签会以「，」拼接保存，并参与推荐内容相似度计算。</li>
-              <li>· 场景、节日标签会以「,」拼接保存，参与推荐场景与节日匹配。</li>
             </ul>
           </section>
         </aside>
@@ -337,6 +438,124 @@ export function AdminTagsPage() {
         </p>
       </Dialog>
     </div>
+  );
+}
+
+function HomeDisplayPanel({
+  type,
+  items,
+  loading,
+  dirty,
+  saving,
+  onToggle,
+  onMove,
+  onSave,
+}: {
+  type: "CATEGORY" | "OCCASION";
+  items: HomeDraftItem[];
+  loading: boolean;
+  dirty: boolean;
+  saving: boolean;
+  onToggle: (id: number, visible: boolean) => void;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onSave: () => void;
+}) {
+  const isCategory = type === "CATEGORY";
+  const visibleCount = items.filter((item) => item.visible).length;
+
+  return (
+    <section className="ui-card p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Home className="h-4 w-4 text-primary" />
+          <h2 className="text-sm font-semibold">首页展示</h2>
+        </div>
+        <span className="rounded-full border border-border bg-muted/40 px-2 py-1 text-[10px] tabular-nums text-muted-foreground">
+          展示 {visibleCount}/{items.length}
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+        {isCategory
+          ? "控制首页「按品类挑花」栏目展示哪些品类与先后顺序；关闭后仍可用于商品筛选与编辑。"
+          : "控制首页「把今天的花，送给在意的人」下方的场景标签与先后顺序；关闭后仍可用于商品筛选与编辑。"}
+      </p>
+
+      {loading ? (
+        <div className="mt-3 space-y-1.5">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} className="h-8 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <p className="mt-4 rounded-lg border border-dashed border-border py-6 text-center text-[11px] text-muted-foreground">
+          先添加标签，再配置首页展示。
+        </p>
+      ) : (
+        <>
+          <ul className="mt-3 max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
+            {items.map((item, index) => (
+              <li
+                key={item.id}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors",
+                  item.visible
+                    ? "border-border/70 bg-muted/20"
+                    : "border-dashed border-border/70 bg-transparent",
+                )}
+              >
+                <span className="w-4 shrink-0 text-center text-[10px] tabular-nums text-muted-foreground">
+                  {index + 1}
+                </span>
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-xs",
+                    item.visible ? "font-medium" : "text-muted-foreground",
+                  )}
+                >
+                  {item.name}
+                </span>
+                <button
+                  type="button"
+                  aria-label={`上移 ${item.name}`}
+                  disabled={index === 0}
+                  onClick={() => onMove(index, -1)}
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`下移 ${item.name}`}
+                  disabled={index === items.length - 1}
+                  onClick={() => onMove(index, 1)}
+                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+                <Switch
+                  checked={item.visible}
+                  onCheckedChange={(checked) => onToggle(item.id, checked)}
+                  label={`首页展示 ${item.name}`}
+                />
+              </li>
+            ))}
+          </ul>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-3 w-full"
+            disabled={!dirty}
+            loading={saving}
+            onClick={onSave}
+          >
+            保存展示配置
+          </Button>
+          <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+            {dirty ? "有未保存的修改，保存后商城首页立即生效。" : "当前配置已保存。"}
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -434,6 +653,7 @@ function TagTypeSwitch({
   onChange: (type: TagType) => void;
 }) {
   const options: Array<{ value: TagType; label: string; icon: LucideIcon }> = [
+    { value: "CATEGORY", label: "品类标签", icon: LayoutGrid },
     { value: "OCCASION", label: "场景标签", icon: Heart },
     { value: "FESTIVAL", label: "节日标签", icon: CalendarDays },
     { value: "MEANING", label: "花语标签", icon: Flower2 },
@@ -442,7 +662,7 @@ function TagTypeSwitch({
   return (
     <LayoutGroup id="admin-tag-type">
       <div
-        className="flex rounded-lg border border-border bg-muted/40 p-0.5"
+        className="flex flex-wrap rounded-lg border border-border bg-muted/40 p-0.5"
         role="group"
         aria-label="标签类型"
       >

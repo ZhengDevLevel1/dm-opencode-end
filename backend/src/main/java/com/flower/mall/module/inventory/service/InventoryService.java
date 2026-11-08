@@ -48,6 +48,7 @@ public class InventoryService {
         if (updated == 0) {
             throw BusinessException.of(ErrorCode.CONFLICT, "库存已被其他操作修改，请刷新后重试");
         }
+        productMapper.offShelfIfSoldOut(productId);
         InventoryRecord record = recordMovement(productId, product.getName(), InventoryChangeType.MANUAL_ADJUST,
                 delta, stockBefore, stockAfter, null,
                 StringUtils.hasText(remark) ? remark : "人工库存调整");

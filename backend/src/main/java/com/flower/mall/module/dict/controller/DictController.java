@@ -29,9 +29,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DictController {
 
-    private static final List<String> CATEGORIES = List.of(
-            "玫瑰", "百合", "康乃馨", "向日葵", "郁金香", "混合花束",
-            "永生花", "绿植", "满天星", "礼盒");
     private static final List<String> PRICE_BANDS = List.of("平价", "中端", "高端");
 
     private final TagService tagService;
@@ -41,7 +38,9 @@ public class DictController {
     @GetMapping("/options")
     public ApiResponse<Map<String, Object>> options() {
         Map<String, Object> options = new LinkedHashMap<>();
-        options.put("categories", CATEGORIES);
+        options.put("categories", tagService.names(TagType.CATEGORY));
+        options.put("homeCategories", tagService.homeNames(TagType.CATEGORY));
+        options.put("homeOccasions", tagService.homeNames(TagType.OCCASION));
         options.put("occasions", tagService.names(TagType.OCCASION));
         options.put("festivals", tagService.names(TagType.FESTIVAL));
         options.put("flowerMeanings", tagService.names(TagType.MEANING));

@@ -250,10 +250,18 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
   "message": "success",
   "data": {
     "categories": ["玫瑰", "百合", "康乃馨", "向日葵", "郁金香", "混合花束", "永生花", "绿植", "满天星", "礼盒"],
+    "homeCategories": ["玫瑰", "百合", "康乃馨", "向日葵", "郁金香", "混合花束", "永生花", "绿植", "满天星", "礼盒"],
+    "homeOccasions": ["表白", "生日", "纪念日", "求婚", "婚礼", "母亲节"],
     "occasions": ["表白", "生日", "纪念日", "求婚", "婚礼", "母亲节", "教师节", "毕业季", "情人节", "七夕", "日常", "办公", "探望", "开业", "乔迁", "聚会", "商务", "感谢", "祝福", "道歉", "鼓励", "思念", "订婚", "结婚", "结婚纪念", "约会", "满月", "百日", "寿宴", "升学", "升职", "退休", "周年庆", "慰问", "探病", "康复祝福", "圣诞派对", "新年", "告白"],
     "festivals": ["情人节", "七夕", "520", "元宵节", "妇女节", "母亲节", "父亲节", "儿童节", "端午节", "教师节", "中秋节", "国庆节", "重阳节", "感恩节", "平安夜", "圣诞节", "元旦", "春节", "毕业季", "周年庆"],
     "flowerMeanings": ["热烈爱情", "至死不渝", "天长地久", "只此一人", "永恒的爱", "永不凋零", "浪漫星河", "只为你来", "爱的告白", "优雅浪漫", "纯洁的爱", "默默守护", "深情不变", "心动瞬间", "温暖祝福", "日日欢喜", "平安顺遂", "节日祝福", "温暖团圆", "幸福启程", "幸福美满", "岁岁平安", "心想事成", "前程似锦", "事业有成", "开业大吉", "乔迁之喜", "学业进步", "金榜题名", "感恩母爱", "温柔守护", "感恩祝福", "感恩每一天", "感谢有你", "真诚祝福", "纯洁高雅", "百年好合", "阳光忠诚", "勇敢追梦", "生机陪伴", "清新每一天", "思念守望", "温柔星河", "友谊长存", "健康平安", "康复祝福"],
     "tagMaxCounts": { "occasions": 8, "festivals": 6, "flowerMeanings": 6 },
+    "metrics": {
+      "priceMidThreshold": 100.00,
+      "priceHighThreshold": 300.00,
+      "stockLowThreshold": 10,
+      "stockHighThreshold": 50
+    },
     "priceBands": ["平价", "中端", "高端"],
     "seasons": [{ "value": "SPRING", "label": "春季" }, { "value": "ALL", "label": "四季" }],
     "roles": [{ "value": "CUSTOMER", "label": "消费者/会员" }],
@@ -267,7 +275,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 }
 ```
 
-注意：`categories`、`occasions`、`festivals`、`flowerMeanings`、`priceBands` 是字符串数组；其余枚举项是 `{ value, label }` 数组。`tagMaxCounts` 是三类标签各自允许商品选择的最大个数。场景、节日、花语以数据库 `tag_option` 为唯一来源，管理员在「标签管理」中增删改后，商品编辑选择器与各页面搜索下拉都读取最新列表；`frontend/src/lib/product-tags.ts` 只作为接口未返回时的兜底常量。其他枚举从接口读取，不要另行写死。
+注意：`categories`、`homeCategories`、`homeOccasions`、`occasions`、`festivals`、`flowerMeanings`、`priceBands` 是字符串数组；其余枚举项是 `{ value, label }` 数组。`tagMaxCounts` 是场景、节日、花语三类标签各自允许商品选择的最大个数。品类、场景、节日、花语均以数据库 `tag_option` 为唯一来源，管理员在「标签管理」中增删改后，商品编辑选择器与各页面搜索下拉都读取最新列表；`frontend/src/lib/product-tags.ts` 只作为接口未返回时的兜底常量。`homeCategories` 与 `homeOccasions` 是管理员配置后的商城首页展示列表，只包含开启展示的标签并按配置顺序排列。其他枚举从接口读取，不要另行写死。
 
 ## 3. 接口总览
 
@@ -337,6 +345,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<TagOptionVO>` |
 | DELETE | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<Void>` |
 | PUT | `/api/admin/tags/max-count` | 管理员 | `ApiResponse<{ maxCount: number }>` |
+| PUT | `/api/admin/tags/home-display` | 管理员 | `ApiResponse<Void>` |
 | GET | `/api/admin/metrics` | 管理员 | `ApiResponse<MetricConfigVO>` |
 | PUT | `/api/admin/metrics` | 管理员 | `ApiResponse<MetricConfigVO>` |
 | GET | `/api/admin/reviews` | 管理员 | `ApiResponse<PageResult<ReviewVO>>` |
@@ -1015,6 +1024,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 商品不存在返回 `404/2001`。
 - 每次调整都会生成 `MANUAL_ADJUST` 库存记录。
 - 商品建档初始库存会生成 `STOCK_IN` 记录；下单、取消、售后退款也会生成对应记录。
+- 调整后库存为 0 时商品自动下架；补货后不会自动上架，需要管理员手动上架。
 
 ### 12.2 订单履约接口
 
@@ -1166,13 +1176,15 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `imageUrl` | string | 否 | 最长 500 |
 | `description` | string | 否 | 最长 2000 |
 | `seasonSuitability` | string | 是 | `SPRING/SUMMER/AUTUMN/WINTER/ALL` |
-| `status` | string | 否 | `ON_SALE/OFF_SHELF`；创建时默认 `ON_SALE`，编辑时不传则保持原状态 |
+| `status` | string | 否 | `ON_SALE/OFF_SHELF`；创建时默认 `ON_SALE`，编辑时不传则保持原状态；库存为 0 时强制为 `OFF_SHELF` |
 
 说明：
 
 - 创建商品时初始销量为 0、评分为 0；如果初始库存大于 0，会生成入库记录。
 - 编辑商品时 `stock` 必填；后端按新库存与旧库存的差值自动调整，并记录库存变动。
 - 商品上下架通过查询参数传入，例如：`PUT /api/admin/products/1/status?status=OFF_SHELF`。
+- 库存为 0 时保存商品会自动下架；库存为 0 的商品调用上架接口返回 `400`，需先补充库存。
+- 商品售空（下单扣减库存后为 0）或人工调整库存为 0 时会自动下架；补货后不会自动上架，需管理员手动上架。
 - 删除商品是逻辑删除；删除后公开接口不可见。
 - `imageUrl` 可保存上传接口返回的 URL，也可继续保存外部或相对地址。
 
@@ -1338,6 +1350,42 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 价格带用于商品 `priceBand` 标签和推荐算法的价格特征；库存分档用于店员库存筛选、管理员商品筛选、库存角标和经营总览低库存统计。
 - `priceHighThreshold` 必须大于 `priceMidThreshold`；`stockHighThreshold` 必须大于 `stockLowThreshold`，否则返回 `400`。
 - 保存后后端会清理商品详情与热销缓存，新的阈值立即生效。
+
+### 13.8 标签管理
+
+| 方法 | 路径 | 权限 | 请求 | 响应 |
+| --- | --- | --- | --- | --- |
+| GET | `/api/admin/tags` | 管理员 | 无 | `ApiResponse<TagOverviewVO>` |
+| POST | `/api/admin/tags` | 管理员 | `TagCreateRequest` | `ApiResponse<TagOptionVO>` |
+| PUT | `/api/admin/tags/{id}` | 管理员 | `TagUpdateRequest` | `ApiResponse<TagOptionVO>` |
+| DELETE | `/api/admin/tags/{id}` | 管理员 | 无 | `ApiResponse<Void>` |
+| PUT | `/api/admin/tags/max-count` | 管理员 | `TagMaxCountRequest` | `ApiResponse<{ maxCount: number }>` |
+| PUT | `/api/admin/tags/home-display` | 管理员 | `TagHomeDisplayRequest` | `ApiResponse<Void>` |
+
+`TagOverviewVO`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `categories` | `TagOptionVO[]` | 品类标签 |
+| `occasions` | `TagOptionVO[]` | 场景标签 |
+| `festivals` | `TagOptionVO[]` | 节日标签 |
+| `flowerMeanings` | `TagOptionVO[]` | 花语标签 |
+| `maxCounts` | object | 场景、节日、花语的最大可选数量 |
+
+`TagOptionVO`：`{ id, name, homeVisible, homeSortOrder }`；`homeVisible` 与 `homeSortOrder` 仅对品类、场景标签的商城首页展示生效。
+
+`TagCreateRequest`：`{ type: 'CATEGORY' | 'OCCASION' | 'FESTIVAL' | 'MEANING', name }`。
+
+`TagMaxCountRequest`：`{ type: 'OCCASION' | 'FESTIVAL' | 'MEANING', maxCount }`；品类标签不支持该配置。
+
+`TagHomeDisplayRequest`：`{ type: 'CATEGORY' | 'OCCASION', items: [{ id, visible }] }`，`items` 的顺序即首页展示顺序，必须包含该类型的全部标签，否则返回 `400`。
+
+关键行为：
+
+- 首次访问标签接口时会自动写入默认品类、场景、节日与花语标签，已有数据库无需手工插入。
+- 首页「按品类挑花」读取 `homeCategories`，首页「把今天的花，送给在意的人」下方的场景标签读取 `homeOccasions`，二者只包含 `homeVisible=true` 的标签并按 `homeSortOrder` 升序排列。
+- 场景标签默认只展示前 6 个，品类标签默认全部展示；关闭首页展示不影响商品筛选、编辑与推荐匹配。
+- 删除标签不会清空商品中已保存的旧值。
 
 ## 14. 前端对接流程
 
@@ -1523,9 +1571,12 @@ export interface OptionItem {
 
 export interface DictOptions {
   categories: string[];
+  homeCategories: string[];
+  homeOccasions: string[];
   occasions: string[];
   festivals: string[];
   flowerMeanings: string[];
+  tagMaxCounts: { occasions: number; festivals: number; flowerMeanings: number };
   priceBands: string[];
   seasons: OptionItem[];
   roles: OptionItem[];
@@ -1534,6 +1585,23 @@ export interface DictOptions {
   reviewStatuses: OptionItem[];
   fulfillmentNodes: OptionItem[];
   inventoryChangeTypes: OptionItem[];
+}
+
+export type TagType = 'CATEGORY' | 'OCCASION' | 'FESTIVAL' | 'MEANING';
+
+export interface TagOptionVO {
+  id: number;
+  name: string;
+  homeVisible: boolean;
+  homeSortOrder: number;
+}
+
+export interface TagOverview {
+  categories: TagOptionVO[];
+  occasions: TagOptionVO[];
+  festivals: TagOptionVO[];
+  flowerMeanings: TagOptionVO[];
+  maxCounts: { occasions: number; festivals: number; flowerMeanings: number };
 }
 
 export interface ProductVO {

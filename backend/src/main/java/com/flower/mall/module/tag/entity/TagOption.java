@@ -22,6 +22,10 @@ public class TagOption {
 
     private Integer sortOrder;
 
+    private Boolean homeVisible;
+
+    private Integer homeSortOrder;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

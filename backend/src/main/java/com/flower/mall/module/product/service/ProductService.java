@@ -147,9 +147,7 @@ public class ProductService {
         product.setSalesCount(0);
         product.setRatingAvg(BigDecimal.ZERO);
         product.setRatingCount(0);
-        product.setStatus(StringUtils.hasText(request.getStatus())
-                ? ProductStatus.valueOf(request.getStatus()).name()
-                : ProductStatus.ON_SALE.name());
+        product.setStatus(initialStatus(request));
         product.setVersion(0);
         productMapper.insert(product);
         inventoryService.recordInitialStock(product);
@@ -165,7 +163,10 @@ public class ProductService {
         Product product = new Product();
         product.setId(productId);
         applyRequest(product, request);
-        if (StringUtils.hasText(request.getStatus())) {
+        if (targetStock != null && targetStock <= 0) {
+            // 库存为0的商品不允许保持上架，保存时自动下架。
+            product.setStatus(ProductStatus.OFF_SHELF.name());
+        } else if (StringUtils.hasText(request.getStatus())) {
             product.setStatus(ProductStatus.valueOf(request.getStatus()).name());
         }
         product.setStock(existing.getStock());
@@ -190,6 +191,9 @@ public class ProductService {
             throw BusinessException.of(ErrorCode.PRODUCT_STATUS_INVALID);
         }
         Product existing = getRequired(productId);
+        if (target == ProductStatus.ON_SALE && existing.getStock() != null && existing.getStock() <= 0) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "库存为0，无法上架，请先补充库存");
+        }
         if (target.name().equals(existing.getStatus())) {
             return toVO(existing);
         }
@@ -209,6 +213,15 @@ public class ProductService {
         getRequired(productId);
         productMapper.deleteById(productId);
         evictCaches(productId);
+    }
+
+    private String initialStatus(ProductSaveRequest request) {
+        if (request.getStock() != null && request.getStock() <= 0) {
+            return ProductStatus.OFF_SHELF.name();
+        }
+        return StringUtils.hasText(request.getStatus())
+                ? ProductStatus.valueOf(request.getStatus()).name()
+                : ProductStatus.ON_SALE.name();
     }
 
     private void applyRequest(Product product, ProductSaveRequest request) {

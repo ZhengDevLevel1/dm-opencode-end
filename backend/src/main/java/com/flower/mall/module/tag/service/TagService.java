@@ -5,6 +5,7 @@ import com.flower.mall.common.enums.TagType;
 import com.flower.mall.common.exception.BusinessException;
 import com.flower.mall.common.exception.ErrorCode;
 import com.flower.mall.module.tag.dto.TagCreateRequest;
+import com.flower.mall.module.tag.dto.TagHomeDisplayRequest;
 import com.flower.mall.module.tag.dto.TagMaxCountRequest;
 import com.flower.mall.module.tag.dto.TagOptionVO;
 import com.flower.mall.module.tag.dto.TagOverviewVO;
@@ -19,9 +20,14 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.regex.Pattern;
 
 @Service
@@ -41,9 +47,13 @@ public class TagService {
         ensureInitialized();
         Map<String, Integer> maxCounts = new LinkedHashMap<>();
         for (TagType type : TagType.values()) {
+            if (type == TagType.CATEGORY) {
+                continue;
+            }
             maxCounts.put(type.getKey(), maxCount(type));
         }
         return TagOverviewVO.builder()
+                .categories(options(TagType.CATEGORY))
                 .occasions(options(TagType.OCCASION))
                 .festivals(options(TagType.FESTIVAL))
                 .flowerMeanings(options(TagType.MEANING))
@@ -73,10 +83,23 @@ public class TagService {
                 .toList();
     }
 
+    public List<String> homeNames(TagType type) {
+        ensureInitialized();
+        return optionMapper.selectList(Wrappers.<TagOption>lambdaQuery()
+                        .eq(TagOption::getTagType, type.name())
+                        .orderByAsc(TagOption::getHomeSortOrder)
+                        .orderByAsc(TagOption::getSortOrder)
+                        .orderByAsc(TagOption::getId))
+                .stream()
+                .filter(option -> Boolean.TRUE.equals(option.getHomeVisible()))
+                .map(TagOption::getName)
+                .toList();
+    }
+
     public int maxCount(TagType type) {
         TagTypeSetting setting = settingMapper.selectById(type.name());
         return setting == null || setting.getMaxSelectCount() == null
-                ? DEFAULT_MAX_COUNTS.get(type)
+                ? DEFAULT_MAX_COUNTS.getOrDefault(type, 1)
                 : setting.getMaxSelectCount();
     }
 
@@ -102,19 +125,24 @@ public class TagService {
                 .eq(TagOption::getName, name)) > 0) {
             throw BusinessException.of(ErrorCode.CONFLICT, "该标签已存在");
         }
-        Integer maxSort = optionMapper.selectList(Wrappers.<TagOption>lambdaQuery()
-                        .eq(TagOption::getTagType, type.name())
-                        .orderByDesc(TagOption::getSortOrder)
-                        .last("LIMIT 1"))
-                .stream()
+        List<TagOption> existing = optionMapper.selectList(Wrappers.<TagOption>lambdaQuery()
+                .eq(TagOption::getTagType, type.name()));
+        int maxSort = existing.stream()
                 .map(TagOption::getSortOrder)
-                .filter(value -> value != null)
-                .findFirst()
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
+        int maxHomeSort = existing.stream()
+                .map(TagOption::getHomeSortOrder)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
                 .orElse(0);
         TagOption option = new TagOption();
         option.setTagType(type.name());
         option.setName(name);
         option.setSortOrder(maxSort + 1);
+        option.setHomeVisible(true);
+        option.setHomeSortOrder(maxHomeSort + 1);
         try {
             optionMapper.insert(option);
         } catch (DuplicateKeyException exception) {
@@ -174,11 +202,42 @@ public class TagService {
         return request.getMaxCount();
     }
 
+    @Transactional
+    public void updateHomeDisplay(TagHomeDisplayRequest request) {
+        TagType type = TagType.fromValue(request.getType());
+        if (type != TagType.CATEGORY && type != TagType.OCCASION) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "该标签类型不支持首页展示配置");
+        }
+        ensureInitialized();
+        Map<Long, TagOption> options = optionMapper.selectList(Wrappers.<TagOption>lambdaQuery()
+                        .eq(TagOption::getTagType, type.name()))
+                .stream()
+                .collect(Collectors.toMap(TagOption::getId, Function.identity()));
+        if (request.getItems().size() != options.size()) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "首页展示配置需要包含该类型的全部标签");
+        }
+        Set<Long> seen = new HashSet<>();
+        for (int index = 0; index < request.getItems().size(); index++) {
+            TagHomeDisplayRequest.Item item = request.getItems().get(index);
+            TagOption option = options.get(item.getId());
+            if (option == null) {
+                throw BusinessException.of(ErrorCode.BAD_REQUEST, "标签不属于该类型");
+            }
+            if (!seen.add(item.getId())) {
+                throw BusinessException.of(ErrorCode.BAD_REQUEST, "标签不能重复配置");
+            }
+            option.setHomeVisible(Boolean.TRUE.equals(item.getVisible()));
+            option.setHomeSortOrder(index + 1);
+            optionMapper.updateById(option);
+        }
+    }
+
     private synchronized void ensureInitialized() {
         for (TagType type : TagType.values()) {
             if (optionMapper.selectCount(Wrappers.<TagOption>lambdaQuery()
                     .eq(TagOption::getTagType, type.name())) == 0) {
                 List<String> defaults = switch (type) {
+                    case CATEGORY -> TagDefaults.CATEGORIES;
                     case OCCASION -> TagDefaults.OCCASIONS;
                     case FESTIVAL -> TagDefaults.FESTIVALS;
                     case MEANING -> TagDefaults.FLOWER_MEANINGS;
@@ -188,6 +247,8 @@ public class TagService {
                     option.setTagType(type.name());
                     option.setName(defaults.get(index));
                     option.setSortOrder(index + 1);
+                    option.setHomeVisible(type == TagType.CATEGORY || index < 6);
+                    option.setHomeSortOrder(index + 1);
                     try {
                         optionMapper.insert(option);
                     } catch (DuplicateKeyException ignored) {
@@ -195,10 +256,10 @@ public class TagService {
                     }
                 }
             }
-            if (settingMapper.selectById(type.name()) == null) {
+            if (type != TagType.CATEGORY && settingMapper.selectById(type.name()) == null) {
                 TagTypeSetting setting = new TagTypeSetting();
                 setting.setTagType(type.name());
-                setting.setMaxSelectCount(DEFAULT_MAX_COUNTS.get(type));
+                setting.setMaxSelectCount(DEFAULT_MAX_COUNTS.getOrDefault(type, 1));
                 try {
                     settingMapper.insert(setting);
                 } catch (DuplicateKeyException ignored) {

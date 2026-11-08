@@ -184,14 +184,17 @@ export interface OptionItem {
   label: string;
 }
 
-export type TagType = "OCCASION" | "FESTIVAL" | "MEANING";
+export type TagType = "CATEGORY" | "OCCASION" | "FESTIVAL" | "MEANING";
 
 export interface TagOptionVO {
   id: number;
   name: string;
+  homeVisible: boolean;
+  homeSortOrder: number;
 }
 
 export interface TagOverview {
+  categories: TagOptionVO[];
   occasions: TagOptionVO[];
   festivals: TagOptionVO[];
   flowerMeanings: TagOptionVO[];
@@ -204,6 +207,8 @@ export interface TagOverview {
 
 export interface DictOptions {
   categories: string[];
+  homeCategories: string[];
+  homeOccasions: string[];
   occasions: string[];
   festivals: string[];
   flowerMeanings: string[];

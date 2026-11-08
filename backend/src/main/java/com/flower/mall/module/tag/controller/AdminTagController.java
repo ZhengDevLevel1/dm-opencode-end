@@ -2,6 +2,7 @@ package com.flower.mall.module.tag.controller;
 
 import com.flower.mall.common.api.ApiResponse;
 import com.flower.mall.module.tag.dto.TagCreateRequest;
+import com.flower.mall.module.tag.dto.TagHomeDisplayRequest;
 import com.flower.mall.module.tag.dto.TagMaxCountRequest;
 import com.flower.mall.module.tag.dto.TagOptionVO;
 import com.flower.mall.module.tag.dto.TagOverviewVO;
@@ -61,5 +62,12 @@ public class AdminTagController {
     public ApiResponse<Map<String, Integer>> updateMaxCount(
             @Valid @RequestBody TagMaxCountRequest request) {
         return ApiResponse.ok(Map.of("maxCount", tagService.updateMaxCount(request)));
+    }
+
+    @Operation(summary = "保存首页品类或场景展示配置")
+    @PutMapping("/home-display")
+    public ApiResponse<Void> updateHomeDisplay(@Valid @RequestBody TagHomeDisplayRequest request) {
+        tagService.updateHomeDisplay(request);
+        return ApiResponse.ok(null);
     }
 }

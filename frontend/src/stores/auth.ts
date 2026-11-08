@@ -33,7 +33,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
     setStoredUser(result.user);
     setTokenExpiry(result.expiresIn);
     set({ token: result.token, user: result.user, status: "authenticated" });
-    queryClient.clear();
     return result;
   };
 

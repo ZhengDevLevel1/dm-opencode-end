@@ -120,6 +120,7 @@ public class OrderService {
                 throw BusinessException.of(ErrorCode.STOCK_INSUFFICIENT,
                         "商品「" + product.getName() + "」库存不足，请调整数量后重试");
             }
+            productMapper.offShelfIfSoldOut(product.getId());
             OrderItem item = new OrderItem();
             item.setOrderId(order.getId());
             item.setProductId(product.getId());

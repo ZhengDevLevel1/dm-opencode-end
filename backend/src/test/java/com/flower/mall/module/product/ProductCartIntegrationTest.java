@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -72,6 +73,87 @@ class ProductCartIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].quantity").value(99));
+    }
+
+    @Test
+    void soldOutProductAutoOffShelvesAndCannotBeListedWithZeroStock() throws Exception {
+        String adminToken = login("admin", "admin123");
+
+        mockMvc.perform(post("/api/admin/products")
+                        .header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"零库存商品","category":"玫瑰","price":99.00,
+                                 "stock":0,"seasonSuitability":"ALL","status":"ON_SALE"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.stock").value(0))
+                .andExpect(jsonPath("$.data.status").value("OFF_SHELF"));
+
+        MvcResult created = mockMvc.perform(post("/api/admin/products")
+                        .header("Authorization", bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"售罄自动下架花束","category":"玫瑰","price":99.00,
+                                 "stock":1,"seasonSuitability":"ALL","status":"ON_SALE"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ON_SALE"))
+                .andReturn();
+        long productId = objectMapper
+                .readTree(created.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("id").asLong();
+
+        String customerToken = login("customer", "customer123");
+        long cartItemId = addToCart(customerToken, productId, 1);
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", bearer(customerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"cartItemIds":[%d],"receiverName":"测试收花人",
+                                 "receiverPhone":"13900000003","receiverAddress":"上海市测试路1号"}
+                                """.formatted(cartItemId)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/admin/products/" + productId)
+                        .header("Authorization", bearer(adminToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.stock").value(0))
+                .andExpect(jsonPath("$.data.status").value("OFF_SHELF"));
+
+        mockMvc.perform(put("/api/admin/products/" + productId + "/status")
+                        .header("Authorization", bearer(adminToken))
+                        .param("status", "ON_SALE"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+
+        String staffToken = login("staff", "staff123");
+        mockMvc.perform(post("/api/staff/products/" + productId + "/stock")
+                        .header("Authorization", bearer(staffToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"delta":5,"remark":"补货"}
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/admin/products/" + productId + "/status")
+                        .header("Authorization", bearer(adminToken))
+                        .param("status", "ON_SALE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("ON_SALE"));
+    }
+
+    private long addToCart(String token, long productId, int quantity) throws Exception {
+        MvcResult result = mockMvc.perform(post("/api/cart/items")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId":%d,"quantity":%d}
+                                """.formatted(productId, quantity)))
+                .andExpect(status().isOk())
+                .andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .path("data").path("id").asLong();
     }
 
     private String login(String username, String password) throws Exception {

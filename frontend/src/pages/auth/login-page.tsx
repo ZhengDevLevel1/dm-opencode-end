@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { useForm } from "react-hook-form";
@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EmailCodeField } from "@/components/domain/email-code-field";
+import { useBloomTransition } from "@/components/domain/bloom-transition";
 
 const passwordSchema = z.object({
   username: z.string().min(1, "请输入用户名"),
@@ -52,6 +53,8 @@ function safeRedirect(redirect: string | null, role?: string): string {
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const bloom = useBloomTransition();
+  const manualLoginRef = useRef(false);
   const [searchParams] = useSearchParams();
   const login = useAuthStore((state) => state.login);
   const loginByEmail = useAuthStore((state) => state.loginByEmail);
@@ -83,20 +86,26 @@ export function LoginPage() {
   });
 
   useEffect(() => {
-    if (user) {
+    // 主动登录时由「花开」转场负责跳转，避免刚登录就瞬间切走页面。
+    if (user && !manualLoginRef.current) {
       navigate(safeRedirect(searchParams.get("redirect"), user.role), { replace: true });
     }
   }, [user, navigate, searchParams]);
 
   const finishLogin = (result: Awaited<ReturnType<typeof login>>) => {
+    manualLoginRef.current = true;
     toast.success("欢迎回来", `${result.user.nickname || result.user.username}，花礼正在等你。`);
-    navigate(safeRedirect(searchParams.get("redirect"), result.user.role), {
-      replace: true,
+    const destination = safeRedirect(searchParams.get("redirect"), result.user.role);
+    const started = bloom.play({
+      run: () => navigate(destination, { replace: true }),
     });
+    if (!started) navigate(destination, { replace: true });
   };
 
   const onPasswordSubmit = async (values: PasswordValues) => {
     setFormError("");
+    // 提前标记为主动登录，避免登录态写入后本页的兜底重定向抢在花开动画前跳走。
+    manualLoginRef.current = true;
     try {
       const result = await login(values.username, values.password);
       setRememberedUsername(values.remember ? values.username : null);
@@ -120,6 +129,7 @@ export function LoginPage() {
 
   const onEmailSubmit = async (values: EmailValues) => {
     setFormError("");
+    manualLoginRef.current = true;
     try {
       const result = await loginByEmail(values.email.trim(), values.code.trim());
       finishLogin(result);
