@@ -10,6 +10,7 @@ import {
   ScrollText,
   Settings2,
   ShoppingBag,
+  SlidersHorizontal,
   Sparkles,
   Tags,
   UserRound,
@@ -30,11 +31,20 @@ export interface NavItem {
   badge?: "cart" | "favorites" | "pending";
 }
 
+export type WorkbenchKey = "mall" | "staff" | "admin";
+
 export interface NavGroup {
   label: string;
   items: NavItem[];
+  workbench: WorkbenchKey;
   roles?: UserRole[];
   auth?: boolean;
+}
+
+export function resolveWorkbench(pathname: string): WorkbenchKey {
+  if (pathname.startsWith("/admin")) return "admin";
+  if (pathname.startsWith("/staff")) return "staff";
+  return "mall";
 }
 
 export interface WorkbenchLink {
@@ -52,6 +62,7 @@ export const workbenches: WorkbenchLink[] = [
 export const navGroups: NavGroup[] = [
   {
     label: "花礼",
+    workbench: "mall",
     items: [
       {
         label: "花礼首页",
@@ -76,6 +87,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "我的账户",
+    workbench: "mall",
     auth: true,
     items: [
       {
@@ -115,6 +127,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "履约",
+    workbench: "staff",
     roles: ["STAFF", "ADMIN"],
     items: [
       {
@@ -135,6 +148,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "经营管理",
+    workbench: "admin",
     roles: ["ADMIN"],
     items: [
       {
@@ -155,6 +169,12 @@ export const navGroups: NavGroup[] = [
         description: "场景、节日与花语",
         to: "/admin/tags",
         icon: Tags,
+      },
+      {
+        label: "指标配置",
+        description: "价格带与库存分档",
+        to: "/admin/metrics",
+        icon: SlidersHorizontal,
       },
       {
         label: "用户管理",
@@ -184,6 +204,7 @@ export const navGroups: NavGroup[] = [
   },
   {
     label: "偏好",
+    workbench: "mall",
     auth: true,
     items: [
       {
@@ -225,6 +246,7 @@ const staticMeta: Record<string, RouteMeta> = {
   "/admin": { title: "经营总览", description: "销售额、订单与花礼经营状况", icon: LayoutDashboard },
   "/admin/products": { title: "商品管理", description: "维护花礼信息、状态与库存", icon: PackageSearch },
   "/admin/tags": { title: "标签管理", description: "维护场景、节日与花语标签及选择上限", icon: Tags },
+  "/admin/metrics": { title: "指标配置", description: "调整价格带与库存分档阈值", icon: SlidersHorizontal },
   "/admin/users": { title: "用户管理", description: "账号、角色与启用状态", icon: UsersRound },
   "/admin/reviews": { title: "评价管理", description: "可见性、回复与评分影响", icon: MessagesSquare },
   "/admin/recommendations": { title: "推荐运营", description: "权重配置、日志与效果评估", icon: WandSparkles },
@@ -256,6 +278,9 @@ export function getRouteMeta(pathname: string): RouteMeta {
   }
   if (pathname.startsWith("/admin/tags")) {
     return staticMeta["/admin/tags"];
+  }
+  if (pathname.startsWith("/admin/metrics")) {
+    return staticMeta["/admin/metrics"];
   }
   if (pathname.startsWith("/admin/users")) {
     return staticMeta["/admin/users"];

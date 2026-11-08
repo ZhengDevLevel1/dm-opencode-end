@@ -16,6 +16,8 @@ import com.flower.mall.module.product.dto.ProductQuery;
 import com.flower.mall.module.product.dto.ProductSaveRequest;
 import com.flower.mall.module.product.dto.ProductVO;
 import com.flower.mall.module.product.entity.Product;
+import com.flower.mall.common.api.PageResult;
+import com.flower.mall.module.metric.service.MetricConfigService;
 import com.flower.mall.module.product.mapper.ProductMapper;
 import com.flower.mall.module.tag.service.TagService;
 import com.flower.mall.support.CacheKeys;
@@ -39,6 +41,7 @@ public class ProductService {
     private final CacheService cacheService;
     private final AppProperties properties;
     private final TagService tagService;
+    private final MetricConfigService metricConfigService;
 
     public IPage<Product> page(ProductQuery query, boolean adminView) {
         long page = Math.max(query.getPage(), 1);
@@ -48,6 +51,23 @@ public class ProductService {
             wrapper.eq(StringUtils.hasText(query.getStatus()), Product::getStatus, query.getStatus());
         } else {
             wrapper.eq(Product::getStatus, ProductStatus.ON_SALE.name());
+        }
+        if (Boolean.TRUE.equals(query.getLowStock())) {
+            wrapper.eq(Product::getStatus, ProductStatus.ON_SALE.name())
+                    .lt(Product::getStock, metricConfigService.lowStockThreshold());
+        }
+        if (StringUtils.hasText(query.getStockLevel())) {
+            int low = metricConfigService.lowStockThreshold();
+            int high = metricConfigService.highStockThreshold();
+            switch (query.getStockLevel().toUpperCase(Locale.ROOT)) {
+                case "LOW" -> wrapper.lt(Product::getStock, low);
+                case "SUFFICIENT" -> wrapper.ge(Product::getStock, low)
+                        .lt(Product::getStock, high);
+                case "OVERSTOCK" -> wrapper.ge(Product::getStock, high);
+                default -> {
+                    // ALL 不增加库存条件。
+                }
+            }
         }
         if (StringUtils.hasText(query.getKeyword())) {
             String keyword = query.getKeyword().trim();
@@ -75,9 +95,13 @@ public class ProductService {
         return productMapper.selectPage(new Page<>(page, size), wrapper);
     }
 
+    public PageResult<ProductVO> pageVO(ProductQuery query, boolean adminView) {
+        return PageResult.of(page(query, adminView), this::toVO);
+    }
+
     public ProductVO detail(Long productId, boolean adminView) {
         if (adminView) {
-            return ProductVO.from(getRequired(productId));
+            return toVO(getRequired(productId));
         }
         String cacheKey = CacheKeys.productDetail(productId);
         return cacheService.get(cacheKey, new TypeReference<ProductVO>() {
@@ -86,7 +110,7 @@ public class ProductService {
             if (!ProductStatus.ON_SALE.name().equals(product.getStatus())) {
                 throw BusinessException.of(ErrorCode.PRODUCT_OFF_SHELF);
             }
-            ProductVO vo = ProductVO.from(product);
+            ProductVO vo = toVO(product);
             cacheService.put(cacheKey, vo,
                     Duration.ofSeconds(properties.getCache().getProductDetailSeconds()));
             return vo;
@@ -101,7 +125,7 @@ public class ProductService {
                     .eq(Product::getStatus, ProductStatus.ON_SALE.name())
                     .orderByDesc(Product::getSalesCount)
                     .last("LIMIT " + limit));
-            List<ProductVO> result = products.stream().map(ProductVO::from).toList();
+            List<ProductVO> result = products.stream().map(this::toVO).toList();
             cacheService.put(CacheKeys.HOT_PRODUCTS, result,
                     Duration.ofSeconds(properties.getCache().getHotProductsSeconds()));
             return result;
@@ -130,7 +154,7 @@ public class ProductService {
         productMapper.insert(product);
         inventoryService.recordInitialStock(product);
         evictCaches(product.getId());
-        return ProductVO.from(productMapper.selectById(product.getId()));
+        return toVO(productMapper.selectById(product.getId()));
     }
 
     @Transactional
@@ -154,7 +178,7 @@ public class ProductService {
             inventoryService.adjustStock(productId, targetStock - stockBefore, "商品编辑调整库存");
         }
         evictCaches(productId);
-        return ProductVO.from(productMapper.selectById(productId));
+        return toVO(productMapper.selectById(productId));
     }
 
     @Transactional
@@ -167,7 +191,7 @@ public class ProductService {
         }
         Product existing = getRequired(productId);
         if (target.name().equals(existing.getStatus())) {
-            return ProductVO.from(existing);
+            return toVO(existing);
         }
         Product update = new Product();
         update.setId(productId);
@@ -177,7 +201,7 @@ public class ProductService {
             throw BusinessException.of(ErrorCode.CONFLICT, "商品已被其他操作修改，请刷新后重试");
         }
         evictCaches(productId);
-        return ProductVO.from(productMapper.selectById(productId));
+        return toVO(productMapper.selectById(productId));
     }
 
     @Transactional
@@ -204,6 +228,12 @@ public class ProductService {
         product.setSeasonSuitability(SeasonSuitability.valueOf(request.getSeasonSuitability()).name());
     }
 
+    private ProductVO toVO(Product product) {
+        ProductVO vo = ProductVO.from(product);
+        vo.setPriceBand(metricConfigService.priceBand(product.getPrice()));
+        return vo;
+    }
+
     private void applySort(LambdaQueryWrapper<Product> wrapper, String sort) {
         String value = StringUtils.hasText(sort) ? sort : "sales_desc";
         switch (value) {
@@ -212,6 +242,7 @@ public class ProductService {
             case "newest" -> wrapper.orderByDesc(Product::getCreatedAt);
             case "rating_desc" -> wrapper.orderByDesc(Product::getRatingAvg);
             case "stock_asc" -> wrapper.orderByAsc(Product::getStock);
+            case "stock_desc" -> wrapper.orderByDesc(Product::getStock);
             default -> wrapper.orderByDesc(Product::getSalesCount);
         }
         wrapper.orderByDesc(Product::getId);

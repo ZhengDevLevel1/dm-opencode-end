@@ -1,6 +1,7 @@
 package com.flower.mall.module.stats.service;
 
 import com.flower.mall.common.enums.OrderStatus;
+import com.flower.mall.module.metric.service.MetricConfigService;
 import com.flower.mall.module.stats.dto.CategorySalesRow;
 import com.flower.mall.module.stats.dto.CategorySalesVO;
 import com.flower.mall.module.stats.dto.OrderStatusRow;
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 public class StatsService {
 
     private final StatsMapper statsMapper;
+    private final MetricConfigService metricConfigService;
 
     public OverviewStatsVO overview() {
         BigDecimal averageRating = statsMapper.averageRating();
@@ -40,7 +42,7 @@ public class StatsService {
                 .totalOrders(statsMapper.totalOrders())
                 .todayOrders(statsMapper.todayOrders())
                 .pendingFulfillment(statsMapper.pendingFulfillment())
-                .lowStockProducts(statsMapper.lowStockProducts())
+                .lowStockProducts(statsMapper.lowStockProducts(metricConfigService.lowStockThreshold()))
                 .onSaleProducts(statsMapper.onSaleProducts())
                 .customerCount(statsMapper.customerCount())
                 .totalReviews(statsMapper.totalReviews())

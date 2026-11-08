@@ -30,6 +30,7 @@ import com.flower.mall.module.recommendation.model.RecommendationCandidate;
 import com.flower.mall.module.recommendation.model.RecommendationContext;
 import com.flower.mall.module.recommendation.model.RecommendationLogLabels;
 import com.flower.mall.module.recommendation.model.RecommendationResult;
+import com.flower.mall.module.metric.service.MetricConfigService;
 import com.flower.mall.module.recommendation.model.RecommendationWeights;
 import com.flower.mall.module.recommendation.model.ScoredProduct;
 import com.flower.mall.module.recommendation.model.UserBehaviorData;
@@ -75,6 +76,7 @@ public class RecommendationService {
     private final RecommendationEngine engine;
     private final ObjectMapper objectMapper;
     private final AppProperties properties;
+    private final MetricConfigService metricConfigService;
 
     public RecommendationResponse recommend(RecommendationQuery query) {
         AuthUser authUser = SecurityUtils.currentUserOrNull();
@@ -86,7 +88,7 @@ public class RecommendationService {
                 .eq(Product::getStatus, ProductStatus.ON_SALE.name())
                 .orderByDesc(Product::getSalesCount));
         List<RecommendationCandidate> candidates = products.stream()
-                .map(RecommendationCandidate::from)
+                .map(this::toCandidate)
                 .toList();
         RecommendationWeight weightEntity = getOrCreateWeights();
         RecommendationResult result = engine.recommend(candidates, behavior, context,
@@ -230,7 +232,7 @@ public class RecommendationService {
                 .eq(Product::getStatus, ProductStatus.ON_SALE.name())
                 .orderByDesc(Product::getSalesCount));
         List<RecommendationCandidate> products = productEntities.stream()
-                .map(RecommendationCandidate::from)
+                .map(this::toCandidate)
                 .toList();
         RecommendationWeights weights = RecommendationWeights.from(getOrCreateWeights());
         int candidateLimit = properties.getRecommendation().getCandidateLimit();
@@ -431,6 +433,10 @@ public class RecommendationService {
                 ? query.getFestival().trim()
                 : FestivalCalendar.detect(LocalDate.now()).orElse(null);
         return RecommendationContext.of(season, festival, query.getScene());
+    }
+
+    private RecommendationCandidate toCandidate(Product product) {
+        return RecommendationCandidate.from(product, metricConfigService.priceBand(product.getPrice()));
     }
 
     private RecommendationItemVO toItemVO(ScoredProduct scored) {

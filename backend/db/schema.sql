@@ -290,6 +290,16 @@ CREATE TABLE tag_type_setting (
     PRIMARY KEY (tag_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='标签类型配置表';
 
+CREATE TABLE metric_config (
+    id TINYINT NOT NULL DEFAULT 1,
+    price_mid_threshold DECIMAL(10,2) NOT NULL DEFAULT 100.00,
+    price_high_threshold DECIMAL(10,2) NOT NULL DEFAULT 300.00,
+    stock_low_threshold INT NOT NULL DEFAULT 10,
+    stock_high_threshold INT NOT NULL DEFAULT 50,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='价格带与库存指标配置表';
+
 CREATE TABLE user_theme_preference (
     user_id BIGINT NOT NULL,
     mode VARCHAR(20) NOT NULL DEFAULT 'system',

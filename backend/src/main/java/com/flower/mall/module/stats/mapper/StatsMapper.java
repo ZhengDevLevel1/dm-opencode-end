@@ -43,9 +43,9 @@ public interface StatsMapper {
 
     @Select("""
             SELECT COUNT(*) FROM product
-            WHERE deleted = 0 AND status = 'ON_SALE' AND stock < 10
+            WHERE deleted = 0 AND status = 'ON_SALE' AND stock < #{threshold}
             """)
-    long lowStockProducts();
+    long lowStockProducts(@Param("threshold") int threshold);
 
     @Select("SELECT COUNT(*) FROM product WHERE deleted = 0 AND status = 'ON_SALE'")
     long onSaleProducts();

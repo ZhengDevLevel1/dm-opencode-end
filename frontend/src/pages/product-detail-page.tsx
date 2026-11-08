@@ -22,7 +22,7 @@ import {
   recommendationService,
   reviewService,
 } from "@/lib/services";
-import { useFavoritesQuery } from "@/hooks/queries";
+import { useDict, useFavoritesQuery } from "@/hooks/queries";
 import { useLoginGuard } from "@/hooks/use-login-guard";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatNumber, splitTags } from "@/lib/format";
@@ -48,6 +48,7 @@ export function ProductDetailPage() {
   const queryClient = useQueryClient();
   const { requireLogin, isLoggedIn } = useLoginGuard();
   const favorites = useFavoritesQuery();
+  const dict = useDict();
   const [quantity, setQuantity] = useState(1);
   const [showAllReviews, setShowAllReviews] = useState(false);
 
@@ -184,7 +185,8 @@ export function ProductDetailPage() {
   }
 
   const soldOut = data.stock <= 0;
-  const lowStock = data.stock > 0 && data.stock < 10;
+  const stockLow = dict.data?.metrics?.stockLowThreshold ?? 10;
+  const lowStock = data.stock > 0 && data.stock < stockLow;
   const maxQuantity = Math.min(99, data.stock);
   const tags = splitTags(data.occasionTags);
   const festivalTags = splitTags(data.festivalTags);

@@ -9,6 +9,7 @@ import com.flower.mall.common.enums.ReviewStatus;
 import com.flower.mall.common.enums.SeasonSuitability;
 import com.flower.mall.common.enums.TagType;
 import com.flower.mall.common.enums.UserRole;
+import com.flower.mall.module.metric.service.MetricConfigService;
 import com.flower.mall.module.tag.service.TagService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,6 +35,7 @@ public class DictController {
     private static final List<String> PRICE_BANDS = List.of("平价", "中端", "高端");
 
     private final TagService tagService;
+    private final MetricConfigService metricConfigService;
 
     @Operation(summary = "获取全部枚举字典")
     @GetMapping("/options")
@@ -48,6 +50,7 @@ public class DictController {
                 "festivals", tagService.maxCount(TagType.FESTIVAL),
                 "flowerMeanings", tagService.maxCount(TagType.MEANING)));
         options.put("priceBands", PRICE_BANDS);
+        options.put("metrics", metricConfigService.get());
         options.put("seasons", options(SeasonSuitability.values(),
                 SeasonSuitability::name, SeasonSuitability::getLabel));
         options.put("roles", options(UserRole.values(), UserRole::name, UserRole::getLabel));

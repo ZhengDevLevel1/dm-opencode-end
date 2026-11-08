@@ -15,6 +15,8 @@ public class ProductQuery {
     private String festival;
     private String season;
     private String status;
+    private Boolean lowStock;
+    private String stockLevel;
     private BigDecimal minPrice;
     private BigDecimal maxPrice;
     private String sort = "sales_desc";

@@ -26,8 +26,13 @@ public class RecommendationCandidate {
     private final int salesCount;
     private final BigDecimal ratingAvg;
     private final int ratingCount;
+    private final String priceBand;
 
     public static RecommendationCandidate from(Product product) {
+        return from(product, ProductVO.priceBand(product.getPrice()));
+    }
+
+    public static RecommendationCandidate from(Product product, String priceBand) {
         SeasonSuitability season = SeasonSuitability.ALL;
         if (product.getSeasonSuitability() != null) {
             try {
@@ -50,11 +55,12 @@ public class RecommendationCandidate {
                 .salesCount(product.getSalesCount() == null ? 0 : product.getSalesCount())
                 .ratingAvg(product.getRatingAvg() == null ? BigDecimal.ZERO : product.getRatingAvg())
                 .ratingCount(product.getRatingCount() == null ? 0 : product.getRatingCount())
+                .priceBand(priceBand)
                 .build();
     }
 
     public String priceBand() {
-        return ProductVO.priceBand(price);
+        return priceBand == null ? ProductVO.priceBand(price) : priceBand;
     }
 
     public boolean matchesFestival(String festival) {

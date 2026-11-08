@@ -41,7 +41,18 @@ export type ProductSort =
   | "price_desc"
   | "newest"
   | "rating_desc"
-  | "stock_asc";
+  | "stock_asc"
+  | "stock_desc";
+
+export type StockLevel = "ALL" | "LOW" | "SUFFICIENT" | "OVERSTOCK";
+
+export interface MetricConfig {
+  priceMidThreshold: number;
+  priceHighThreshold: number;
+  stockLowThreshold: number;
+  stockHighThreshold: number;
+  updatedAt?: string;
+}
 
 export interface UserVO {
   id: number;
@@ -172,6 +183,7 @@ export interface DictOptions {
     festivals: number;
     flowerMeanings: number;
   };
+  metrics: MetricConfig;
   priceBands: string[];
   seasons: OptionItem[];
   roles: OptionItem[];
@@ -236,6 +248,8 @@ export interface ProductQuery {
   festival?: string;
   season?: SeasonSuitability;
   status?: ProductStatus;
+  lowStock?: boolean;
+  stockLevel?: StockLevel;
   minPrice?: number;
   maxPrice?: number;
   sort?: ProductSort;

@@ -13,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 
+import static org.hamcrest.Matchers.everyItem;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.lessThan;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -78,6 +81,14 @@ class SearchIntegrationTest {
                         .param("size", "3"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].id").value(16));
+
+        mockMvc.perform(get("/api/staff/products")
+                        .header("Authorization", bearer(token))
+                        .param("lowStock", "true")
+                        .param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[*].stock", everyItem(lessThan(10))))
+                .andExpect(jsonPath("$.data.records[*].status", everyItem(is("ON_SALE"))));
     }
 
     @Test

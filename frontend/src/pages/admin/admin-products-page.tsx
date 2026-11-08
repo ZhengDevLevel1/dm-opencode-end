@@ -29,6 +29,7 @@ import type {
   ProductStatus,
   ProductVO,
   SeasonSuitability,
+  StockLevel,
 } from "@/types/api";
 import { ImageUpload } from "@/components/domain/image-upload";
 import { ProductImage } from "@/components/domain/product-image";
@@ -81,6 +82,8 @@ const productSortOptions: Array<{ value: ProductSort; label: string }> = [
   { value: "price_asc", label: "价格从低到高" },
   { value: "price_desc", label: "价格从高到低" },
   { value: "rating_desc", label: "评分优先" },
+  { value: "stock_asc", label: "库存从低到高" },
+  { value: "stock_desc", label: "库存从高到低" },
 ];
 
 const productSchema = z.object({
@@ -139,6 +142,7 @@ export function AdminProductsPage() {
   const [draftKeyword, setDraftKeyword] = useState(urlKeyword);
   const [keyword, setKeyword] = useState(urlKeyword);
   const [status, setStatus] = useState("");
+  const [stockLevel, setStockLevel] = useState<StockLevel>("ALL");
   const [category, setCategory] = useState("");
   const [occasion, setOccasion] = useState("");
   const [festival, setFestival] = useState("");
@@ -165,6 +169,8 @@ export function AdminProductsPage() {
     () => (dict.data?.festivals ?? FESTIVAL_TAG_OPTIONS).map((item) => ({ value: item, label: item })),
     [dict.data?.festivals],
   );
+  const stockLow = dict.data?.metrics?.stockLowThreshold ?? 10;
+  const stockHigh = dict.data?.metrics?.stockHighThreshold ?? 50;
 
   useEffect(() => {
     if (!urlKeyword) return;
@@ -179,6 +185,7 @@ export function AdminProductsPage() {
       size: PAGE_SIZE,
       keyword: keyword.trim() || undefined,
       status: status ? (status as ProductStatus) : undefined,
+      stockLevel: stockLevel === "ALL" ? undefined : stockLevel,
       category: category || undefined,
       occasion: occasion || undefined,
       festival: festival || undefined,
@@ -187,7 +194,19 @@ export function AdminProductsPage() {
       maxPrice: maxPrice.trim() && Number.isFinite(Number(maxPrice)) ? Number(maxPrice) : undefined,
       sort,
     }),
-    [page, keyword, status, category, occasion, festival, season, minPrice, maxPrice, sort],
+    [
+      page,
+      keyword,
+      status,
+      stockLevel,
+      category,
+      occasion,
+      festival,
+      season,
+      minPrice,
+      maxPrice,
+      sort,
+    ],
   );
 
   const query = useQuery({
@@ -222,6 +241,7 @@ export function AdminProductsPage() {
   const activeFilters = [
     keyword,
     status,
+    stockLevel !== "ALL",
     category,
     occasion,
     festival,
@@ -242,6 +262,7 @@ export function AdminProductsPage() {
     setDraftKeyword("");
     setKeyword("");
     setStatus("");
+    setStockLevel("ALL");
     setCategory("");
     setOccasion("");
     setFestival("");
@@ -323,6 +344,30 @@ export function AdminProductsPage() {
                 }}
                 options={productStatusOptions}
                 placeholder="全部状态"
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+            <div className="w-44 shrink-0">
+              <Label htmlFor="admin-product-stock" className="sr-only">
+                库存
+              </Label>
+              <CustomSelect
+                id="admin-product-stock"
+                value={stockLevel}
+                onChange={(next) => {
+                  setStockLevel(next as StockLevel);
+                  setPage(1);
+                }}
+                options={[
+                  { value: "ALL", label: "全部库存" },
+                  { value: "OVERSTOCK", label: `过量库存 (≥ ${stockHigh})` },
+                  {
+                    value: "SUFFICIENT",
+                    label: `充足库存 (${stockLow}–${Math.max(stockLow, stockHigh - 1)})`,
+                  },
+                  { value: "LOW", label: `低库存 (< ${stockLow})` },
+                ]}
+                placeholder="全部库存"
                 className={FILTER_SELECT_CLASS}
               />
             </div>
@@ -538,12 +583,12 @@ export function AdminProductsPage() {
                       <span
                         className={cn(
                           "text-xs font-medium tabular",
-                          product.stock < 10 && "text-destructive",
+                          product.stock < stockLow && "text-destructive",
                         )}
                       >
                         {formatNumber(product.stock)}
                       </span>
-                      {product.stock < 10 ? (
+                      {product.stock < stockLow ? (
                         <span className="ml-1.5 text-[10px] text-destructive">低库存</span>
                       ) : null}
                     </TD>

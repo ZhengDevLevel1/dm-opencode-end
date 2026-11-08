@@ -26,7 +26,7 @@ public class ProductController {
     @Operation(summary = "组合条件分页检索商品")
     @GetMapping
     public ApiResponse<PageResult<ProductVO>> page(ProductQuery query) {
-        return ApiResponse.ok(PageResult.of(productService.page(query, false), ProductVO::from));
+        return ApiResponse.ok(productService.pageVO(query, false));
     }
 
     @Operation(summary = "热销商品（Redis 缓存）")

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutGroup, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { ChevronsRight, Flower2, Pin, PinOff, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/stores/auth";
@@ -10,7 +10,7 @@ import { useCartQuery, useFavoritesQuery } from "@/hooks/queries";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { staffService } from "@/lib/services";
-import { canSeeRole, navGroups, workbenches } from "./nav";
+import { canSeeRole, navGroups, resolveWorkbench, workbenches } from "./nav";
 import { Button } from "@/components/ui/button";
 
 function useBadgeCounts() {
@@ -61,50 +61,54 @@ function WorkbenchSwitch({ expanded }: { expanded: boolean }) {
   const user = useAuthStore((state) => state.user);
   const navigate = useNavigate();
   const location = useLocation();
+  const switchId = useId();
   const links = useMemo(
     () => workbenches.filter((item) => canSeeRole(user?.role, item.roles)),
     [user?.role],
   );
   if (!user || links.length <= 1) return null;
 
-  const current =
-    location.pathname.startsWith("/admin")
-      ? "admin"
-      : location.pathname.startsWith("/staff")
-        ? "staff"
-        : "mall";
+  const current = resolveWorkbench(location.pathname);
+  const next = links[(links.findIndex((link) => resolveWorkbench(link.to) === current) + 1) % links.length];
 
   return (
     <div className="px-2 pb-3">
       {expanded ? (
-        <div className="flex rounded-lg bg-sidebar-accent/60 p-0.5">
-          {links.map((link) => {
-            const key = link.to === "/" ? "mall" : link.to === "/admin" ? "admin" : "staff";
-            const active = current === key;
-            return (
-              <button
-                key={link.to}
-                type="button"
-                onClick={() => navigate(link.to)}
-                className={cn(
-                  "flex-1 cursor-pointer rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
-                  active
-                    ? "bg-card text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {link.label}
-              </button>
-            );
-          })}
-        </div>
+        <LayoutGroup id={`workbench-switch-${switchId}`}>
+          <div className="flex rounded-lg bg-sidebar-accent/60 p-0.5">
+            {links.map((link) => {
+              const key = resolveWorkbench(link.to);
+              const active = current === key;
+              return (
+                <button
+                  key={link.to}
+                  type="button"
+                  onClick={() => navigate(link.to)}
+                  className={cn(
+                    "relative flex-1 cursor-pointer rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
+                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId={`workbench-switch-pill-${switchId}`}
+                      className="absolute inset-0 rounded-md bg-card shadow-sm"
+                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                    />
+                  ) : null}
+                  <span className="relative z-10">{link.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </LayoutGroup>
       ) : (
         <button
           type="button"
-          onClick={() => navigate(current === "mall" ? links[1]?.to ?? "/" : "/")}
+          onClick={() => navigate(next?.to ?? "/")}
           className="flex h-9 w-12 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent/40"
-          aria-label="切换工作台"
-          title="切换工作台"
+          aria-label={next ? `切换到${next.label}` : "切换工作台"}
+          title={next ? `切换到${next.label}` : "切换工作台"}
         >
           <ChevronsRight className="h-4 w-4" />
         </button>
@@ -126,13 +130,18 @@ function SidebarContent({
   const counts = useBadgeCounts();
   const location = useLocation();
   const navigate = useNavigate();
+  const reduceMotionSetting = useThemeStore((state) => state.reduceMotion);
+  const prefersReducedMotion = useReducedMotion();
+  const reduceMotion = Boolean(reduceMotionSetting || prefersReducedMotion);
+  const workbench = resolveWorkbench(location.pathname);
 
   const groups = navGroups.filter((group) => {
+    if (group.workbench !== workbench) return false;
     if (group.roles && !canSeeRole(user?.role, group.roles)) return false;
     if (group.auth && !user) return false;
     return true;
   });
-  const layoutKey = `sidebar-${mobile ? "mobile" : "desktop"}`;
+  const layoutKey = `sidebar-${mobile ? "mobile" : "desktop"}-${workbench}`;
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -153,9 +162,21 @@ function SidebarContent({
       <WorkbenchSwitch expanded={expanded} />
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-4" aria-label="主导航">
-        <LayoutGroup id={layoutKey}>
-          {groups.map((group) => (
-            <div key={group.label} className="mb-4 last:mb-0">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={workbench}
+            initial={{ opacity: 0, y: reduceMotion ? 0 : 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reduceMotion ? 0 : -6 }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }
+            }
+          >
+            <LayoutGroup id={layoutKey}>
+              {groups.map((group) => (
+                <div key={group.label} className="mb-4 last:mb-0">
               {expanded ? (
                 <p className="mb-1.5 px-2 text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
                   {group.label}
@@ -259,8 +280,10 @@ function SidebarContent({
                 })}
               </div>
             </div>
-          ))}
-        </LayoutGroup>
+              ))}
+            </LayoutGroup>
+          </motion.div>
+        </AnimatePresence>
       </nav>
       <SidebarFooter expanded={expanded} />
     </div>

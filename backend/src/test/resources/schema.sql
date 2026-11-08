@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS metric_config;
 DROP TABLE IF EXISTS tag_option;
 DROP TABLE IF EXISTS tag_type_setting;
 DROP TABLE IF EXISTS user_theme_preference;
@@ -247,6 +248,15 @@ CREATE TABLE tag_option (
 CREATE TABLE tag_type_setting (
     tag_type VARCHAR(20) PRIMARY KEY,
     max_select_count INT NOT NULL DEFAULT 8,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE metric_config (
+    id TINYINT PRIMARY KEY,
+    price_mid_threshold DECIMAL(10,2) NOT NULL DEFAULT 100.00,
+    price_high_threshold DECIMAL(10,2) NOT NULL DEFAULT 300.00,
+    stock_low_threshold INT NOT NULL DEFAULT 10,
+    stock_high_threshold INT NOT NULL DEFAULT 50,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

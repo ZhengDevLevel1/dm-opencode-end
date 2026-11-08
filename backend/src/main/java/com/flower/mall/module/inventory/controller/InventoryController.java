@@ -36,7 +36,7 @@ public class InventoryController {
     @Operation(summary = "分页查询商品库存（含下架商品）")
     @GetMapping("/products")
     public ApiResponse<PageResult<ProductVO>> products(ProductQuery query) {
-        return ApiResponse.ok(PageResult.of(productService.page(query, true), ProductVO::from));
+        return ApiResponse.ok(productService.pageVO(query, true));
     }
 
     @Operation(summary = "查看商品库存详情（含下架商品）")

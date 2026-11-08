@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { adminService } from "@/lib/services";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
+import { useDict } from "@/hooks/queries";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDate, formatNumber, formatRating } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -145,11 +146,11 @@ function loadDashboardLayout(): DashboardLayoutConfig {
 
 export function AdminDashboardPage() {
   const navigate = useNavigate();
+  const dict = useDict();
   const [days, setDays] = useState(30);
   const [moreMetricsOpen, setMoreMetricsOpen] = useState(false);
   const [layout, setLayout] = useState<DashboardLayoutConfig>(loadDashboardLayout);
   const [layoutOpen, setLayoutOpen] = useState(false);
-  const [lowStockOpen, setLowStockOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem(DASHBOARD_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
@@ -330,8 +331,8 @@ export function AdminDashboardPage() {
           icon={TriangleAlert}
           label="低库存商品"
           value={formatNumber(data?.lowStockProducts)}
-          hint="库存低于 10 件"
-          onClick={() => setLowStockOpen(true)}
+          hint={`库存低于 ${dict.data?.metrics?.stockLowThreshold ?? 10} 件`}
+          onClick={() => navigate("/staff/inventory?lowStock=1")}
         />
       </section>
 
@@ -684,26 +685,6 @@ export function AdminDashboardPage() {
         onLayoutChange={setLayout}
       />
 
-      <Dialog
-        open={lowStockOpen}
-        onOpenChange={setLowStockOpen}
-        title="低库存说明"
-        description="该指标只提供数量，后端没有低库存商品列表接口。"
-        size="sm"
-        footer={
-          <Button variant="outline" size="sm" onClick={() => setLowStockOpen(false)}>
-            知道了
-          </Button>
-        }
-      >
-        <p className="text-sm text-muted-foreground">
-          当前有{" "}
-          <span className="font-semibold text-foreground tabular">
-            {formatNumber(data?.lowStockProducts)}
-          </span>{" "}
-          个在售商品库存低于 10。商品接口没有库存筛选参数，无法在此展开商品清单。
-        </p>
-      </Dialog>
     </div>
   );
 }

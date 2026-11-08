@@ -52,6 +52,7 @@ import type {
   ThemePreferenceRequest,
   ReviewReplyRequest,
   ReviewStatus,
+  MetricConfig,
   TagOptionVO,
   TagOverview,
   TagType,
@@ -213,6 +214,10 @@ export const adminService = {
     api.get<RecommendationEvaluationVO>("/admin/recommendations/evaluation"),
   recommendationStats: () =>
     api.get<RecommendationStatsVO>("/admin/recommendations/stats"),
+
+  metricConfig: () => api.get<MetricConfig>("/admin/metrics"),
+  updateMetricConfig: (body: Omit<MetricConfig, "updatedAt">) =>
+    api.put<MetricConfig>("/admin/metrics", body),
 
   tagOverview: () => api.get<TagOverview>("/admin/tags"),
   createTag: (type: TagType, name: string) =>

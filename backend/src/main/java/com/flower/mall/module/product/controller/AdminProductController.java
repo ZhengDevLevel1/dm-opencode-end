@@ -32,7 +32,7 @@ public class AdminProductController {
     @Operation(summary = "管理员分页查询商品（含下架）")
     @GetMapping
     public ApiResponse<PageResult<ProductVO>> page(ProductQuery query) {
-        return ApiResponse.ok(PageResult.of(productService.page(query, true), ProductVO::from));
+        return ApiResponse.ok(productService.pageVO(query, true));
     }
 
     @Operation(summary = "管理员查看商品详情")

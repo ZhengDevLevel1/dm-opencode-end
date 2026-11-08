@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { adminService } from "@/lib/services";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
+import { useDict } from "@/hooks/queries";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDateTime, formatNumber, formatRating } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -52,6 +53,7 @@ const tooltipStyle = {
 
 export function StoreBoardPage() {
   const navigate = useNavigate();
+  const dict = useDict();
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -169,7 +171,7 @@ export function StoreBoardPage() {
                 icon={TriangleAlert}
                 label="低库存商品"
                 value={formatNumber(data?.lowStockProducts)}
-                hint="库存低于 10 件"
+                hint={`库存低于 ${dict.data?.metrics?.stockLowThreshold ?? 10} 件`}
               />
               <BoardMetric
                 icon={ShoppingBag}

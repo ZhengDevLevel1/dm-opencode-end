@@ -64,6 +64,20 @@ public class CacheService {
         }
     }
 
+    public void evictByPrefix(String prefix) {
+        if (!enabled) {
+            return;
+        }
+        try {
+            var keys = redisTemplate.keys(prefix + "*");
+            if (keys != null && !keys.isEmpty()) {
+                redisTemplate.delete(keys);
+            }
+        } catch (Exception exception) {
+            warn(exception);
+        }
+    }
+
     private void warn(Exception exception) {
         long now = System.currentTimeMillis();
         if (now - lastWarningAt > TimeUnit.MINUTES.toMillis(5)) {

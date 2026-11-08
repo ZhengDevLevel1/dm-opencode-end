@@ -330,6 +330,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<TagOptionVO>` |
 | DELETE | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<Void>` |
 | PUT | `/api/admin/tags/max-count` | 管理员 | `ApiResponse<{ maxCount: number }>` |
+![alt text](image.png)| GET | `/api/admin/metrics` | 管理员 | `ApiResponse<MetricConfigVO>` |
+| PUT | `/api/admin/metrics` | 管理员 | `ApiResponse<MetricConfigVO>` |
 | GET | `/api/admin/reviews` | 管理员 | `ApiResponse<PageResult<ReviewVO>>` |
 | PUT | `/api/admin/reviews/{id}/status` | 管理员 | `ApiResponse<ReviewVO>` |
 | PUT | `/api/admin/reviews/{id}/reply` | 管理员 | `ApiResponse<ReviewVO>` |
@@ -587,7 +589,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | `season` | string |  | `SPRING/SUMMER/AUTUMN/WINTER/ALL`；会同时匹配对应季节和 `ALL` |
 | `minPrice` | number |  | 最低价格，包含边界 |
 | `maxPrice` | number |  | 最高价格，包含边界 |
-| `sort` | string | `sales_desc` | `sales_desc`、`price_asc`、`price_desc`、`newest`、`rating_desc`、`stock_asc`；非法值回退为销量降序 |
+| `stockLevel` | string |  | `ALL/OVERSTOCK/SUFFICIENT/LOW`，按指标配置中的库存阈值分档筛选 |
+| `sort` | string | `sales_desc` | `sales_desc`、`price_asc`、`price_desc`、`newest`、`rating_desc`、`stock_asc`、`stock_desc`；非法值回退为销量降序 |
 
 说明：
 
@@ -933,7 +936,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | POST | `/api/staff/products/{id}/stock` | 店员 | `StockAdjustRequest` | `ApiResponse<InventoryRecord>` |
 | GET | `/api/staff/inventory` | 店员 | 分页/筛选参数 | `ApiResponse<PageResult<InventoryRecord>>` |
 
-店员商品查询复用 `ProductQuery`，与公开商品列表参数一致，但会同时返回已上架和下架商品；`status` 可用于精确筛选商品状态，`sort=stock_asc` 可按库存升序排列。商品详情同样不受上下架状态限制。
+店员商品查询复用 `ProductQuery`，与公开商品列表参数一致，但会同时返回已上架和下架商品；`status` 可用于精确筛选商品状态，`stockLevel` 可按过量/充足/低库存筛选，`sort=stock_asc/stock_desc` 可按库存升序或降序排列。商品详情同样不受上下架状态限制。
 
 `StockAdjustRequest`
 
@@ -1257,9 +1260,34 @@ AFTER_SALE --店员拒绝--> COMPLETED
 
 - `sales-trend` 的 `days` 默认 30，会被限制在 1-90；返回按日期升序、无数据日期补 0 的连续序列。
 - 销售类统计只计算状态为 `PAID`、`FULFILLING`、`COMPLETED`、`AFTER_SALE` 的订单，不包含待支付、取消、已退款订单。
-- `overview.pendingFulfillment` 统计 `PAID` 订单；`lowStockProducts` 统计在售且库存 `<10` 的商品；`averageRating` 基于可见评价。
+- `overview.pendingFulfillment` 统计 `PAID` 订单；`lowStockProducts` 统计在售且库存低于指标配置中低库存阈值的商品（默认 `<10`）；`averageRating` 基于可见评价。
 - `order-status` 返回全部 7 种订单状态，即使数量为 0。
 - `top-products` 按销量降序，最多 10 条。
+
+### 13.7 指标配置
+
+| 方法 | 路径 | 权限 | 请求 | 响应 |
+| --- | --- | --- | --- | --- |
+| GET | `/api/admin/metrics` | 管理员 | 无 | `ApiResponse<MetricConfigVO>` |
+| PUT | `/api/admin/metrics` | 管理员 | `MetricConfigRequest` | `ApiResponse<MetricConfigVO>` |
+
+`MetricConfigVO`
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `priceMidThreshold` | number | 平价 / 中端价格分界（默认 100.00） |
+| `priceHighThreshold` | number | 中端 / 高端价格分界（默认 300.00） |
+| `stockLowThreshold` | number | 低库存 / 充足库存分界（默认 10） |
+| `stockHighThreshold` | number | 充足库存 / 过量库存分界（默认 50） |
+| `updatedAt` | string | 最近更新时间 |
+
+`MetricConfigRequest` 字段与 `MetricConfigVO` 前四项一致，均为必填。
+
+说明：
+
+- 价格带用于商品 `priceBand` 标签和推荐算法的价格特征；库存分档用于店员库存筛选、管理员商品筛选、库存角标和经营总览低库存统计。
+- `priceHighThreshold` 必须大于 `priceMidThreshold`；`stockHighThreshold` 必须大于 `stockLowThreshold`，否则返回 `400`。
+- 保存后后端会清理商品详情与热销缓存，新的阈值立即生效。
 
 ## 14. 前端对接流程
 
@@ -1489,9 +1517,10 @@ export interface ProductQuery {
   festival?: string;
   season?: SeasonSuitability;
   status?: ProductStatus;
+  stockLevel?: 'ALL' | 'OVERSTOCK' | 'SUFFICIENT' | 'LOW';
   minPrice?: number;
   maxPrice?: number;
-  sort?: 'sales_desc' | 'price_asc' | 'price_desc' | 'newest' | 'rating_desc' | 'stock_asc';
+  sort?: 'sales_desc' | 'price_asc' | 'price_desc' | 'newest' | 'rating_desc' | 'stock_asc' | 'stock_desc';
 }
 
 export interface ProductSaveRequest {

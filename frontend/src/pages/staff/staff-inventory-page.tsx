@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   keepPreviousData,
   useMutation,
@@ -16,6 +16,7 @@ import {
   Minus,
   PackageOpen,
   Plus,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   X,
@@ -33,7 +34,9 @@ import type {
   InventoryQuery,
   InventoryRecord,
   PageResult,
+  ProductSort,
   ProductVO,
+  StockLevel,
 } from "@/types/api";
 import {
   inventoryChangeLabel,
@@ -55,7 +58,10 @@ import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/tabl
 
 const PAGE_SIZE = 20;
 const CARD_PAGE_SIZE = 12;
-const LOW_STOCK_THRESHOLD = 10;
+const DEFAULT_STOCK_LOW = 10;
+const DEFAULT_STOCK_HIGH = 50;
+const FILTER_SELECT_CLASS =
+  "h-9 w-full cursor-pointer rounded-lg border-border bg-card pr-8 font-medium shadow-xs transition-[border-color,background-color,box-shadow] hover:border-primary/40 hover:bg-accent/40";
 
 type InventoryView = "cards" | "list";
 
@@ -106,7 +112,18 @@ function buildQuery(filters: Filters, page: number): InventoryQuery {
 export function StaffInventoryPage() {
   const queryClient = useQueryClient();
   const dict = useDict();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<InventoryView>("cards");
+  const [stockLevel, setStockLevel] = useState<StockLevel>(() => {
+    const level = searchParams.get("stockLevel");
+    if (level && ["LOW", "SUFFICIENT", "OVERSTOCK"].includes(level)) {
+      return level as StockLevel;
+    }
+    return searchParams.get("lowStock") === "1" ? "LOW" : "ALL";
+  });
+  const [cardSort, setCardSort] = useState<ProductSort>("stock_asc");
+  const stockLow = dict.data?.metrics?.stockLowThreshold ?? DEFAULT_STOCK_LOW;
+  const stockHigh = dict.data?.metrics?.stockHighThreshold ?? DEFAULT_STOCK_HIGH;
   const [draft, setDraft] = useState<Filters>(emptyFilters);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [page, setPage] = useState(1);
@@ -130,18 +147,49 @@ export function StaffInventoryPage() {
       page: cardPage,
       size: CARD_PAGE_SIZE,
       keyword: cardKeyword || undefined,
-      sort: "stock_asc",
+      stockLevel: stockLevel === "ALL" ? undefined : stockLevel,
+      sort: cardSort,
     }),
     queryFn: () =>
       staffService.products({
         page: cardPage,
         size: CARD_PAGE_SIZE,
         keyword: cardKeyword || undefined,
-        sort: "stock_asc",
+        stockLevel: stockLevel === "ALL" ? undefined : stockLevel,
+        sort: cardSort,
       }),
     enabled: view === "cards",
     placeholderData: keepPreviousData,
   });
+
+  const stockLevelParam =
+    searchParams.get("stockLevel") ??
+    (searchParams.get("lowStock") === "1" ? "LOW" : "ALL");
+  useEffect(() => {
+    const nextLevel = ["LOW", "SUFFICIENT", "OVERSTOCK"].includes(stockLevelParam)
+      ? (stockLevelParam as StockLevel)
+      : "ALL";
+    setStockLevel(nextLevel);
+    setCardPage(1);
+  }, [stockLevelParam]);
+
+  const updateStockLevel = (value: StockLevel) => {
+    setStockLevel(value);
+    setCardPage(1);
+    const next = new URLSearchParams(searchParams);
+    next.delete("lowStock");
+    if (value === "ALL") next.delete("stockLevel");
+    else next.set("stockLevel", value);
+    setSearchParams(next, { replace: true });
+  };
+
+  const clearCardFilters = () => {
+    setCardKeywordDraft("");
+    setCardKeyword("");
+    setCardSort("stock_asc");
+    setCardPage(1);
+    updateStockLevel("ALL");
+  };
 
   const productSearch = useQuery({
     queryKey: queryKeys.staffProducts({
@@ -208,7 +256,7 @@ export function StaffInventoryPage() {
     setAdjust({
       ...emptyAdjust,
       product: null,
-      mode: record.stockAfter < LOW_STOCK_THRESHOLD ? "increase" : "decrease",
+      mode: record.stockAfter < stockLow ? "increase" : "decrease",
       loadingProduct: true,
     });
     setProductKeyword("");
@@ -264,7 +312,7 @@ export function StaffInventoryPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">库存管理</h1>
           <p className="mt-1 text-xs text-muted-foreground">
-            切换卡片与流水视图，查看商品库存或库存变动记录。库存低于 10 件会标红。
+            切换卡片与流水视图，查看商品库存或库存变动记录。库存低于 {stockLow} 件会标红。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -289,16 +337,18 @@ export function StaffInventoryPage() {
         <InventoryCardsSection
           draftKeyword={cardKeywordDraft}
           keyword={cardKeyword}
+          stockLevel={stockLevel}
+          stockSort={cardSort}
+          stockLow={stockLow}
+          stockHigh={stockHigh}
           onDraftKeywordChange={setCardKeywordDraft}
+          onStockLevelChange={updateStockLevel}
+          onSortChange={setCardSort}
           onSearch={() => {
             setCardKeyword(cardKeywordDraft.trim());
             setCardPage(1);
           }}
-          onClear={() => {
-            setCardKeywordDraft("");
-            setCardKeyword("");
-            setCardPage(1);
-          }}
+          onClear={clearCardFilters}
           page={cardPage}
           onPageChange={setCardPage}
           query={cardQuery}
@@ -422,7 +472,7 @@ export function StaffInventoryPage() {
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
-            变动后库存 &lt; {LOW_STOCK_THRESHOLD}
+            变动后库存 &lt; {stockLow}
           </div>
         </div>
 
@@ -482,7 +532,7 @@ export function StaffInventoryPage() {
               <TBody>
                 {records.map((record) => {
                   const negative = record.changeQuantity < 0;
-                  const low = record.stockAfter < LOW_STOCK_THRESHOLD;
+                  const low = record.stockAfter < stockLow;
                   const label =
                     changeTypes.find((item) => item.value === record.changeType)?.label ??
                     inventoryChangeLabel[record.changeType];
@@ -887,7 +937,13 @@ function InventoryViewSwitch({
 function InventoryCardsSection({
   draftKeyword,
   keyword,
+  stockLevel,
+  stockSort,
+  stockLow,
+  stockHigh,
   onDraftKeywordChange,
+  onStockLevelChange,
+  onSortChange,
   onSearch,
   onClear,
   page,
@@ -897,7 +953,13 @@ function InventoryCardsSection({
 }: {
   draftKeyword: string;
   keyword: string;
+  stockLevel: StockLevel;
+  stockSort: ProductSort;
+  stockLow: number;
+  stockHigh: number;
   onDraftKeywordChange: (value: string) => void;
+  onStockLevelChange: (value: StockLevel) => void;
+  onSortChange: (value: ProductSort) => void;
   onSearch: () => void;
   onClear: () => void;
   page: number;
@@ -907,51 +969,107 @@ function InventoryCardsSection({
 }) {
   const records = query.data?.records ?? [];
   const hasKeyword = keyword.trim().length > 0;
+  const hasStockFilter = stockLevel !== "ALL";
+  const hasSort = stockSort !== "stock_asc";
+  const hasFilter = hasKeyword || hasStockFilter || hasSort;
+  const stockEmptyDescription =
+    stockLevel === "LOW"
+      ? `当前没有库存低于 ${stockLow} 件的商品。`
+      : stockLevel === "OVERSTOCK"
+        ? `当前没有库存达到 ${stockHigh} 件的商品。`
+        : stockLevel === "SUFFICIENT"
+          ? `当前没有库存处于 ${stockLow}–${Math.max(stockLow, stockHigh - 1)} 件区间的商品。`
+          : "商品建档后会在这里显示库存。";
 
   return (
     <>
       <div className="ui-card p-4">
-        <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold">
             <LayoutGrid className="h-3.5 w-3.5 text-primary" />
             商品库存
           </h2>
-          {hasKeyword ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-[11px] text-muted-foreground"
-              onClick={onClear}
-            >
-              <X className="h-3 w-3" />
-              清除筛选
-            </Button>
-          ) : null}
         </div>
         <form
-          className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             onSearch();
           }}
         >
-          <div className="relative w-full sm:w-64">
-            <Label htmlFor="inventory-card-keyword" className="sr-only">
-              搜索商品
-            </Label>
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              id="inventory-card-keyword"
-              value={draftKeyword}
-              onChange={(event) => onDraftKeywordChange(event.target.value)}
-              placeholder="搜索花名、花语、场景或节日"
-              className="h-9 pl-8 text-xs"
-            />
+          <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:flex-1">
+              <Label htmlFor="inventory-card-keyword" className="sr-only">
+                搜索商品
+              </Label>
+              <Search
+                className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
+              <Input
+                id="inventory-card-keyword"
+                value={draftKeyword}
+                onChange={(event) => onDraftKeywordChange(event.target.value)}
+                placeholder="搜索花名、花语、场景或节日"
+                className="pl-10"
+              />
+            </div>
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <Button type="submit" className="w-full px-6 sm:w-auto">
+                搜索
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onClear}
+                className="shrink-0 px-4"
+                title="重置全部筛选"
+              >
+                <RotateCcw className="h-4 w-4" />
+                重置
+              </Button>
+            </div>
           </div>
-          <Button type="submit" size="sm" className="h-9">
-            <Search className="h-3.5 w-3.5" />
-            筛选
-          </Button>
+
+          <div className="my-4 h-px w-full bg-border/60" aria-hidden />
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-44 shrink-0">
+              <Label htmlFor="inventory-stock-filter" className="sr-only">
+                库存
+              </Label>
+              <CustomSelect
+                id="inventory-stock-filter"
+                value={stockLevel}
+                onChange={(next) => onStockLevelChange(next as StockLevel)}
+                options={[
+                  { value: "ALL", label: "全部库存" },
+                  { value: "OVERSTOCK", label: `过量库存 (≥ ${stockHigh})` },
+                  {
+                    value: "SUFFICIENT",
+                    label: `充足库存 (${stockLow}–${Math.max(stockLow, stockHigh - 1)})`,
+                  },
+                  { value: "LOW", label: `低库存 (< ${stockLow})` },
+                ]}
+                placeholder="全部库存"
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+            <div className="ml-auto w-36 shrink-0">
+              <Label htmlFor="inventory-stock-sort" className="sr-only">
+                排序
+              </Label>
+              <CustomSelect
+                id="inventory-stock-sort"
+                value={stockSort}
+                onChange={(next) => onSortChange(next as ProductSort)}
+                options={[
+                  { value: "stock_asc", label: "库存从低到高" },
+                  { value: "stock_desc", label: "库存从高到低" },
+                ]}
+                className={FILTER_SELECT_CLASS}
+              />
+            </div>
+          </div>
         </form>
       </div>
 
@@ -959,11 +1077,13 @@ function InventoryCardsSection({
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <PackageOpen className="h-3.5 w-3.5" />
-            共 {formatNumber(query.data?.total)} 个商品 · 库存从低到高
+            共 {formatNumber(query.data?.total)} 个商品 ·{" "}
+            {stockSort === "stock_asc" ? "库存从低到高" : "库存从高到低"}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className="inline-block h-2 w-2 rounded-full bg-destructive" />
-            库存 &lt; {LOW_STOCK_THRESHOLD}
+            低库存 &lt; {stockLow} · 充足 {stockLow}–{Math.max(stockLow, stockHigh - 1)} · 过量 ≥{" "}
+            {stockHigh}
           </div>
         </div>
 
@@ -982,15 +1102,15 @@ function InventoryCardsSection({
         ) : records.length === 0 ? (
           <EmptyState
             icon={PackageOpen}
-            title={hasKeyword ? "没有找到匹配商品" : "还没有商品"}
+            title={hasFilter ? "没有找到匹配商品" : "还没有商品"}
             description={
               hasKeyword
                 ? "试试换一个花名、花语、场景或节日。"
-                : "商品建档后会在这里显示库存。"
+                : stockEmptyDescription
             }
             bare
             action={
-              hasKeyword ? (
+              hasFilter ? (
                 <Button variant="outline" size="sm" onClick={onClear}>
                   清除筛选
                 </Button>
@@ -1000,7 +1120,13 @@ function InventoryCardsSection({
         ) : (
           <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {records.map((product) => (
-              <ProductStockCard key={product.id} product={product} onAdjust={onAdjust} />
+              <ProductStockCard
+                key={product.id}
+                product={product}
+                stockLow={stockLow}
+                stockHigh={stockHigh}
+                onAdjust={onAdjust}
+              />
             ))}
           </div>
         )}
@@ -1023,12 +1149,18 @@ function InventoryCardsSection({
 
 function ProductStockCard({
   product,
+  stockLow,
+  stockHigh,
   onAdjust,
 }: {
   product: ProductVO;
+  stockLow: number;
+  stockHigh: number;
   onAdjust: (product: ProductVO) => void;
 }) {
-  const low = product.stock < LOW_STOCK_THRESHOLD;
+  const low = product.stock < stockLow;
+  const overstock = product.stock >= stockHigh;
+  const stockTone = low ? "low" : overstock ? "over" : "sufficient";
   const tags = [
     ...(product.occasionTags?.split(",") ?? []),
     ...(product.festivalTags?.split(",") ?? []),
@@ -1043,17 +1175,19 @@ function ProductStockCard({
         src={product.imageUrl}
         alt={product.name}
         seed={product.name}
-        fit="contain"
-        className="aspect-[4/5] w-full bg-muted/30"
+        className="aspect-[4/5] w-full"
         iconClassName="h-8 w-8"
         overlay={
-          <div className="absolute inset-x-2 top-2 flex justify-between gap-2">
-            <Badge variant={product.status === "ON_SALE" ? "success" : "secondary"}>
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2.5">
+            <Badge
+              variant={product.status === "ON_SALE" ? "success" : "secondary"}
+              className="shadow-sm backdrop-blur"
+            >
               {product.statusLabel}
             </Badge>
-            <Badge variant="outline" className="bg-background/80 backdrop-blur-sm">
+            <span className="rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
               {product.seasonLabel}
-            </Badge>
+            </span>
           </div>
         }
       />
@@ -1070,7 +1204,7 @@ function ProductStockCard({
           <span
             className={cn(
               "shrink-0 text-sm font-semibold tabular",
-              low ? "text-destructive" : "text-foreground",
+              low ? "text-destructive" : overstock ? "text-amber-600" : "text-foreground",
             )}
           >
             {formatNumber(product.stock)}
@@ -1098,10 +1232,14 @@ function ProductStockCard({
             <span
               className={cn(
                 "inline-block h-2 w-2 rounded-full",
-                low ? "bg-destructive" : "bg-emerald-500",
+                stockTone === "low"
+                  ? "bg-destructive"
+                  : stockTone === "over"
+                    ? "bg-amber-500"
+                    : "bg-emerald-500",
               )}
             />
-            {low ? "低库存" : "库存充足"}
+            {stockTone === "low" ? "低库存" : stockTone === "over" ? "过量库存" : "充足库存"}
           </div>
           <Button
             variant="ghost"

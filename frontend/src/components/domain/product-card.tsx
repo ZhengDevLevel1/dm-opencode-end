@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { formatNumber } from "@/lib/format";
 import { splitTags } from "@/lib/format";
 import type { ProductVO } from "@/types/api";
+import { useDict } from "@/hooks/queries";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "./product-image";
 import { Price } from "./price";
@@ -33,7 +34,9 @@ export function ProductCard({
   const soldOut = product.stock <= 0;
   const unavailable = offShelf || soldOut;
   const tags = splitTags(product.occasionTags);
-  const lowStock = !offShelf && product.stock > 0 && product.stock < 10;
+  const dict = useDict();
+  const stockLow = dict.data?.metrics?.stockLowThreshold ?? 10;
+  const lowStock = !offShelf && product.stock > 0 && product.stock < stockLow;
 
   return (
     <article

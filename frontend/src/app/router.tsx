@@ -27,6 +27,7 @@ const StaffInventoryPage = lazy(() => import("@/pages/staff/staff-inventory-page
 const AdminDashboardPage = lazy(() => import("@/pages/admin/admin-dashboard-page").then((module) => ({ default: module.AdminDashboardPage })));
 const AdminProductsPage = lazy(() => import("@/pages/admin/admin-products-page").then((module) => ({ default: module.AdminProductsPage })));
 const AdminTagsPage = lazy(() => import("@/pages/admin/admin-tags-page").then((module) => ({ default: module.AdminTagsPage })));
+const AdminMetricsPage = lazy(() => import("@/pages/admin/admin-metrics-page").then((module) => ({ default: module.AdminMetricsPage })));
 const AdminUsersPage = lazy(() => import("@/pages/admin/admin-users-page").then((module) => ({ default: module.AdminUsersPage })));
 const AdminReviewsPage = lazy(() => import("@/pages/admin/admin-reviews-page").then((module) => ({ default: module.AdminReviewsPage })));
 const AdminRecommendationsPage = lazy(() => import("@/pages/admin/admin-recommendations-page").then((module) => ({ default: module.AdminRecommendationsPage })));
@@ -164,6 +165,14 @@ export function AppRoutes() {
             element={
               <RequireRole roles={["ADMIN"]}>
                 <AdminTagsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="admin/metrics"
+            element={
+              <RequireRole roles={["ADMIN"]}>
+                <AdminMetricsPage />
               </RequireRole>
             }
           />

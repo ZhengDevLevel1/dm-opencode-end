@@ -5,6 +5,7 @@ import com.flower.mall.common.enums.OrderStatus;
 import com.flower.mall.common.enums.ReviewStatus;
 import com.flower.mall.module.favorite.entity.UserFavorite;
 import com.flower.mall.module.favorite.mapper.UserFavoriteMapper;
+import com.flower.mall.module.metric.service.MetricConfigService;
 import com.flower.mall.module.order.entity.Order;
 import com.flower.mall.module.order.entity.OrderItem;
 import com.flower.mall.module.order.mapper.OrderItemMapper;
@@ -37,6 +38,7 @@ public class UserBehaviorService {
     private final ProductMapper productMapper;
     private final UserFavoriteMapper favoriteMapper;
     private final ReviewMapper reviewMapper;
+    private final MetricConfigService metricConfigService;
 
     public UserBehaviorData load(Long userId) {
         if (userId == null) {
@@ -78,20 +80,20 @@ public class UserBehaviorService {
         List<UserBehaviorData.PurchasedProduct> purchases = purchasedQuantities.entrySet().stream()
                 .filter(entry -> products.containsKey(entry.getKey()))
                 .map(entry -> new UserBehaviorData.PurchasedProduct(
-                        RecommendationCandidate.from(products.get(entry.getKey())), entry.getValue()))
+                        toCandidate(products.get(entry.getKey())), entry.getValue()))
                 .toList();
 
         List<RecommendationCandidate> favoriteProducts = favorites.stream()
                 .map(favorite -> products.get(favorite.getProductId()))
                 .filter(product -> product != null)
-                .map(RecommendationCandidate::from)
+                .map(this::toCandidate)
                 .toList();
 
         List<UserBehaviorData.ReviewedProduct> reviewedProducts = reviews.stream()
                 .map(review -> {
                     Product product = products.get(review.getProductId());
                     return product == null ? null : new UserBehaviorData.ReviewedProduct(
-                            RecommendationCandidate.from(product), review.getRating());
+                            toCandidate(product), review.getRating());
                 })
                 .filter(value -> value != null)
                 .toList();
@@ -131,6 +133,10 @@ public class UserBehaviorService {
                 .purchaseFrequency(recentOrders.size())
                 .averageRating(averageRating)
                 .build();
+    }
+
+    private RecommendationCandidate toCandidate(Product product) {
+        return RecommendationCandidate.from(product, metricConfigService.priceBand(product.getPrice()));
     }
 
     private void addTag(Set<String> tags, String prefix, String value) {
