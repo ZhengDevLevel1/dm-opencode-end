@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import {
   Area,
   CartesianGrid,
@@ -22,6 +22,7 @@ import {
   EyeOff,
   GripVertical,
   LayoutGrid,
+  Loader2,
   MessageSquareText,
   MonitorPlay,
   PackageCheck,
@@ -169,6 +170,7 @@ export function AdminDashboardPage() {
     queryKey: queryKeys.adminSalesTrend(days),
     queryFn: () => adminService.salesTrend(days),
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
   });
   const categories = useQuery({
     queryKey: queryKeys.adminCategorySales,
@@ -253,7 +255,7 @@ export function AdminDashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
+          <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-card p-1">
             {trendRanges.map((range) => (
               <button
                 key={range.days}
@@ -261,7 +263,7 @@ export function AdminDashboardPage() {
                 aria-pressed={days === range.days}
                 onClick={() => setDays(range.days)}
                 className={cn(
-                  "rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+                  "rounded-md px-2.5 py-1.5 text-[11px] font-medium",
                   days === range.days
                     ? "bg-primary-solid text-primary-solid-foreground"
                     : "text-muted-foreground hover:bg-muted",
@@ -271,8 +273,18 @@ export function AdminDashboardPage() {
               </button>
             ))}
           </div>
-          <Button variant="outline" size="sm" loading={refreshing} onClick={refreshAll}>
-            <RefreshCw className="h-3.5 w-3.5" />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={refreshing}
+            aria-busy={refreshing || undefined}
+            onClick={refreshAll}
+          >
+            {refreshing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
             刷新
           </Button>
           <Button variant="outline" size="sm" onClick={() => setLayoutOpen(true)}>
