@@ -27,6 +27,7 @@ import { RecommendationCard } from "@/components/domain/recommendation-card";
 import { SectionHeading } from "@/components/domain/section-heading";
 import { ProductImage } from "@/components/domain/product-image";
 import { Price } from "@/components/domain/price";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardSkeleton, ProductGridSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
@@ -209,9 +210,9 @@ export function HomePage() {
                   seed={heroRec.name}
                   className="aspect-[16/9] w-full"
                   overlay={
-                    <span className="absolute top-3 left-3 rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-medium backdrop-blur">
+                    <Badge variant="overlay" className="absolute top-3 left-3 text-[10px]">
                       当季花礼
-                    </span>
+                    </Badge>
                   }
                 />
                 <div className="p-4">

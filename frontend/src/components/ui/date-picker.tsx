@@ -346,7 +346,7 @@ export function DatePicker({
                       "text-foreground hover:bg-slate-100 dark:hover:bg-accent",
                     isToday && !isSelected && "font-medium text-primary ring-1 ring-primary/50 ring-inset",
                     isSelected &&
-                      "bg-primary font-semibold text-primary-foreground shadow-sm hover:bg-primary",
+                      "bg-primary-solid font-semibold text-primary-solid-foreground shadow-sm hover:bg-primary-solid",
                   )}
                 >
                   {date.getDate()}

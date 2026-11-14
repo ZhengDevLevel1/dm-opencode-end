@@ -13,6 +13,7 @@ import { toast } from "@/stores/toast";
 import type { RecommendationItemVO, SeasonSuitability } from "@/types/api";
 import { RecommendationCard } from "@/components/domain/recommendation-card";
 import { SectionHeading } from "@/components/domain/section-heading";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Label } from "@/components/ui/label";
@@ -210,9 +211,9 @@ export function RecommendationsPage() {
               登录后，系统会结合你的收藏、评价与近期订单生成更贴合的花礼推荐。
             </p>
           </div>
-          <span className="rounded-full bg-card px-2.5 py-1 text-[11px] text-muted-foreground">
+          <Badge variant="secondary" className="text-[11px]">
             冷启动
-          </span>
+          </Badge>
         </div>
       ) : null}
 

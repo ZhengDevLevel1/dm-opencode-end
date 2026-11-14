@@ -263,7 +263,7 @@ export function AdminDashboardPage() {
                 className={cn(
                   "rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                   days === range.days
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-primary-solid text-primary-solid-foreground"
                     : "text-muted-foreground hover:bg-muted",
                 )}
               >

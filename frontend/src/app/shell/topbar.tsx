@@ -40,7 +40,7 @@ import { getRouteMeta } from "./nav";
 function IconBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-primary-foreground tabular">
+    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-solid px-1 text-[9px] font-semibold text-primary-solid-foreground tabular">
       {count > 99 ? "99+" : count}
     </span>
   );

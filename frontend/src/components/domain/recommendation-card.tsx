@@ -4,6 +4,7 @@ import { ChevronDown, Flower2, Loader2, ShoppingBag, Sparkles } from "lucide-rea
 import { cn } from "@/lib/cn";
 import { formatNumber, formatScore } from "@/lib/format";
 import type { RecommendationItemVO } from "@/types/api";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ProductImage } from "./product-image";
@@ -52,13 +53,13 @@ export function RecommendationCard({
           className="aspect-[5/4] w-full transition-transform duration-300 group-hover:scale-[1.015]"
           overlay={
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2.5">
-              <span className="rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur">
+              <Badge variant="overlay" className="text-[10px]">
                 {item.priceBand}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-medium text-primary-foreground">
+              </Badge>
+              <Badge variant="solid" className="bg-primary-solid/90 text-[10px]">
                 <Sparkles className="h-3 w-3" />
                 {formatScore(item.score)}
-              </span>
+              </Badge>
             </div>
           }
         />

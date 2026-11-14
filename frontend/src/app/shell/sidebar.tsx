@@ -251,7 +251,7 @@ function SidebarContent({
                           strokeWidth={1.9}
                         />
                         {!expanded && badge > 0 ? (
-                          <span className="absolute -top-1.5 right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-semibold text-primary-foreground tabular">
+                          <span className="absolute -top-1.5 right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary-solid px-0.5 text-[9px] font-semibold text-primary-solid-foreground tabular">
                             {badge > 99 ? "99+" : badge}
                           </span>
                         ) : null}

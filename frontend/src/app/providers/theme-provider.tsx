@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { buildCustomAccentVars } from "@/lib/custom-accent";
 import { useThemeStore } from "@/stores/theme";
 
 const ResolvedThemeContext = createContext(false);
@@ -13,44 +14,11 @@ export function useResolvedDark(): boolean {
   return useContext(ResolvedThemeContext);
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const normalized = hex.replace("#", "");
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) return null;
-  return {
-    r: parseInt(normalized.slice(0, 2), 16),
-    g: parseInt(normalized.slice(2, 4), 16),
-    b: parseInt(normalized.slice(4, 6), 16),
-  };
-}
-
-function isLightColor(hex: string): boolean {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return false;
-  const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
-  return luminance > 0.62;
-}
-
 function applyCustomAccent(color: string) {
   const root = document.documentElement;
-  const foreground = isLightColor(color) ? "oklch(18% 0.02 250)" : "oklch(99% 0.005 240)";
-  root.style.setProperty("--primary", color);
-  root.style.setProperty("--primary-foreground", foreground);
-  root.style.setProperty("--ring", color);
-  root.style.setProperty("--sidebar-primary", color);
-  root.style.setProperty("--sidebar-primary-foreground", foreground);
-  root.style.setProperty("--accent", `color-mix(in oklab, ${color} 16%, var(--background))`);
-  root.style.setProperty(
-    "--accent-foreground",
-    `color-mix(in oklab, ${color} 62%, var(--foreground))`,
-  );
-  root.style.setProperty(
-    "--sidebar-accent",
-    `color-mix(in oklab, ${color} 18%, var(--background))`,
-  );
-  root.style.setProperty(
-    "--sidebar-accent-foreground",
-    `color-mix(in oklab, ${color} 62%, var(--foreground))`,
-  );
+  Object.entries(buildCustomAccentVars(color)).forEach(([property, value]) => {
+    root.style.setProperty(property, value);
+  });
 }
 
 function clearCustomAccent() {
@@ -58,6 +26,8 @@ function clearCustomAccent() {
   [
     "--primary",
     "--primary-foreground",
+    "--primary-solid",
+    "--primary-solid-foreground",
     "--ring",
     "--sidebar-primary",
     "--sidebar-primary-foreground",

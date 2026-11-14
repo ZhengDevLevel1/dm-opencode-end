@@ -396,7 +396,7 @@ export function TagPicker({
                   <button
                     type="button"
                     onClick={() => closePanel(true)}
-                    className="rounded-md bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                    className="rounded-md bg-primary-solid px-2.5 py-1 text-[11px] font-medium text-primary-solid-foreground transition-opacity hover:opacity-90"
                   >
                     完成
                   </button>

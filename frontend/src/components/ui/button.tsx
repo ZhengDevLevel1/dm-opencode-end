@@ -25,7 +25,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClass: Record<ButtonVariant, string> = {
-  default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90",
+  default: "bg-primary-solid text-primary-solid-foreground shadow-sm hover:bg-primary-solid/90",
   destructive:
     "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
   outline:

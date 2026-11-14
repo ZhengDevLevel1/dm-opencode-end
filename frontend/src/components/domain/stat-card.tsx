@@ -27,7 +27,7 @@ export function StatCard({
       <span
         className={cn(
           "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-          filled ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+          filled ? "bg-primary-solid text-primary-solid-foreground" : "bg-primary/10 text-primary",
         )}
       >
         <Icon className="h-5 w-5" strokeWidth={1.9} />

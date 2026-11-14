@@ -7,7 +7,9 @@ export type BadgeVariant =
   | "warning"
   | "destructive"
   | "secondary"
-  | "outline";
+  | "outline"
+  | "solid"
+  | "overlay";
 
 const variants: Record<BadgeVariant, string> = {
   default: "border-transparent bg-primary/15 text-primary",
@@ -16,6 +18,8 @@ const variants: Record<BadgeVariant, string> = {
   destructive: "border-transparent bg-destructive/15 text-destructive",
   secondary: "border-transparent bg-secondary text-secondary-foreground",
   outline: "border-border text-foreground",
+  solid: "border-0 bg-primary-solid text-primary-solid-foreground",
+  overlay: "border-0 bg-overlay text-overlay-foreground shadow-sm backdrop-blur-sm",
 };
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

@@ -1185,9 +1185,9 @@ function ProductStockCard({
             >
               {product.statusLabel}
             </Badge>
-            <span className="rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
+            <Badge variant="overlay" className="text-[10px]">
               {product.seasonLabel}
-            </span>
+            </Badge>
           </div>
         }
       />

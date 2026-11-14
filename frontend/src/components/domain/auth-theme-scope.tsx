@@ -1,32 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useResolvedDark } from "@/app/providers/theme-provider";
 import { cn } from "@/lib/cn";
+import { buildCustomAccentVars, HEX_PATTERN } from "@/lib/custom-accent";
 import type { AccentId, PaletteId } from "@/stores/theme";
-
-const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
-
-function isLightColor(hex: string): boolean {
-  const normalized = hex.replace("#", "");
-  const r = parseInt(normalized.slice(0, 2), 16);
-  const g = parseInt(normalized.slice(2, 4), 16);
-  const b = parseInt(normalized.slice(4, 6), 16);
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 > 0.62;
-}
 
 /** 生成与 ThemeProvider 自定义强调色一致的一组 CSS 变量。 */
 function customAccentStyle(color: string): CSSProperties {
-  const foreground = isLightColor(color) ? "oklch(18% 0.02 250)" : "oklch(99% 0.005 240)";
-  return {
-    "--primary": color,
-    "--primary-foreground": foreground,
-    "--ring": color,
-    "--sidebar-primary": color,
-    "--sidebar-primary-foreground": foreground,
-    "--accent": `color-mix(in oklab, ${color} 16%, var(--background))`,
-    "--accent-foreground": `color-mix(in oklab, ${color} 62%, var(--foreground))`,
-    "--sidebar-accent": `color-mix(in oklab, ${color} 18%, var(--background))`,
-    "--sidebar-accent-foreground": `color-mix(in oklab, ${color} 62%, var(--foreground))`,
-  } as CSSProperties;
+  return buildCustomAccentVars(color) as CSSProperties;
 }
 
 /**

@@ -552,7 +552,7 @@ export function SettingsPage() {
                     <div className="h-2 w-1/2 rounded-full bg-muted" />
                   </div>
                   <div className="mt-4 flex gap-2">
-                    <span className="rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-medium text-primary-foreground">
+                    <span className="rounded-md bg-primary-solid px-2.5 py-1.5 text-[11px] font-medium text-primary-solid-foreground">
                       主按钮
                     </span>
                     <span className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[11px]">
@@ -1376,12 +1376,12 @@ function AuthBackgroundPreview({
       ) : null}
       <div className="relative z-10 flex h-full flex-col justify-between p-3">
         <div className="flex items-start justify-between gap-3">
-          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur">
+          <Badge variant="overlay" className="text-[10px]">
             登录页背景
-          </span>
-          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+          </Badge>
+          <Badge variant="overlay" className="text-[10px]">
             {label}
-          </span>
+          </Badge>
         </div>
         <div
           className="max-w-[72%] rounded-lg border border-border/60 p-2.5 shadow-sm backdrop-blur-sm"
@@ -1394,7 +1394,7 @@ function AuthBackgroundPreview({
           <p className="text-[11px] font-semibold">登录页效果实时预览</p>
           <div className="mt-1.5 h-1.5 w-24 rounded-full bg-muted" />
           <div className="mt-1 h-1.5 w-16 rounded-full bg-muted" />
-          <span className="mt-2 inline-flex rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground">
+          <span className="mt-2 inline-flex rounded-md bg-primary-solid px-2 py-1 text-[10px] font-medium text-primary-solid-foreground">
             主按钮
           </span>
           {type === "image" ? (
@@ -1539,12 +1539,12 @@ function BackgroundPreview({
       <div className="app-background pointer-events-none absolute inset-0" aria-hidden="true" />
       <div className="relative z-10 flex h-full flex-col justify-between p-3">
         <div className="flex items-start justify-between gap-3">
-          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] font-medium shadow-sm backdrop-blur">
+          <Badge variant="overlay" className="text-[10px]">
             页面背景
-          </span>
-          <span className="rounded-full border border-border/60 bg-card/85 px-2 py-0.5 text-[10px] text-muted-foreground shadow-sm backdrop-blur">
+          </Badge>
+          <Badge variant="overlay" className="text-[10px]">
             {label}
-          </span>
+          </Badge>
         </div>
         <div className="max-w-[72%] rounded-lg border border-border/60 bg-card/88 p-2.5 shadow-sm backdrop-blur-sm">
           <p className="text-[11px] font-semibold">背景效果实时预览</p>

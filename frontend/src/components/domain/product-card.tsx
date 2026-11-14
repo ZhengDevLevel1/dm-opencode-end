@@ -5,6 +5,7 @@ import { formatNumber } from "@/lib/format";
 import { splitTags } from "@/lib/format";
 import type { ProductVO } from "@/types/api";
 import { useDict } from "@/hooks/queries";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "./product-image";
 import { Price } from "./price";
@@ -53,13 +54,13 @@ export function ProductCard({
           className="aspect-[4/5] w-full"
           overlay={
             <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-2.5">
-              <span className="rounded-full bg-card/90 px-2 py-0.5 text-[10px] font-medium text-foreground shadow-sm backdrop-blur">
+              <Badge variant="overlay" className="text-[10px]">
                 {product.priceBand}
-              </span>
+              </Badge>
               {offShelf ? (
-                <span className="rounded-full bg-foreground/80 px-2 py-0.5 text-[10px] font-medium text-background">
+                <Badge variant="overlay" className="text-[10px]">
                   已下架
-                </span>
+                </Badge>
               ) : soldOut ? (
                 <span className="rounded-full bg-destructive/90 px-2 py-0.5 text-[10px] font-medium text-destructive-foreground">
                   售罄
