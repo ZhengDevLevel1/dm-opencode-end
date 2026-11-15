@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BarChart3,
+  Layers,
   RefreshCw,
   RotateCcw,
   Save,
@@ -20,6 +21,9 @@ import { toast } from "@/stores/toast";
 import type {
   RecommendationLogQuery,
   RecommendationLogVO,
+  RecommendationScene,
+  RecommendationSceneWeightRequest,
+  RecommendationSceneWeightVO,
   RecommendationWeightRequest,
   RecommendationWeightsVO,
 } from "@/types/api";
@@ -35,6 +39,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Progress } from "@/components/ui/progress";
 import { RangeSlider } from "@/components/ui/range-slider";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -78,6 +83,14 @@ function round3(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+const sceneDescriptions: Record<RecommendationScene, string> = {
+  home: "首页首屏与推荐卡片，兼顾当季节日氛围。",
+  catalog: "全部花礼默认综合排序，突出内容、热度与评分平衡。",
+  recommendations: "智能推荐页，更侧重用户长期行为与收藏偏好。",
+  product: "商品详情相似推荐，以当前商品为种子并排除自身。",
+  garden: "旧版花园入口，沿用首页权重。",
+};
+
 function weightsSum(weights: RecommendationWeightRequest): number {
   return round3(
     weights.contentWeight +
@@ -85,6 +98,24 @@ function weightsSum(weights: RecommendationWeightRequest): number {
       weights.festivalWeight +
       weights.ratingWeight,
   );
+}
+
+function roundedWeightsSum(weights: RecommendationWeightRequest): number {
+  return round3(
+    round3(weights.contentWeight) +
+      round3(weights.popularityWeight) +
+      round3(weights.festivalWeight) +
+      round3(weights.ratingWeight),
+  );
+}
+
+function weightsValid(weights: RecommendationWeightRequest): boolean {
+  const rawSum =
+    weights.contentWeight +
+    weights.popularityWeight +
+    weights.festivalWeight +
+    weights.ratingWeight;
+  return Math.abs(rawSum - 1) <= 0.001 && roundedWeightsSum(weights) === 1;
 }
 
 function toWeightRequest(weights: RecommendationWeightsVO): RecommendationWeightRequest {
@@ -114,7 +145,9 @@ function normalizeWeights(weights: RecommendationWeightRequest): RecommendationW
 
 export function AdminRecommendationsPage() {
   const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => (searchParams.get("keyword") ? "logs" : "weights"));
+  const [tab, setTab] = useState(() =>
+    searchParams.get("keyword") ? "logs" : "scene-weights",
+  );
   const keywordParam = searchParams.get("keyword");
 
   useEffect(() => {
@@ -126,16 +159,22 @@ export function AdminRecommendationsPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">推荐运营</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          调整推荐权重、查看离线评估与最近推荐日志。权重之和必须严格等于 1。
+          按场景调整推荐权重、查看离线评估与最近推荐日志。每个场景的四项权重之和必须严格等于 1。
         </p>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
+          <TabsTrigger value="scene-weights">
+            <span className="inline-flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5" />
+              场景权重
+            </span>
+          </TabsTrigger>
           <TabsTrigger value="weights">
             <span className="inline-flex items-center gap-1.5">
               <WandSparkles className="h-3.5 w-3.5" />
-              权重配置
+              兜底权重
             </span>
           </TabsTrigger>
           <TabsTrigger value="evaluation">
@@ -158,6 +197,9 @@ export function AdminRecommendationsPage() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="scene-weights" className="mt-4">
+          <SceneWeightsSection />
+        </TabsContent>
         <TabsContent value="weights" className="mt-4">
           <WeightsSection />
         </TabsContent>
@@ -171,6 +213,252 @@ export function AdminRecommendationsPage() {
           <LogsSection />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function SceneWeightsSection() {
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, RecommendationSceneWeightRequest>>({});
+  const sceneQuery = useQuery({
+    queryKey: queryKeys.adminRecommendationSceneWeights,
+    queryFn: adminService.sceneWeights,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (!sceneQuery.data) return;
+    const next: Record<string, RecommendationSceneWeightRequest> = {};
+    sceneQuery.data.forEach((scene) => {
+      next[scene.scene] = {
+        scene: scene.scene,
+        contentWeight: scene.contentWeight,
+        popularityWeight: scene.popularityWeight,
+        festivalWeight: scene.festivalWeight,
+        ratingWeight: scene.ratingWeight,
+        enabled: scene.enabled,
+      };
+    });
+    setDraft(next);
+  }, [sceneQuery.data]);
+
+  const mutation = useMutation({
+    mutationFn: adminService.saveSceneWeights,
+    onSuccess: (saved) => {
+      toast.success("场景权重已保存", "后续各入口推荐请求会使用对应场景权重。");
+      const next: Record<string, RecommendationSceneWeightRequest> = {};
+      saved.forEach((scene) => {
+        next[scene.scene] = {
+          scene: scene.scene,
+          contentWeight: scene.contentWeight,
+          popularityWeight: scene.popularityWeight,
+          festivalWeight: scene.festivalWeight,
+          ratingWeight: scene.ratingWeight,
+          enabled: scene.enabled,
+        };
+      });
+      setDraft(next);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.adminRecommendationSceneWeights,
+      });
+    },
+    onError: (error) => toast.error("场景权重保存失败", getErrorMessage(error)),
+  });
+
+  const scenes = sceneQuery.data ?? [];
+  const currentFor = (scene: RecommendationSceneWeightVO) => draft[scene.scene] ?? scene;
+  const valid = scenes.every((scene) => weightsValid(currentFor(scene)));
+  const dirty = scenes.some((scene) => {
+    const current = draft[scene.scene];
+    if (!current) return false;
+    return (
+      round3(current.contentWeight) !== round3(scene.contentWeight) ||
+      round3(current.popularityWeight) !== round3(scene.popularityWeight) ||
+      round3(current.festivalWeight) !== round3(scene.festivalWeight) ||
+      round3(current.ratingWeight) !== round3(scene.ratingWeight) ||
+      (current.enabled ?? true) !== scene.enabled
+    );
+  });
+
+  const updateField = (
+    scene: RecommendationSceneWeightVO,
+    patch: Partial<RecommendationSceneWeightRequest>,
+  ) => {
+    setDraft((previous) => ({
+      ...previous,
+      [scene.scene]: {
+        ...(previous[scene.scene] ?? scene),
+        ...patch,
+        scene: scene.scene,
+      },
+    }));
+  };
+
+  if (sceneQuery.isLoading) {
+    return (
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Skeleton className="h-80 w-full rounded-xl" />
+        <Skeleton className="h-80 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (sceneQuery.isError) {
+    return (
+      <ErrorState
+        title="场景权重没送到"
+        description={getErrorMessage(sceneQuery.error)}
+        onRetry={() => void sceneQuery.refetch()}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="ui-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">场景权重配置</h2>
+            <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-muted-foreground">
+              首页、全部花礼、智能推荐与商品详情分别使用独立权重；关闭某个场景后会回退到兜底权重。
+              商品详情以当前商品为种子，不会重复推荐当前商品。
+            </p>
+          </div>
+          <Badge variant={valid ? "success" : "destructive"}>
+            {valid ? "全部场景和 = 1" : "存在权重和不为 1 的场景"}
+          </Badge>
+        </div>
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {scenes.map((scene) => {
+          const current = currentFor(scene);
+          const sum = weightsSum(current);
+          const sceneValid = weightsValid(current);
+          return (
+            <article key={scene.scene} className="ui-card p-4 md:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold tracking-tight">{scene.sceneLabel}</h3>
+                    <Badge variant={current.enabled ? "secondary" : "outline"}>
+                      {current.enabled ? "启用" : "已关闭"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {sceneDescriptions[scene.scene] ?? scene.scene}
+                  </p>
+                </div>
+                <Switch
+                  checked={current.enabled ?? true}
+                  onCheckedChange={(checked) => updateField(scene, { enabled: checked })}
+                  label={`${scene.sceneLabel}启用状态`}
+                />
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {weightFields.map((field) => {
+                  const value = current[field.key];
+                  return (
+                    <div key={field.key} className="rounded-lg border border-border/60 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label
+                          htmlFor={`scene-${scene.scene}-${field.key}`}
+                          className="text-[11px]"
+                        >
+                          {field.label}
+                        </Label>
+                        <Input
+                          id={`scene-${scene.scene}-${field.key}`}
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.001}
+                          value={value}
+                          onChange={(event) => {
+                            const next = Number(event.target.value);
+                            updateField(scene, {
+                              [field.key]: Number.isFinite(next)
+                                ? Math.min(1, Math.max(0, next))
+                                : 0,
+                            });
+                          }}
+                          className="h-7 w-20 text-right font-mono-ui text-[11px]"
+                        />
+                      </div>
+                      <RangeSlider
+                        min={0}
+                        max={1}
+                        step={0.001}
+                        value={value}
+                        onChange={(next) => updateField(scene, { [field.key]: next })}
+                        className="mt-2 w-full"
+                        aria-label={`${scene.sceneLabel}${field.label}权重`}
+                      />
+                      <p className="mt-1 text-[10px] text-muted-foreground">{field.description}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    updateField(scene, normalizeWeights(current))
+                  }
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  归一化
+                </Button>
+                <span className={sceneValid ? "text-[11px] text-muted-foreground" : "text-[11px] text-destructive"}>
+                  当前总和 {sum.toFixed(3)}
+                  {scene.seedRequired ? " · 需要种子商品" : ""}
+                  {scene.maxPerCategory > 0 ? ` · 每类最多 ${scene.maxPerCategory} 件` : ""}
+                </span>
+              </div>
+              {!sceneValid ? (
+                <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/[0.04] px-3 py-2 text-[11px] text-destructive">
+                  该场景权重之和需要等于 1，可点击「归一化」自动调整。
+                </p>
+              ) : null}
+              {scene.updatedAt ? (
+                <p className="mt-2 text-[10px] text-muted-foreground">
+                  最近更新 {formatDateTime(scene.updatedAt)}
+                  {scene.updatedBy ? ` · 操作人 #${scene.updatedBy}` : ""}
+                </p>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          onClick={() =>
+            mutation.mutate({
+              scenes: scenes.map((scene) => {
+                const current = currentFor(scene);
+                return {
+                  scene: scene.scene,
+                  contentWeight: current.contentWeight,
+                  popularityWeight: current.popularityWeight,
+                  festivalWeight: current.festivalWeight,
+                  ratingWeight: current.ratingWeight,
+                  enabled: current.enabled,
+                };
+              }),
+            })
+          }
+          loading={mutation.isPending}
+          disabled={!valid || !dirty}
+        >
+          <Save className="h-3.5 w-3.5" />
+          保存全部场景
+        </Button>
+      </div>
     </div>
   );
 }
@@ -214,13 +502,7 @@ function WeightsSection() {
 
   const current = weights ?? weightsQuery.data ?? defaultWeights;
   const sum = weightsSum(current);
-  const roundedSum = round3(
-    round3(current.contentWeight) +
-      round3(current.popularityWeight) +
-      round3(current.festivalWeight) +
-      round3(current.ratingWeight),
-  );
-  const valid = Math.abs(sum - 1) <= 0.001 && roundedSum === 1;
+  const valid = weightsValid(current);
   const changed =
     weightsQuery.data &&
     (round3(weightsQuery.data.contentWeight) !== round3(current.contentWeight) ||

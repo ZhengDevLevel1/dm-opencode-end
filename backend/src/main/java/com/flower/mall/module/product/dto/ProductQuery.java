@@ -19,5 +19,5 @@ public class ProductQuery {
     private String stockLevel;
     private BigDecimal minPrice;
     private BigDecimal maxPrice;
-    private String sort = "sales_desc";
+    private String sort = "recommend";
 }

@@ -3,18 +3,22 @@ package com.flower.mall.module.recommendation.service;
 import com.flower.mall.common.enums.SeasonSuitability;
 import com.flower.mall.module.recommendation.model.RecommendationCandidate;
 import com.flower.mall.module.recommendation.model.RecommendationContext;
+import com.flower.mall.module.recommendation.model.RecommendationMode;
 import com.flower.mall.module.recommendation.model.RecommendationResult;
+import com.flower.mall.module.recommendation.model.RecommendationScene;
 import com.flower.mall.module.recommendation.model.RecommendationWeights;
 import com.flower.mall.module.recommendation.model.ScoredProduct;
 import com.flower.mall.module.recommendation.model.UserBehaviorData;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -34,15 +38,15 @@ public class RecommendationEngine {
                                           RecommendationWeights rawWeights,
                                           int candidateLimit,
                                           int limit) {
-        RecommendationWeights weights = rawWeights == null ? RecommendationWeights.DEFAULT : rawWeights.normalized();
-        int resultLimit = Math.max(limit, 1);
-        if (products == null || products.isEmpty()) {
-            return new RecommendationResult(context, weights, true, List.of());
-        }
-        boolean coldStart = behavior == null || behavior.isEmpty();
+        return recommendWithDocuments(prepareDocuments(products, behavior), products, behavior, context,
+                rawWeights, candidateLimit, limit);
+    }
 
+    public PreparedDocuments prepareDocuments(List<RecommendationCandidate> products, UserBehaviorData behavior) {
         Map<Long, RecommendationCandidate> documentCandidates = new LinkedHashMap<>();
-        products.forEach(product -> documentCandidates.put(product.getId(), product));
+        if (products != null) {
+            products.forEach(product -> documentCandidates.put(product.getId(), product));
+        }
         if (behavior != null) {
             if (behavior.getPurchases() != null) {
                 behavior.getPurchases().forEach(purchase ->
@@ -57,25 +61,58 @@ public class RecommendationEngine {
                         documentCandidates.putIfAbsent(review.product().getId(), review.product()));
             }
         }
-
+        if (documentCandidates.isEmpty()) {
+            return PreparedDocuments.empty();
+        }
         Map<Long, Map<String, Integer>> termCounts = new LinkedHashMap<>();
         documentCandidates.forEach((id, candidate) -> termCounts.put(id, buildTermCounts(candidate)));
         Map<String, Double> idf = computeIdf(termCounts);
         Map<Long, Map<String, Double>> vectors = new LinkedHashMap<>();
         termCounts.forEach((id, counts) -> vectors.put(id, toTfIdfVector(counts, idf)));
+        return new PreparedDocuments(termCounts, idf, vectors);
+    }
+
+    public RecommendationResult recommendWithDocuments(PreparedDocuments documents,
+                                                       List<RecommendationCandidate> products,
+                                                       UserBehaviorData behavior,
+                                                       RecommendationContext context,
+                                                       RecommendationWeights rawWeights,
+                                                       int candidateLimit,
+                                                       int limit) {
+        RecommendationWeights weights = rawWeights == null ? RecommendationWeights.DEFAULT : rawWeights.normalized();
+        int resultLimit = Math.max(limit, 1);
+        RecommendationScene scene = context.scene();
+        if (products == null || products.isEmpty()) {
+            RecommendationMode mode = scene == RecommendationScene.CATALOG
+                    ? RecommendationMode.CATALOG_POPULAR
+                    : RecommendationMode.CONTEXT_COLD_START;
+            return new RecommendationResult(context, weights, true, mode, List.of());
+        }
+        boolean coldStart = behavior == null || behavior.isEmpty();
+        Map<Long, Map<String, Integer>> termCounts = documents.termCounts();
+        Map<String, Double> idf = documents.idf();
+        Map<Long, Map<String, Double>> vectors = documents.vectors();
+
+        RecommendationCandidate seed = findSeed(products, context.seedProductId());
+        Map<String, Double> seedProfile = seed == null
+                ? Map.of()
+                : vectors.getOrDefault(seed.getId(), Map.of());
+        boolean seedSimilar = scene == RecommendationScene.PRODUCT && seed != null && !seedProfile.isEmpty();
 
         Map<String, Double> contextProfile = buildContextVector(context, idf);
+        Map<String, Double> behaviorProfile = coldStart
+                ? Map.of()
+                : buildBehaviorVector(behavior, vectors);
         Map<String, Double> profile;
-        if (coldStart) {
+        if (seedSimilar) {
+            profile = behaviorProfile.isEmpty()
+                    ? seedProfile
+                    : blendVectors(seedProfile, behaviorProfile, 0.75);
+        } else if (behaviorProfile.isEmpty()) {
             profile = contextProfile;
+            coldStart = true;
         } else {
-            Map<String, Double> behaviorProfile = buildBehaviorVector(behavior, vectors);
-            if (behaviorProfile.isEmpty()) {
-                profile = contextProfile;
-                coldStart = true;
-            } else {
-                profile = blendBehaviorWithContext(behaviorProfile, contextProfile, behavior);
-            }
+            profile = blendBehaviorWithContext(behaviorProfile, contextProfile, behavior, scene);
         }
         Map<String, Double> normalizedProfile = normalize(profile);
 
@@ -85,8 +122,9 @@ public class RecommendationEngine {
                     vectors.getOrDefault(product.getId(), Map.of())));
         }
 
+        Long excludedId = scene == RecommendationScene.PRODUCT ? context.seedProductId() : null;
         List<RecommendationCandidate> candidatePool = selectCandidates(
-                products, similarities, candidateLimit, resultLimit);
+                products, similarities, candidateLimit, resultLimit, excludedId, seed);
         int maxSales = products.stream().mapToInt(RecommendationCandidate::getSalesCount).max().orElse(0);
         List<ScoredProduct> scored = new ArrayList<>();
         for (RecommendationCandidate product : candidatePool) {
@@ -99,7 +137,8 @@ public class RecommendationEngine {
                     + weights.festival() * festivalSeasonScore
                     + weights.rating() * ratingScore;
             List<String> matchedTags = matchedTags(normalizedProfile, termCounts.get(product.getId()));
-            String reason = buildReason(product, context, coldStart, matchedTags, popularityScore, ratingScore);
+            String reason = buildReason(product, context, coldStart, matchedTags,
+                    popularityScore, ratingScore, seed, seedSimilar);
             scored.add(new ScoredProduct(product, round4(contentScore), round4(popularityScore),
                     round4(festivalSeasonScore), round4(ratingScore), round4(finalScore),
                     reason, matchedTags));
@@ -107,10 +146,64 @@ public class RecommendationEngine {
         scored.sort(Comparator.comparingDouble(ScoredProduct::finalScore).reversed()
                 .thenComparing(Comparator.comparingInt((ScoredProduct item) -> item.product().getSalesCount()).reversed())
                 .thenComparing(item -> item.product().getId()));
-        if (scored.size() > resultLimit) {
-            scored = new ArrayList<>(scored.subList(0, resultLimit));
+        scored = applyDiversity(scored, scene.maxPerCategory(), resultLimit);
+        RecommendationMode mode = seedSimilar
+                ? RecommendationMode.SEED_SIMILAR
+                : coldStart
+                ? (scene == RecommendationScene.CATALOG
+                ? RecommendationMode.CATALOG_POPULAR
+                : RecommendationMode.CONTEXT_COLD_START)
+                : RecommendationMode.PERSONALIZED;
+        return new RecommendationResult(context, weights, coldStart, mode, scored);
+    }
+
+    private RecommendationCandidate findSeed(List<RecommendationCandidate> products, Long seedProductId) {
+        if (seedProductId == null) {
+            return null;
         }
-        return new RecommendationResult(context, weights, coldStart, scored);
+        return products.stream()
+                .filter(product -> Objects.equals(product.getId(), seedProductId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Map<String, Double> blendVectors(Map<String, Double> primary,
+                                             Map<String, Double> secondary,
+                                             double primaryWeight) {
+        Map<String, Double> combined = new LinkedHashMap<>();
+        mergeVector(combined, primary, primaryWeight);
+        mergeVector(combined, secondary, 1.0 - primaryWeight);
+        return normalize(combined);
+    }
+
+    private List<ScoredProduct> applyDiversity(List<ScoredProduct> scored,
+                                               int maxPerCategory,
+                                               int limit) {
+        if (maxPerCategory <= 0) {
+            return scored.size() > limit
+                    ? new ArrayList<>(scored.subList(0, limit))
+                    : scored;
+        }
+        List<ScoredProduct> selected = new ArrayList<>();
+        List<ScoredProduct> overflow = new ArrayList<>();
+        Map<String, Integer> categoryCounts = new LinkedHashMap<>();
+        for (ScoredProduct item : scored) {
+            String category = item.product().getCategory() == null ? "" : item.product().getCategory();
+            int count = categoryCounts.getOrDefault(category, 0);
+            if (selected.size() < limit && count < maxPerCategory) {
+                selected.add(item);
+                categoryCounts.put(category, count + 1);
+            } else {
+                overflow.add(item);
+            }
+        }
+        for (ScoredProduct item : overflow) {
+            if (selected.size() >= limit) {
+                break;
+            }
+            selected.add(item);
+        }
+        return selected;
     }
 
     private Map<String, Integer> buildTermCounts(RecommendationCandidate product) {
@@ -210,12 +303,15 @@ public class RecommendationEngine {
 
     private Map<String, Double> blendBehaviorWithContext(Map<String, Double> behaviorProfile,
                                                          Map<String, Double> contextProfile,
-                                                         UserBehaviorData behavior) {
+                                                         UserBehaviorData behavior,
+                                                         RecommendationScene scene) {
         double frequency = Math.min(Math.max(behavior.getPurchaseFrequency(), 0), 10) / 10.0;
         double rating = behavior.getAverageRating() > 0
                 ? Math.min(behavior.getAverageRating(), 5.0) / 5.0
                 : 0.5;
-        double confidence = Math.max(0.55, Math.min(0.90, 0.55 + 0.20 * frequency + 0.15 * rating));
+        double confidence = Math.max(0.55, Math.min(0.90, 0.55 + 0.20 * frequency + 0.15 * rating))
+                * scene.behaviorConfidenceFactor();
+        confidence = Math.max(0.35, Math.min(0.92, confidence));
         Map<String, Double> combined = new LinkedHashMap<>();
         mergeVector(combined, behaviorProfile, confidence);
         mergeVector(combined, contextProfile, 1.0 - confidence);
@@ -271,8 +367,11 @@ public class RecommendationEngine {
     private List<RecommendationCandidate> selectCandidates(List<RecommendationCandidate> products,
                                                             Map<Long, Double> similarities,
                                                             int candidateLimit,
-                                                            int resultLimit) {
+                                                            int resultLimit,
+                                                            Long excludedId,
+                                                            RecommendationCandidate seed) {
         List<RecommendationCandidate> bySimilarity = products.stream()
+                .filter(product -> excludedId == null || !Objects.equals(product.getId(), excludedId))
                 .sorted(Comparator.comparingDouble((RecommendationCandidate product) ->
                                 similarities.getOrDefault(product.getId(), 0.0)).reversed()
                         .thenComparing(Comparator.comparingInt(RecommendationCandidate::getSalesCount).reversed()))
@@ -284,13 +383,36 @@ public class RecommendationEngine {
             Set<Long> selectedIds = selected.stream().map(RecommendationCandidate::getId)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
             products.stream()
-                    .sorted(Comparator.comparingInt(RecommendationCandidate::getSalesCount).reversed()
-                            .thenComparing(RecommendationCandidate::getId))
+                    .filter(product -> excludedId == null || !Objects.equals(product.getId(), excludedId))
+                    .sorted(fillComparator(seed))
                     .filter(product -> !selectedIds.contains(product.getId()))
-                    .limit((long) Math.max(candidateLimit, resultLimit) - selected.size())
+                    .limit(Math.max(0, (long) Math.max(candidateLimit, resultLimit) - selected.size()))
                     .forEach(selected::add);
         }
         return selected;
+    }
+
+    private Comparator<RecommendationCandidate> fillComparator(RecommendationCandidate seed) {
+        Comparator<RecommendationCandidate> bySales =
+                Comparator.comparingInt(RecommendationCandidate::getSalesCount).reversed();
+        if (seed == null) {
+            return bySales.thenComparing(RecommendationCandidate::getId);
+        }
+        return Comparator
+                .comparing((RecommendationCandidate product) ->
+                        !Objects.equals(product.getCategory(), seed.getCategory()))
+                .thenComparingDouble(product -> priceDistance(product, seed))
+                .thenComparing(bySales)
+                .thenComparing(RecommendationCandidate::getId);
+    }
+
+    private double priceDistance(RecommendationCandidate product, RecommendationCandidate seed) {
+        BigDecimal left = product.getPrice();
+        BigDecimal right = seed.getPrice();
+        if (left == null || right == null) {
+            return Double.MAX_VALUE;
+        }
+        return left.subtract(right).abs().doubleValue();
     }
 
     private double popularity(int salesCount, int maxSales) {
@@ -364,10 +486,38 @@ public class RecommendationEngine {
 
     private String buildReason(RecommendationCandidate product, RecommendationContext context,
                                boolean coldStart, List<String> matchedTags,
-                               double popularityScore, double ratingScore) {
+                               double popularityScore, double ratingScore,
+                               RecommendationCandidate seed, boolean seedSimilar) {
+        RecommendationScene scene = context.scene();
         List<String> parts = new ArrayList<>();
-        if (coldStart) {
-            if (context.festival() != null) {
+        if (seedSimilar) {
+            if (seed != null && Objects.equals(product.getCategory(), seed.getCategory())) {
+                parts.add("与正在查看的「" + seed.getName() + "」同属" + product.getCategory() + "花礼");
+            }
+            if (!matchedTags.isEmpty()) {
+                parts.add("风格标签相近：" + String.join("、", matchedTags));
+            }
+            if (context.festival() != null && product.matchesFestival(context.festival())) {
+                parts.add("同样适合" + context.festival() + "场景");
+            }
+            if (seed != null && Objects.equals(product.priceBand(), seed.priceBand())) {
+                parts.add("价位相近，方便对比选择");
+            }
+            if (parts.isEmpty()) {
+                parts.add("基于当前商品的品类、花语与价格区间相似度推荐");
+            }
+        } else if (scene == RecommendationScene.PRODUCT) {
+            parts.add("同品类热销花礼，可作为当前商品的备选");
+            if (context.festival() != null && product.matchesFestival(context.festival())) {
+                parts.add("契合" + context.festival() + "节日场景");
+            }
+            if (popularityScore >= 0.75) {
+                parts.add("热销商品，已售" + product.getSalesCount() + "件");
+            }
+        } else if (coldStart) {
+            if (scene == RecommendationScene.CATALOG) {
+                parts.add("综合排序：结合当季时令、销量热度与评分推荐");
+            } else if (context.festival() != null) {
                 parts.add("新用户冷启动：结合" + context.festival() + "节日与"
                         + context.season().getLabel() + "时令推荐");
             } else {
@@ -396,7 +546,11 @@ public class RecommendationEngine {
                 parts.add("综合评分" + product.getRatingAvg().setScale(1, java.math.RoundingMode.HALF_UP) + "分");
             }
             if (parts.isEmpty()) {
-                parts.add("综合内容相似度、销量与评分推荐");
+                parts.add(switch (scene) {
+                    case CATALOG -> "综合内容相似度、销量、评分与当季匹配推荐";
+                    case RECOMMENDATIONS -> "结合你的收藏、评价与近期订单偏好推荐";
+                    default -> "综合内容相似度、销量与评分推荐";
+                });
             }
         }
         return parts.stream().limit(3).collect(Collectors.joining("；"));
@@ -404,6 +558,15 @@ public class RecommendationEngine {
 
     private double round4(double value) {
         return Math.round(value * 10000.0) / 10000.0;
+    }
+
+    public record PreparedDocuments(Map<Long, Map<String, Integer>> termCounts,
+                                    Map<String, Double> idf,
+                                    Map<Long, Map<String, Double>> vectors) {
+
+        private static PreparedDocuments empty() {
+            return new PreparedDocuments(Map.of(), Map.of(), Map.of());
+        }
     }
 
     private static final class TagUtilsCompat {

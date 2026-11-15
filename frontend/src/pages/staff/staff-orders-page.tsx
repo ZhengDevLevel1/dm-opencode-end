@@ -30,6 +30,7 @@ const statusTabs: Array<{ value: OrderStatus | ""; label: string }> = [
   { value: "FULFILLING", label: "履约中" },
   { value: "AFTER_SALE", label: "待售后" },
   { value: "COMPLETED", label: "已完成" },
+  { value: "REFUNDED", label: "已退款" },
   { value: "CANCELLED", label: "已取消" },
   { value: "PENDING_PAYMENT", label: "待支付" },
 ];

@@ -5,6 +5,8 @@ import com.flower.mall.common.api.PageResult;
 import com.flower.mall.module.log.annotation.OperationLogRecord;
 import com.flower.mall.module.recommendation.dto.RecommendationEvaluationVO;
 import com.flower.mall.module.recommendation.dto.RecommendationLogVO;
+import com.flower.mall.module.recommendation.dto.RecommendationSceneWeightVO;
+import com.flower.mall.module.recommendation.dto.RecommendationSceneWeightsRequest;
 import com.flower.mall.module.recommendation.dto.RecommendationStatsVO;
 import com.flower.mall.module.recommendation.dto.RecommendationWeightRequest;
 import com.flower.mall.module.recommendation.dto.RecommendationWeightsVO;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Tag(name = "管理员-推荐配置与效果")
 @RestController
@@ -43,6 +46,20 @@ public class AdminRecommendationController {
     public ApiResponse<RecommendationWeightsVO> updateWeights(
             @Valid @RequestBody RecommendationWeightRequest request) {
         return ApiResponse.ok(recommendationService.updateWeights(request));
+    }
+
+    @Operation(summary = "查看场景推荐权重配置")
+    @GetMapping("/scene-weights")
+    public ApiResponse<List<RecommendationSceneWeightVO>> sceneWeights() {
+        return ApiResponse.ok(recommendationService.getSceneWeights());
+    }
+
+    @Operation(summary = "批量调整场景推荐权重（每个场景四项之和须为1）")
+    @PutMapping("/scene-weights")
+    @OperationLogRecord(module = "推荐管理", operation = "调整场景推荐权重")
+    public ApiResponse<List<RecommendationSceneWeightVO>> updateSceneWeights(
+            @Valid @RequestBody RecommendationSceneWeightsRequest request) {
+        return ApiResponse.ok(recommendationService.updateSceneWeights(request));
     }
 
     @Operation(summary = "分页查询推荐日志")

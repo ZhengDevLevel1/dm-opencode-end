@@ -15,6 +15,8 @@ import com.flower.mall.module.order.mapper.OrderItemMapper;
 import com.flower.mall.module.order.mapper.OrderMapper;
 import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
+import com.flower.mall.module.recommendation.service.UserBehaviorService;
 import com.flower.mall.module.review.dto.ReviewCreateRequest;
 import com.flower.mall.module.review.dto.ReviewVO;
 import com.flower.mall.module.review.entity.Review;
@@ -45,6 +47,8 @@ public class ReviewService {
     private final ProductMapper productMapper;
     private final UserMapper userMapper;
     private final CacheService cacheService;
+    private final RecommendationCatalogCache catalogCache;
+    private final UserBehaviorService userBehaviorService;
 
     @Transactional
     public ReviewVO create(ReviewCreateRequest request) {
@@ -80,6 +84,7 @@ public class ReviewService {
         updateItem.setReviewed(1);
         orderItemMapper.updateById(updateItem);
         recalculateProductRating(orderItem.getProductId());
+        userBehaviorService.evict(userId);
         return toVOList(List.of(reviewMapper.selectById(review.getId())), false).get(0);
     }
 
@@ -140,6 +145,7 @@ public class ReviewService {
         update.setStatus(target.name());
         reviewMapper.updateById(update);
         recalculateProductRating(review.getProductId());
+        userBehaviorService.evict(review.getUserId());
         return toVOList(List.of(reviewMapper.selectById(reviewId)), true).get(0);
     }
 
@@ -169,6 +175,7 @@ public class ReviewService {
         productMapper.updateRatingStats(productId, avg, stats.reviewCount());
         cacheService.evict(CacheKeys.productDetail(productId));
         cacheService.evict(CacheKeys.HOT_PRODUCTS);
+        catalogCache.invalidate();
     }
 
     private List<ReviewVO> toVOList(List<Review> reviews, boolean includeProductName) {

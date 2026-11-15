@@ -35,6 +35,7 @@ export const queryKeys = {
   adminMetrics: ["admin", "metrics"] as const,
   adminLogs: (params: object) => ["admin", "logs", params] as const,
   adminRecommendationWeights: ["admin", "recommendation-weights"] as const,
+  adminRecommendationSceneWeights: ["admin", "recommendation-scene-weights"] as const,
   adminRecommendationLogs: (params: object) =>
     ["admin", "recommendation-logs", params] as const,
   adminRecommendationEvaluation: ["admin", "recommendation-evaluation"] as const,

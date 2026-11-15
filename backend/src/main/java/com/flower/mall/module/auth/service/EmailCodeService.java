@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -23,6 +24,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 邮箱验证码：负责验证码的生成、发送、校验与过期清理。
@@ -167,6 +169,11 @@ public class EmailCodeService {
             case CHANGE_PASSWORD -> "修改密码";
             case CHANGE_EMAIL -> "更换邮箱";
         };
+    }
+
+    @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.MINUTES)
+    public void cleanupExpiredCodes() {
+        cleanupExpired(Instant.now());
     }
 
     private void cleanupExpired(Instant now) {

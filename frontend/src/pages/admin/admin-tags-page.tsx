@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LayoutGroup, motion } from "framer-motion";
 import {
@@ -78,6 +78,7 @@ export function AdminTagsPage() {
   const [deleteTarget, setDeleteTarget] = useState<TagOptionVO | null>(null);
   const [maxCount, setMaxCount] = useState("8");
   const [homeDraft, setHomeDraft] = useState<HomeDraftItem[]>([]);
+  const homeDraftTypeRef = useRef<TagType | null>(null);
 
   const meta = TYPE_META[activeType];
   const isCategory = activeType === "CATEGORY";
@@ -106,7 +107,18 @@ export function AdminTagsPage() {
     [tags],
   );
 
+  const homeDirty =
+    homeDraft.length !== orderedTags.length ||
+    homeDraft.some((item, index) => {
+      const tag = orderedTags[index];
+      return !tag || tag.id !== item.id || (tag.homeVisible !== false) !== item.visible;
+    });
+
   useEffect(() => {
+    const typeChanged = homeDraftTypeRef.current !== activeType;
+    const needsInitialSync = homeDraft.length === 0 && orderedTags.length > 0;
+    if (!typeChanged && homeDirty && !needsInitialSync) return;
+    homeDraftTypeRef.current = activeType;
     setHomeDraft(
       orderedTags.map((tag) => ({
         id: tag.id,
@@ -114,7 +126,7 @@ export function AdminTagsPage() {
         visible: tag.homeVisible !== false,
       })),
     );
-  }, [orderedTags]);
+  }, [activeType, homeDirty, homeDraft.length, orderedTags]);
 
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.adminTags });
@@ -182,13 +194,6 @@ export function AdminTagsPage() {
     }),
     [overview.data],
   );
-
-  const homeDirty =
-    homeDraft.length !== orderedTags.length ||
-    homeDraft.some((item, index) => {
-      const tag = orderedTags[index];
-      return !tag || tag.id !== item.id || (tag.homeVisible !== false) !== item.visible;
-    });
 
   const moveHomeItem = (index: number, direction: -1 | 1) => {
     setHomeDraft((current) => {

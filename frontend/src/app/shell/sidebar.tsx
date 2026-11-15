@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { ChevronsRight, Flower2, Pin, PinOff, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { preloadRoute } from "@/app/route-loaders";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
@@ -83,6 +84,8 @@ function WorkbenchSwitch({ expanded }: { expanded: boolean }) {
                 <button
                   key={link.to}
                   type="button"
+                  onMouseEnter={() => preloadRoute(link.to)}
+                  onFocus={() => preloadRoute(link.to)}
                   onClick={() => navigate(link.to)}
                   className={cn(
                     "relative flex-1 cursor-pointer rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
@@ -204,6 +207,8 @@ function SidebarContent({
                       to={item.to}
                       end={item.to === "/"}
                       title={expanded ? undefined : `${item.label} · ${item.description}`}
+                      onMouseEnter={() => preloadRoute(item.to)}
+                      onFocus={() => preloadRoute(item.to)}
                       onClick={() => {
                         if (mobile) onNavigate?.();
                         if (

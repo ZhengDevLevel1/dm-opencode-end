@@ -173,6 +173,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | `6003` | `404` | 评价不存在 | 管理端操作不存在的评价 |
 | `7001` | `400` | 推荐权重不合法，四项权重之和必须为1 | 权重校验失败 |
 | `7002` | `200` | 暂无可推荐商品 | 已定义，当前推荐接口不主动抛出，空结果仍返回 200 |
+| `7003` | `400` | 商品详情推荐需要提供商品ID | `scene=product` 未传 `productId` |
 | `8001` | `503` | 图片上传服务未启用 | MinIO 未配置或 `app.minio.enabled=false` |
 | `8002` | `400` | 仅支持 JPG、PNG、WEBP、GIF 格式的图片 | 文件为空或类型不支持 |
 | `8003` | `400` | 图片大小不能超过5MB | 文件超过单图限制 |
@@ -355,6 +356,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/appearance/auth-background` | 管理员 | `ApiResponse<AuthBackgroundVO>` |
 | GET | `/api/admin/recommendations/weights` | 管理员 | `ApiResponse<RecommendationWeightsVO>` |
 | PUT | `/api/admin/recommendations/weights` | 管理员 | `ApiResponse<RecommendationWeightsVO>` |
+| GET | `/api/admin/recommendations/scene-weights` | 管理员 | `ApiResponse<RecommendationSceneWeightVO[]>` |
+| PUT | `/api/admin/recommendations/scene-weights` | 管理员 | `ApiResponse<RecommendationSceneWeightVO[]>` |
 | GET | `/api/admin/recommendations/logs` | 管理员 | `ApiResponse<PageResult<RecommendationLogVO>>` |
 | GET | `/api/admin/recommendations/evaluation` | 管理员 | `ApiResponse<RecommendationEvaluationVO>` |
 | GET | `/api/admin/recommendations/stats` | 管理员 | `ApiResponse<RecommendationStatsVO>` |
@@ -649,11 +652,13 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | `minPrice` | number |  | 最低价格，包含边界 |
 | `maxPrice` | number |  | 最高价格，包含边界 |
 | `stockLevel` | string |  | `ALL/OVERSTOCK/SUFFICIENT/LOW`，按指标配置中的库存阈值分档筛选 |
-| `sort` | string | `sales_desc` | `sales_desc`、`price_asc`、`price_desc`、`newest`、`rating_desc`、`stock_asc`、`stock_desc`；非法值回退为销量降序 |
+| `sort` | string | `recommend` | `recommend`（综合推荐，仅公开列表且无 `keyword` 时生效）、`sales_desc`、`price_asc`、`price_desc`、`newest`、`rating_desc`、`stock_asc`、`stock_desc`；其他值回退为销量降序 |
 
 说明：
 
 - 公开接口忽略 `status` 参数，始终只查 `ON_SALE`。
+- `sort=recommend` 使用 `catalog` 推荐场景的权重和当季/节日上下文重新排序；带 `keyword` 时回退为普通销量排序。管理端和店员端商品列表不会走综合推荐，未传排序时仍按销量降序。
+- 综合推荐最多扫描前 `app.recommendation.catalog-scan-limit`（默认 500）条候选，筛选结果总数仍按完整条件统计。
 - `season` 非法时返回 `400`，消息为“季节参数不合法”。
 - `occasionTags`、`festivalTags` 是逗号分隔字符串；`occasion`/`festival` 查询参数目前是单个模糊匹配值，不支持把多个标签拼成一个字符串做多选筛选。
 - 商品详情下架或不存在分别返回 `409/2002`、`404/2001`。
@@ -917,10 +922,16 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `limit` | number | `10` | 推荐数量，1-50 |
 | `festival` | string | 自动识别 | 节日名称，最长 20；不传时按当前日期识别 |
 | `season` | string | 当前月份季节 | `SPRING/SUMMER/AUTUMN/WINTER/ALL`；非法值会回退到当前月份季节，不报错 |
-| `scene` | string | `home` | 推荐场景，最长 30；当前已接收但不参与推荐结果，前端可传但不要依赖其改变排序 |
+| `scene` | string | `home` | 推荐场景：`home`、`catalog`、`recommendations`、`product`、`garden`；非法值返回 `400` |
+| `productId` | number |  | 种子商品 ID；`scene=product` 时必填 |
 
 说明：
 
+- 场景会影响权重、冷启动置信度、品类多样性和推荐理由：`home`/`recommendations` 每个品类最多 2 个，`product` 最多 3 个，`catalog` 不限制；`garden` 复用 `home` 的权重策略。
+- `scene=product` 且未传 `productId` 返回 `400/7003`；种子商品不存在或已下架分别返回 `404/2001`、`409/2003`，推荐结果不会包含种子商品本身。
+- `weights` 返回当前场景实际生效的四维权重。场景权重由管理员在 `/api/admin/recommendations/scene-weights` 配置；场景行缺失或停用时回退到全局权重 `/api/admin/recommendations/weights`。
+- `mode` 可能为 `PERSONALIZED`、`CONTEXT_COLD_START`、`SEED_SIMILAR`、`CATALOG_POPULAR`；商品详情场景命中种子相似时优先返回 `SEED_SIMILAR`。
+- `GET /api/products?sort=recommend` 复用 `catalog` 场景的权重与上下文排序，但不会写入推荐日志。
 - 未登录或无历史行为时 `coldStart=true`，按当前节日/季节和热度降级推荐。
 - 已登录时使用近 30 天已支付/履约中/已完成/售后中订单，以及当前用户的全部收藏和可见评价生成个性化画像。
 - 只推荐 `ON_SALE` 商品。
@@ -938,14 +949,14 @@ AFTER_SALE --店员拒绝--> COMPLETED
   "seasonLabel": "秋季",
   "festival": "教师节",
   "scene": "home",
+  "sceneLabel": "首页推荐",
+  "mode": "CONTEXT_COLD_START",
   "generatedAt": "2026-10-28T10:00:00",
   "weights": {
-    "contentWeight": 0.400,
-    "popularityWeight": 0.200,
-    "festivalWeight": 0.250,
-    "ratingWeight": 0.150,
-    "updatedBy": 1,
-    "updatedAt": "2026-09-28T10:00:00"
+    "contentWeight": 0.300,
+    "popularityWeight": 0.230,
+    "festivalWeight": 0.330,
+    "ratingWeight": 0.140
   },
   "items": [
     {
@@ -1247,6 +1258,8 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | --- | --- | --- | --- | --- |
 | GET | `/api/admin/recommendations/weights` | 管理员 | 无 | `ApiResponse<RecommendationWeightsVO>` |
 | PUT | `/api/admin/recommendations/weights` | 管理员 | `RecommendationWeightRequest` | `ApiResponse<RecommendationWeightsVO>` |
+| GET | `/api/admin/recommendations/scene-weights` | 管理员 | 无 | `ApiResponse<RecommendationSceneWeightVO[]>` |
+| PUT | `/api/admin/recommendations/scene-weights` | 管理员 | `RecommendationSceneWeightsRequest` | `ApiResponse<RecommendationSceneWeightVO[]>` |
 | GET | `/api/admin/recommendations/logs` | 管理员 | 分页/筛选 | `ApiResponse<PageResult<RecommendationLogVO>>` |
 | GET | `/api/admin/recommendations/evaluation` | 管理员 | 无 | `ApiResponse<RecommendationEvaluationVO>` |
 | GET | `/api/admin/recommendations/stats` | 管理员 | 无 | `ApiResponse<RecommendationStatsVO>` |
@@ -1260,7 +1273,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `festivalWeight` | number | 是 | 0-1 |
 | `ratingWeight` | number | 是 | 0-1 |
 
-四个权重会分别四舍五入到 3 位小数，四舍五入后的和必须严格等于 1；原始和与 1 的偏差也不能超过 `0.001`，否则返回 `400/7001`。默认权重：
+四个权重会分别四舍五入到 3 位小数，四舍五入后的和必须严格等于 1；原始和与 1 的偏差也不能超过 `0.001`，否则返回 `400/7001`。该组权重是场景权重缺失或停用时的全局兜底值，默认：
 
 ```json
 {
@@ -1270,6 +1283,27 @@ AFTER_SALE --店员拒绝--> COMPLETED
   "ratingWeight": 0.150
 }
 ```
+
+`RecommendationSceneWeightsRequest`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `scenes` | array | 是 | 场景权重列表，不能为空；场景不能重复 |
+| `scenes[].scene` | string | 是 | `home`、`catalog`、`recommendations`、`product` |
+| `scenes[].contentWeight` | number | 是 | 0-1 |
+| `scenes[].popularityWeight` | number | 是 | 0-1 |
+| `scenes[].festivalWeight` | number | 是 | 0-1 |
+| `scenes[].ratingWeight` | number | 是 | 0-1 |
+| `scenes[].enabled` | boolean | 否 | 默认 `true`；为 `false` 时该场景回退到全局权重 |
+
+每个场景单独校验四项之和，规则与全局权重一致。批量保存只更新请求中出现的场景，返回全部可配置场景的当前生效值；场景行缺失时读取接口展示全局兜底权重。`RecommendationSceneWeightVO` 额外返回 `sceneLabel`、`maxPerCategory`、`seedRequired`、`enabled`、`updatedBy`、`updatedAt`。默认场景权重：
+
+| 场景 | content | popularity | festival | rating |
+| --- | --- | --- | --- | --- |
+| `home` | 0.300 | 0.230 | 0.330 | 0.140 |
+| `catalog` | 0.250 | 0.310 | 0.260 | 0.180 |
+| `recommendations` | 0.460 | 0.150 | 0.240 | 0.150 |
+| `product` | 0.550 | 0.090 | 0.220 | 0.140 |
 
 推荐日志查询参数：
 
@@ -1394,7 +1428,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 1. `GET /api/dict/options` 获取筛选/表单字典。
 2. `GET /api/products` 查询商品，或 `GET /api/products/hot` 获取热销。
 3. `GET /api/products/{id}` 查看详情。
-4. `GET /api/recommendations` 获取推荐；不登录时 `coldStart=true`。
+4. `GET /api/recommendations?scene=home` 获取首页推荐，商品详情用 `scene=product&productId={id}` 获取相似商品；不登录时 `coldStart=true`。
 5. `GET /api/reviews/products/{productId}` 查看公开评价。
 
 ### 14.2 登录与个人中心
@@ -1431,7 +1465,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | 访客 | 首页、商品列表、商品详情、推荐、评价浏览、登录、注册 |
 | `CUSTOMER` | 首页、商品、推荐、收藏、购物车、我的订单、支付、我的评价、售后 |
 | `STAFF` | 订单履约、订单详情、库存调整、库存记录、售后处理 |
-| `ADMIN` | 用户管理、商品管理、评价管理、操作日志、推荐权重/日志/评估/统计、经营统计 |
+| `ADMIN` | 用户管理、商品管理、评价管理、操作日志、场景权重/日志/评估/统计、经营统计 |
 
 ## 15. 数据结构（TypeScript 参考）
 
@@ -1640,7 +1674,7 @@ export interface ProductQuery {
   stockLevel?: 'ALL' | 'OVERSTOCK' | 'SUFFICIENT' | 'LOW';
   minPrice?: number;
   maxPrice?: number;
-  sort?: 'sales_desc' | 'price_asc' | 'price_desc' | 'newest' | 'rating_desc' | 'stock_asc' | 'stock_desc';
+  sort?: 'recommend' | 'sales_desc' | 'price_asc' | 'price_desc' | 'newest' | 'rating_desc' | 'stock_asc' | 'stock_desc';
 }
 
 export interface ProductSaveRequest {
@@ -1840,11 +1874,20 @@ export interface OperationLog {
 ### 15.6 推荐
 
 ```ts
+export type RecommendationScene = 'home' | 'catalog' | 'recommendations' | 'product' | 'garden';
+
+export type RecommendationMode =
+  | 'PERSONALIZED'
+  | 'CONTEXT_COLD_START'
+  | 'SEED_SIMILAR'
+  | 'CATALOG_POPULAR';
+
 export interface RecommendationQueryParams {
   limit?: number;
   festival?: string;
   season?: SeasonSuitability;
-  scene?: string;
+  scene?: RecommendationScene;
+  productId?: number;
 }
 
 export interface RecommendationWeightsVO {
@@ -1861,6 +1904,25 @@ export interface RecommendationWeightRequest {
   popularityWeight: number;
   festivalWeight: number;
   ratingWeight: number;
+}
+
+export interface RecommendationSceneWeightRequest extends RecommendationWeightRequest {
+  scene: Exclude<RecommendationScene, 'garden'>;
+  enabled?: boolean;
+}
+
+export interface RecommendationSceneWeightsRequest {
+  scenes: RecommendationSceneWeightRequest[];
+}
+
+export interface RecommendationSceneWeightVO extends RecommendationWeightRequest {
+  scene: Exclude<RecommendationScene, 'garden'>;
+  sceneLabel: string;
+  maxPerCategory: number;
+  seedRequired: boolean;
+  enabled: boolean;
+  updatedBy?: number;
+  updatedAt?: string;
 }
 
 export interface RecommendationItemVO {
@@ -1892,7 +1954,10 @@ export interface RecommendationResponse {
   season: SeasonSuitability;
   seasonLabel: string;
   festival?: string;
-  scene: string;
+  scene: RecommendationScene;
+  sceneLabel: string;
+  seedProductId?: number;
+  mode: RecommendationMode;
   generatedAt: string;
   weights: RecommendationWeightsVO;
   items: RecommendationItemVO[];
@@ -1991,7 +2056,8 @@ export interface TopProductVO {
 - 图片上传依赖 MinIO；未配置时上传接口返回 `503/8001`。商品历史相对地址仍可使用占位图或独立静态资源服务兜底。
 - 没有地址簿、优惠券、积分、真实物流、真实支付；地址随订单提交，支付只有模拟回调。
 - 没有订单预览接口：前端可从购物车列表计算预计金额，但最终金额以下单响应为准。
-- `RecommendationQuery.scene` 目前不会改变推荐排序；地点维度尚未建模。
+- `RecommendationQuery.scene` 已参与场景权重、冷启动置信度、品类多样性和推荐理由；`scene=product` 还需传 `productId`，缺少时返回 `400/7003`。地点维度仍未建模。
+- 公开商品列表的 `sort=recommend` 最多扫描 `app.recommendation.catalog-scan-limit`（默认 500）条候选；带 `keyword` 时回退为普通销量排序。
 - 推荐接口允许匿名访问；需要个性化时必须携带有效 JWT。
 - 商品标签在 `ProductVO`/`ProductSaveRequest` 中是逗号分隔字符串；在 `RecommendationItemVO` 中是数组，二者不要混用。
 - 公开商品接口只返回在售商品；管理端商品接口才可看到下架商品。

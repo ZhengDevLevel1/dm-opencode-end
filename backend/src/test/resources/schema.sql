@@ -5,6 +5,7 @@ DROP TABLE IF EXISTS user_theme_preference;
 DROP TABLE IF EXISTS appearance_setting;
 DROP TABLE IF EXISTS operation_log;
 DROP TABLE IF EXISTS recommendation_log;
+DROP TABLE IF EXISTS recommendation_scene_weight;
 DROP TABLE IF EXISTS recommendation_weight;
 DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS fulfillment_record;
@@ -30,7 +31,8 @@ CREATE TABLE sys_user (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted TINYINT NOT NULL DEFAULT 0,
-    CONSTRAINT uk_user_username UNIQUE (username)
+    CONSTRAINT uk_user_username UNIQUE (username),
+    CONSTRAINT uk_user_email UNIQUE (email)
 );
 
 CREATE TABLE product (
@@ -178,6 +180,20 @@ CREATE TABLE review (
     CONSTRAINT fk_review_order_item FOREIGN KEY (order_item_id) REFERENCES order_item (id),
     CONSTRAINT fk_review_user FOREIGN KEY (user_id) REFERENCES sys_user (id),
     CONSTRAINT fk_review_product FOREIGN KEY (product_id) REFERENCES product (id)
+);
+
+CREATE TABLE recommendation_scene_weight (
+    scene VARCHAR(30) PRIMARY KEY,
+    content_weight DECIMAL(4,3) NOT NULL DEFAULT 0.400,
+    popularity_weight DECIMAL(4,3) NOT NULL DEFAULT 0.200,
+    festival_weight DECIMAL(4,3) NOT NULL DEFAULT 0.250,
+    rating_weight DECIMAL(4,3) NOT NULL DEFAULT 0.150,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    updated_by BIGINT,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_recommendation_scene_weight_sum CHECK (
+        ABS(content_weight + popularity_weight + festival_weight + rating_weight - 1.000) <= 0.001
+    )
 );
 
 CREATE TABLE recommendation_weight (

@@ -12,6 +12,8 @@ public final class RecommendationLogLabels {
 
     private static final Map<String, String> SCENE_LABELS = Map.of(
             "home", "首页推荐",
+            "catalog", "全部花礼",
+            "recommendations", "智能推荐",
             "product", "商品详情",
             "garden", "花园推荐"
     );

@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 export function PageLoading() {
   return (
     <div
-      className="flex min-h-[50vh] items-center justify-center"
+      className="flex min-h-[calc(100dvh-9rem)] w-full items-center justify-center"
       role="status"
       aria-live="polite"
     >

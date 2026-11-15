@@ -1,9 +1,11 @@
 import { create } from "zustand";
+import { ApiError } from "@/lib/api-client";
 import { authService } from "@/lib/services";
 import {
   clearAuthStorage,
   getStoredUser,
   getToken,
+  getTokenExpiry,
   setStoredUser,
   setToken,
   setTokenExpiry,
@@ -27,6 +29,15 @@ interface AuthState {
 
 let hydratePromise: Promise<void> | null = null;
 
+const initialToken = getToken();
+const initialUser = initialToken ? getStoredUser() : null;
+const initialExpiry = getTokenExpiry();
+const hasCachedSession = Boolean(
+  initialToken &&
+    initialUser &&
+    (!initialExpiry || initialExpiry > Date.now()),
+);
+
 export const useAuthStore = create<AuthState>((set, get) => {
   const applyLogin = (result: LoginResponse): LoginResponse => {
     setToken(result.token);
@@ -37,9 +48,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
   };
 
   return {
-    token: getToken(),
-    user: getStoredUser(),
-    status: "idle",
+    token: initialToken,
+    user: initialUser,
+    status: hasCachedSession ? "authenticated" : initialToken ? "loading" : "anonymous",
 
     login: async (username, password) =>
       applyLogin(await authService.login({ username, password })),
@@ -74,15 +85,27 @@ export const useAuthStore = create<AuthState>((set, get) => {
         set({ status: "anonymous", token: null, user: null });
         return;
       }
-      set({ status: "loading", token });
+      if (get().user) {
+        set({ token });
+      } else {
+        set({ status: "loading", token });
+      }
       hydratePromise = (async () => {
         try {
           const user = await authService.me();
           setStoredUser(user);
           set({ user, status: "authenticated" });
-        } catch {
-          clearAuthStorage();
-          set({ token: null, user: null, status: "anonymous" });
+        } catch (error) {
+          const unauthorized =
+            error instanceof ApiError && (error.status === 401 || error.status === 403);
+          if (unauthorized) {
+            clearAuthStorage();
+            set({ token: null, user: null, status: "anonymous" });
+          } else if (get().user) {
+            set({ status: "authenticated" });
+          } else {
+            set({ token: getToken(), status: "anonymous" });
+          }
         } finally {
           hydratePromise = null;
         }

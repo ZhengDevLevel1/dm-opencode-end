@@ -7,7 +7,7 @@ import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
-import type { OrderItemVO, OrderVO, ReviewVO } from "@/types/api";
+import type { OrderItemVO, OrderVO, PageResult, ReviewVO } from "@/types/api";
 import { Rating, StarInput } from "@/components/domain/rating";
 import { ReviewStatusBadge } from "@/components/domain/status-badge";
 import { ProductImage } from "@/components/domain/product-image";
@@ -28,6 +28,17 @@ interface PendingItem {
   item: OrderItemVO;
 }
 
+async function loadCompletedOrders(): Promise<PageResult<OrderVO>> {
+  const first = await orderService.list({ page: 1, size: 100, status: "COMPLETED" });
+  if (first.pages <= 1) return first;
+  const records = [...first.records];
+  for (let page = 2; page <= first.pages; page += 1) {
+    const next = await orderService.list({ page, size: 100, status: "COMPLETED" });
+    records.push(...next.records);
+  }
+  return { ...first, records, page: 1, size: records.length, pages: 1 };
+}
+
 export function MyReviewsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -42,7 +53,7 @@ export function MyReviewsPage() {
 
   const completedOrders = useQuery({
     queryKey: queryKeys.orders({ page: 1, size: 100, status: "COMPLETED" }),
-    queryFn: () => orderService.list({ page: 1, size: 100, status: "COMPLETED" }),
+    queryFn: loadCompletedOrders,
     staleTime: 30_000,
   });
 

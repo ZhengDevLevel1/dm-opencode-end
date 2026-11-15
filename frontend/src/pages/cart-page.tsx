@@ -32,7 +32,7 @@ export function CartPage() {
       .map((value) => Number(value))
       .filter((value) => Number.isInteger(value) && value > 0);
   });
-  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<number>>(() => new Set());
   const [clearOpen, setClearOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CartItemVO | null>(null);
 
@@ -55,7 +55,7 @@ export function CartPage() {
     mutationFn: ({ id, quantity }: { id: number; quantity: number }) =>
       cartService.update(id, { quantity }),
     onMutate: async ({ id, quantity }) => {
-      setPendingId(id);
+      setPendingIds((current) => new Set(current).add(id));
       await queryClient.cancelQueries({ queryKey: queryKeys.cart });
       const previous = queryClient.getQueryData<CartItemVO[]>(queryKeys.cart);
       queryClient.setQueryData<CartItemVO[]>(queryKeys.cart, (current) =>
@@ -73,8 +73,12 @@ export function CartPage() {
       }
       toast.error("数量更新失败", getErrorMessage(error));
     },
-    onSettled: () => {
-      setPendingId(null);
+    onSettled: (_data, _error, variables) => {
+      setPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(variables.id);
+        return next;
+      });
       void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
     },
   });
@@ -254,13 +258,13 @@ export function CartPage() {
                         size="icon-sm"
                         aria-label="减少数量"
                         className="h-8 w-8 rounded-none"
-                        disabled={!item.available || item.quantity <= 1 || pendingId === item.id}
+                        disabled={!item.available || item.quantity <= 1 || pendingIds.has(item.id)}
                         onClick={() => changeQuantity(item, item.quantity - 1)}
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
                       <span className="w-9 text-center text-xs font-medium tabular">
-                        {pendingId === item.id ? (
+                        {pendingIds.has(item.id) ? (
                           <Loader2 className="mx-auto h-3.5 w-3.5 animate-spin" />
                         ) : (
                           item.quantity
@@ -271,7 +275,7 @@ export function CartPage() {
                         size="icon-sm"
                         aria-label="增加数量"
                         className="h-8 w-8 rounded-none"
-                        disabled={!item.available || item.quantity >= max || pendingId === item.id}
+                        disabled={!item.available || item.quantity >= max || pendingIds.has(item.id)}
                         onClick={() => changeQuantity(item, item.quantity + 1)}
                       >
                         <Plus className="h-3 w-3" />

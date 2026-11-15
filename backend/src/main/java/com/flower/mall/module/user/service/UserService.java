@@ -17,7 +17,9 @@ import com.flower.mall.module.user.dto.UpdateProfileRequest;
 import com.flower.mall.module.user.dto.UserVO;
 import com.flower.mall.module.user.entity.User;
 import com.flower.mall.module.user.mapper.UserMapper;
+import com.flower.mall.security.UserDetailsServiceImpl;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final EmailCodeService emailCodeService;
+    private final UserDetailsServiceImpl userDetailsService;
 
     public IPage<User> page(long page, long size, String keyword, String role, String status) {
         return userMapper.selectPage(new Page<>(page, size), Wrappers.<User>lambdaQuery()
@@ -68,10 +71,22 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setNickname(StringUtils.hasText(request.getNickname()) ? request.getNickname() : request.getUsername());
         user.setPhone(blankToNull(request.getPhone()));
-        user.setEmail(blankToNull(request.getEmail()));
+        String email = normalizeEmail(request.getEmail());
+        if (email != null && userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                .eq(User::getEmail, email)) > 0) {
+            throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+        }
+        user.setEmail(email);
         user.setRole(UserRole.valueOf(request.getRole()).name());
         user.setStatus(UserStatus.ENABLED.name());
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException exception) {
+            if (isEmailDuplicate(exception)) {
+                throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+            }
+            throw BusinessException.of(ErrorCode.USERNAME_EXISTS);
+        }
         return UserVO.from(userMapper.selectById(user.getId()));
     }
 
@@ -85,7 +100,13 @@ public class UserService {
             user.setPhone(blankToNull(request.getPhone()));
         }
         if (request.getEmail() != null) {
-            user.setEmail(blankToNull(request.getEmail()));
+            String email = normalizeEmail(request.getEmail());
+            if (email != null && userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                    .eq(User::getEmail, email)
+                    .ne(User::getId, userId)) > 0) {
+                throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+            }
+            user.setEmail(email);
         }
         if (StringUtils.hasText(request.getRole())) {
             user.setRole(UserRole.valueOf(request.getRole()).name());
@@ -97,7 +118,15 @@ public class UserService {
             }
             user.setStatus(UserStatus.valueOf(request.getStatus()).name());
         }
-        userMapper.updateById(user);
+        try {
+            userMapper.updateById(user);
+        } catch (DuplicateKeyException exception) {
+            if (isEmailDuplicate(exception)) {
+                throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+            }
+            throw exception;
+        }
+        userDetailsService.evict(userId);
         return UserVO.from(userMapper.selectById(userId));
     }
 
@@ -108,6 +137,7 @@ public class UserService {
         update.setId(userId);
         update.setPassword(passwordEncoder.encode(newPassword));
         userMapper.updateById(update);
+        userDetailsService.evict(userId);
     }
 
     @Transactional
@@ -144,7 +174,15 @@ public class UserService {
                     ? request.getAvatarUrl().trim()
                     : "");
         }
-        userMapper.updateById(user);
+        try {
+            userMapper.updateById(user);
+        } catch (DuplicateKeyException exception) {
+            if (isEmailDuplicate(exception)) {
+                throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+            }
+            throw exception;
+        }
+        userDetailsService.evict(userId);
         return UserVO.from(userMapper.selectById(userId));
     }
 
@@ -168,6 +206,7 @@ public class UserService {
         update.setId(user.getId());
         update.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userMapper.updateById(update);
+        userDetailsService.evict(user.getId());
     }
 
     private String blankToNull(String value) {
@@ -176,5 +215,10 @@ public class UserService {
 
     private String normalizeEmail(String value) {
         return StringUtils.hasText(value) ? value.trim().toLowerCase(Locale.ROOT) : null;
+    }
+
+    private boolean isEmailDuplicate(DuplicateKeyException exception) {
+        String message = exception.getMostSpecificCause().getMessage();
+        return message != null && message.toLowerCase(Locale.ROOT).contains("email");
     }
 }

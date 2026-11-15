@@ -8,7 +8,7 @@
 | --- | --- |
 | 顾客 `CUSTOMER` | 浏览/搜索/筛选商品、接收个性化推荐、购物车与收藏、下单与模拟支付、评价、申请售后 |
 | 店员 `STAFF` | 接单、推进履约节点（接单 → 备货 → 配送 → 签收）、库存调整与流水查询、售后审批 |
-| 管理员 `ADMIN` | 用户与商品管理、评价审核与回复、推荐权重调整与效果评估、销售统计、操作日志审计、登录页背景配置 |
+| 管理员 `ADMIN` | 用户与商品管理、评价审核与回复、场景推荐权重调整与效果评估、销售统计、操作日志审计、登录页背景配置 |
 
 核心业务还包括：JWT 认证与 RBAC、商品图片/头像/登录页背景上传（MinIO）、库存原子扣减、缓存失效、全局主题与外观设置。
 
@@ -35,7 +35,7 @@
 ```text
 .
 ├── backend/                 # Spring Boot 后端
-│   ├── db/                  # schema.sql / data.sql / 增量迁移 SQL
+│   ├── db/                  # flower_shop.sql 完整初始化 / 拆分脚本 / 增量迁移
 │   ├── src/main/java/com/flower/mall/
 │   │   ├── common/          # 统一响应、分页、枚举、异常
 │   │   ├── config/          # 安全、MyBatis-Plus、OpenAPI 配置
@@ -72,10 +72,10 @@
 ### 1. 初始化数据库
 
 ```bash
-mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS flower_shop DEFAULT CHARSET utf8mb4;"
-mysql -uroot -p flower_shop < backend/db/schema.sql
-mysql -uroot -p flower_shop < backend/db/data.sql
+mysql -uroot -p < backend/db/flower_shop.sql
 ```
+
+`flower_shop.sql` 已整合建库、全部表结构、演示数据和默认配置，会自动创建并使用 `flower_shop`。也可以继续分别导入 `backend/db/schema.sql` 和 `backend/db/data.sql`。
 
 已有旧库升级时，按需执行 `backend/db/` 下的增量迁移脚本，例如：
 
@@ -150,7 +150,17 @@ npm run dev
 3. **情境信号**：节日、季节匹配（支持 `ALL` 季节），叠加热度与评分
 4. **热度兜底**：冷启动用户自动回退到节日/季节 + 热度推荐
 
-管理员可在后台在线调整四维权重并运行五类用户画像的 Top-10 评估；每次推荐可追溯候选、权重与最终结果。候选集大小由 `app.recommendation.candidate-limit` 控制。
+推荐场景会改变实际生效的权重、冷启动置信度和品类多样性：
+
+| 场景 | 用途 | 特点 |
+| --- | --- | --- |
+| `home` | 首页推荐 | 节日/季节权重更高，每个品类最多 2 个 |
+| `catalog` | 全部花礼“综合推荐”排序 | 热度和评分权重更高，默认公开商品列表排序 |
+| `recommendations` | 智能推荐页 | 内容与行为偏好权重更高 |
+| `product` | 商品详情相似推荐 | 必须传 `productId`，种子商品自身不返回，每个品类最多 3 个 |
+| `garden` | 花园场景 | 复用 `home` 策略 |
+
+管理员可在后台按场景调整四维权重，并配置停用后的全局兜底权重；还可运行五类用户画像的 Top-10 评估。每次推荐可追溯场景、权重与最终结果。候选集大小由 `app.recommendation.candidate-limit` 控制，公开 `sort=recommend` 列表的扫描上限由 `app.recommendation.catalog-scan-limit` 控制。
 
 ## 接口文档
 

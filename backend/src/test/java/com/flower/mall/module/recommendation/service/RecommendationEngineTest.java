@@ -3,7 +3,9 @@ package com.flower.mall.module.recommendation.service;
 import com.flower.mall.common.enums.SeasonSuitability;
 import com.flower.mall.module.recommendation.model.RecommendationCandidate;
 import com.flower.mall.module.recommendation.model.RecommendationContext;
+import com.flower.mall.module.recommendation.model.RecommendationMode;
 import com.flower.mall.module.recommendation.model.RecommendationResult;
+import com.flower.mall.module.recommendation.model.RecommendationScene;
 import com.flower.mall.module.recommendation.model.RecommendationWeights;
 import com.flower.mall.module.recommendation.model.ScoredProduct;
 import com.flower.mall.module.recommendation.model.UserBehaviorData;
@@ -159,6 +161,82 @@ class RecommendationEngineTest {
                 .findFirst().orElseThrow();
         assertThat(highRose.contentSimilarity()).isGreaterThan(lowRose.contentSimilarity());
         assertThat(highRose.finalScore()).isGreaterThan(lowRose.finalScore());
+    }
+
+    @Test
+    void preparedDocumentsReuseProducesIdenticalRanking() {
+        List<RecommendationCandidate> products = List.of(
+                product(1, "红玫瑰花束", "玫瑰", "热烈爱情", List.of("表白", "纪念日"),
+                        List.of("情人节"), SeasonSuitability.ALL, "199.00", 320, "4.80", 86),
+                product(3, "粉色康乃馨", "康乃馨", "感恩母爱", List.of("母亲节"),
+                        List.of("母亲节"), SeasonSuitability.SPRING, "129.00", 210, "4.70", 55),
+                product(9, "绿色盆栽", "绿植", "生机陪伴", List.of("日常"),
+                        List.of(), SeasonSuitability.ALL, "49.00", 400, "4.40", 70));
+        RecommendationContext context = RecommendationContext.of(SeasonSuitability.SPRING, "母亲节", "home");
+        RecommendationEngine.PreparedDocuments documents =
+                engine.prepareDocuments(products, UserBehaviorData.empty());
+
+        RecommendationResult direct = engine.recommend(products, UserBehaviorData.empty(), context,
+                RecommendationWeights.DEFAULT, 10, 3);
+        RecommendationResult prepared = engine.recommendWithDocuments(documents, products,
+                UserBehaviorData.empty(), context, RecommendationWeights.DEFAULT, 10, 3);
+
+        assertThat(prepared.items()).extracting(item -> item.product().getId())
+                .containsExactlyElementsOf(direct.items().stream().map(item -> item.product().getId()).toList());
+        assertThat(prepared.items()).extracting(ScoredProduct::finalScore)
+                .containsExactlyElementsOf(direct.items().stream().map(ScoredProduct::finalScore).toList());
+    }
+
+    @Test
+    void productSceneExcludesSeedAndPrefersSameCategory() {
+        RecommendationCandidate seed = product(1, "红玫瑰花束", "玫瑰", "热烈爱情",
+                List.of("表白"), List.of("情人节"), SeasonSuitability.ALL,
+                "199.00", 320, "4.80", 86);
+        RecommendationCandidate sameCategory = product(2, "香槟玫瑰", "玫瑰", "天长地久",
+                List.of("求婚"), List.of("情人节"), SeasonSuitability.ALL,
+                "599.00", 96, "4.90", 30);
+        RecommendationCandidate other = product(9, "绿色盆栽", "绿植", "生机陪伴",
+                List.of("日常"), List.of(), SeasonSuitability.ALL,
+                "49.00", 400, "4.40", 70);
+
+        RecommendationResult result = engine.recommend(List.of(seed, sameCategory, other),
+                UserBehaviorData.empty(),
+                RecommendationContext.of(SeasonSuitability.SUMMER, null,
+                        RecommendationScene.PRODUCT, 1L),
+                new RecommendationWeights(1, 0, 0, 0), 10, 5);
+
+        assertThat(result.mode()).isEqualTo(RecommendationMode.SEED_SIMILAR);
+        assertThat(result.items()).extracting(item -> item.product().getId())
+                .doesNotContain(1L);
+        assertThat(result.items().get(0).product().getCategory()).isEqualTo("玫瑰");
+        assertThat(result.items().get(0).reason()).contains("同属");
+    }
+
+    @Test
+    void homeSceneCapsProductsPerCategory() {
+        List<RecommendationCandidate> products = List.of(
+                product(1, "红玫瑰", "玫瑰", "热烈爱情", List.of("表白"),
+                        List.of(), SeasonSuitability.ALL, "199.00", 100, "4.60", 20),
+                product(2, "香槟玫瑰", "玫瑰", "天长地久", List.of("求婚"),
+                        List.of(), SeasonSuitability.ALL, "299.00", 90, "4.70", 18),
+                product(3, "粉玫瑰", "玫瑰", "温柔爱意", List.of("纪念日"),
+                        List.of(), SeasonSuitability.ALL, "159.00", 80, "4.50", 15),
+                product(4, "绿萝", "绿植", "生机陪伴", List.of("日常"),
+                        List.of(), SeasonSuitability.ALL, "49.00", 70, "4.40", 12),
+                product(5, "多肉", "绿植", "治愈陪伴", List.of("办公"),
+                        List.of(), SeasonSuitability.ALL, "39.00", 60, "4.30", 10));
+
+        RecommendationResult result = engine.recommend(products, UserBehaviorData.empty(),
+                RecommendationContext.of(SeasonSuitability.SUMMER, null,
+                        RecommendationScene.HOME, null),
+                new RecommendationWeights(1, 0, 0, 0), 10, 4);
+
+        assertThat(result.items()).hasSize(4);
+        Map<String, Long> counts = result.items().stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        item -> item.product().getCategory(),
+                        java.util.stream.Collectors.counting()));
+        assertThat(counts.values()).allMatch(count -> count <= 2);
     }
 
     @Test

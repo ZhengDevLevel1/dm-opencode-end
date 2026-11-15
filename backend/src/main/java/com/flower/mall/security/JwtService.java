@@ -5,14 +5,18 @@ import com.flower.mall.config.AppProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class JwtService {
 
@@ -21,7 +25,15 @@ public class JwtService {
 
     public JwtService(AppProperties properties) {
         this.properties = properties;
-        byte[] secret = properties.getJwt().getSecret().getBytes(StandardCharsets.UTF_8);
+        String configuredSecret = properties.getJwt().getSecret();
+        if (!StringUtils.hasText(configuredSecret)) {
+            byte[] generated = new byte[64];
+            new SecureRandom().nextBytes(generated);
+            this.secretKey = Keys.hmacShaKeyFor(generated);
+            log.warn("JWT_SECRET 未配置，已生成临时密钥；重启后现有登录会话将失效");
+            return;
+        }
+        byte[] secret = configuredSecret.getBytes(StandardCharsets.UTF_8);
         if (secret.length < 32) {
             throw new IllegalStateException("JWT secret must be at least 32 bytes long");
         }

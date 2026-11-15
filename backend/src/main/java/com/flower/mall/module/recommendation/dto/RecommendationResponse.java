@@ -20,6 +20,9 @@ public class RecommendationResponse {
     private String seasonLabel;
     private String festival;
     private String scene;
+    private String sceneLabel;
+    private Long seedProductId;
+    private String mode;
     private LocalDateTime generatedAt;
     private RecommendationWeightsVO weights;
     private List<RecommendationItemVO> items;

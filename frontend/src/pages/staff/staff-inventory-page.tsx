@@ -24,8 +24,9 @@ import {
 import { LayoutGroup, motion } from "framer-motion";
 import { staffService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
+import { invalidateCatalogQueries } from "@/lib/query-invalidation";
 import { getErrorMessage } from "@/lib/api-client";
-import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
+import { formatCurrency, formatDateTime, formatNumber, splitTags } from "@/lib/format";
 import { useDict } from "@/hooks/queries";
 import { cn } from "@/lib/cn";
 import { toast } from "@/stores/toast";
@@ -216,7 +217,7 @@ export function StaffInventoryPage() {
         delta: payload.delta,
         remark: payload.remark,
       }),
-    onSuccess: (record) => {
+    onSuccess: (record, payload) => {
       toast.success(
         "库存已调整",
         `${record.productName}：${record.stockBefore} → ${record.stockAfter} 件。`,
@@ -224,9 +225,7 @@ export function StaffInventoryPage() {
       setAdjustOpen(false);
       setAdjust(emptyAdjust);
       setAdjustError("");
-      void queryClient.invalidateQueries({ queryKey: ["staff", "inventory"] });
-      void queryClient.invalidateQueries({ queryKey: ["staff", "products"] });
-      void queryClient.invalidateQueries({ queryKey: ["products"] });
+      invalidateCatalogQueries(queryClient, payload.product.id);
     },
     onError: (error) => {
       setAdjustError(getErrorMessage(error));
@@ -1162,12 +1161,11 @@ function ProductStockCard({
   const overstock = product.stock >= stockHigh;
   const stockTone = low ? "low" : overstock ? "over" : "sufficient";
   const tags = [
-    ...(product.occasionTags?.split(",") ?? []),
-    ...(product.festivalTags?.split(",") ?? []),
-  ]
-    .map((tag) => tag.trim())
-    .filter(Boolean)
-    .slice(0, 4);
+    ...new Set([
+      ...splitTags(product.occasionTags),
+      ...splitTags(product.festivalTags),
+    ]),
+  ].slice(0, 4);
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-lg border border-border/70 bg-background transition-colors hover:border-primary/30">

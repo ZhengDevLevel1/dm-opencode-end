@@ -55,10 +55,12 @@ export function CommandMenu() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [recent, setRecent] = useState<string[]>(readRecent);
 
   const trimmed = query.trim();
+  const debouncedTrimmed = debouncedQuery.trim();
   const isStaff = user?.role === "STAFF" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
 
@@ -73,24 +75,33 @@ export function CommandMenu() {
     setSelected(0);
   }, [query]);
 
+  useEffect(() => {
+    if (!trimmed) {
+      setDebouncedQuery("");
+      return;
+    }
+    const timer = window.setTimeout(() => setDebouncedQuery(trimmed), 180);
+    return () => window.clearTimeout(timer);
+  }, [trimmed]);
+
   const productQuery = useQuery({
-    queryKey: ["command", "products", trimmed],
-    queryFn: () => productService.list({ keyword: trimmed, page: 1, size: 5 }),
-    enabled: open && trimmed.length > 0,
+    queryKey: ["command", "products", debouncedTrimmed],
+    queryFn: () => productService.list({ keyword: debouncedTrimmed, page: 1, size: 5 }),
+    enabled: open && debouncedTrimmed.length > 0,
     staleTime: 30_000,
   });
 
   const staffOrderQuery = useQuery({
-    queryKey: queryKeys.staffOrders({ page: 1, size: 5, keyword: trimmed }),
-    queryFn: () => staffService.orders({ page: 1, size: 5, keyword: trimmed }),
-    enabled: open && trimmed.length > 0 && isStaff,
+    queryKey: queryKeys.staffOrders({ page: 1, size: 5, keyword: debouncedTrimmed }),
+    queryFn: () => staffService.orders({ page: 1, size: 5, keyword: debouncedTrimmed }),
+    enabled: open && debouncedTrimmed.length > 0 && isStaff,
     staleTime: 15_000,
   });
 
   const userQuery = useQuery({
-    queryKey: queryKeys.adminUsers({ page: 1, size: 5, keyword: trimmed }),
-    queryFn: () => adminService.users({ page: 1, size: 5, keyword: trimmed }),
-    enabled: open && trimmed.length > 0 && isAdmin,
+    queryKey: queryKeys.adminUsers({ page: 1, size: 5, keyword: debouncedTrimmed }),
+    queryFn: () => adminService.users({ page: 1, size: 5, keyword: debouncedTrimmed }),
+    enabled: open && debouncedTrimmed.length > 0 && isAdmin,
     staleTime: 15_000,
   });
 
@@ -132,7 +143,7 @@ export function CommandMenu() {
   }, [recent, trimmed]);
 
   const resultEntries = useMemo<CommandEntry[]>(() => {
-    if (!trimmed) return [];
+    if (!debouncedTrimmed) return [];
     const entries: CommandEntry[] = [];
     productQuery.data?.records.forEach((product) => {
       entries.push({
@@ -181,7 +192,16 @@ export function CommandMenu() {
       });
     }
     return entries;
-  }, [trimmed, productQuery.data, staffOrderQuery.data, userQuery.data, isStaff, isAdmin, navigate]);
+  }, [
+    trimmed,
+    debouncedTrimmed,
+    productQuery.data,
+    staffOrderQuery.data,
+    userQuery.data,
+    isStaff,
+    isAdmin,
+    navigate,
+  ]);
 
   const entries = useMemo(
     () => [...recentEntries, ...pageEntries, ...resultEntries],
@@ -190,7 +210,10 @@ export function CommandMenu() {
 
   const loading =
     trimmed.length > 0 &&
-    (productQuery.isFetching || (isStaff && staffOrderQuery.isFetching) || (isAdmin && userQuery.isFetching));
+    (trimmed !== debouncedTrimmed ||
+      productQuery.isFetching ||
+      (isStaff && staffOrderQuery.isFetching) ||
+      (isAdmin && userQuery.isFetching));
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {

@@ -22,6 +22,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 
 const SORT_OPTIONS: Array<{ value: ProductSort; label: string }> = [
+  { value: "recommend", label: "综合推荐" },
   { value: "sales_desc", label: "销量优先" },
   { value: "price_asc", label: "价格从低到高" },
   { value: "price_desc", label: "价格从高到低" },
@@ -46,18 +47,33 @@ export function ProductsPage() {
   const dict = useDict();
   const favorites = useFavoritesQuery();
   const [searchInput, setSearchInput] = useState(params.get("keyword") ?? "");
+  const [priceDraft, setPriceDraft] = useState({
+    minPrice: params.get("minPrice") ?? "",
+    maxPrice: params.get("maxPrice") ?? "",
+  });
   const [favPendingId, setFavPendingId] = useState<number | null>(null);
   const [addingId, setAddingId] = useState<number | null>(null);
+  const keywordParam = params.get("keyword") ?? "";
+  const minPriceParam = params.get("minPrice") ?? "";
+  const maxPriceParam = params.get("maxPrice") ?? "";
 
   useEffect(() => {
-    setSearchInput(params.get("keyword") ?? "");
-  }, [params]);
+    setSearchInput(keywordParam);
+  }, [keywordParam]);
+
+  useEffect(() => {
+    setPriceDraft((current) => ({ ...current, minPrice: minPriceParam }));
+  }, [minPriceParam]);
+
+  useEffect(() => {
+    setPriceDraft((current) => ({ ...current, maxPrice: maxPriceParam }));
+  }, [maxPriceParam]);
 
   const page = Math.max(1, Number(params.get("page") ?? "1") || 1);
-  const sortParam = params.get("sort") ?? "sales_desc";
+  const sortParam = params.get("sort") ?? "recommend";
   const sort: ProductSort = SORT_OPTIONS.some((option) => option.value === sortParam)
     ? (sortParam as ProductSort)
-    : "sales_desc";
+    : "recommend";
   const seasonParam = params.get("season") ?? "";
   const season = SEASON_VALUES.includes(seasonParam as SeasonSuitability)
     ? (seasonParam as SeasonSuitability)
@@ -133,8 +149,7 @@ export function ProductsPage() {
   };
 
   const applyPrice = (key: "minPrice" | "maxPrice") => {
-    const input = document.getElementById(`price-${key}`) as HTMLInputElement | null;
-    const raw = input?.value.trim() ?? "";
+    const raw = priceDraft[key].trim();
     if (raw && !Number.isFinite(Number(raw))) return;
     updateParams({ [key]: raw || undefined });
   };
@@ -205,7 +220,7 @@ export function ProductsPage() {
   if (season) activeChips.push({ key: "season", label: `季节：${seasonLabel}`, onRemove: () => updateParams({ season: undefined }) });
   if (minPrice) activeChips.push({ key: "minPrice", label: `最低 ¥${minPrice}`, onRemove: () => updateParams({ minPrice: undefined }) });
   if (maxPrice) activeChips.push({ key: "maxPrice", label: `最高 ¥${maxPrice}`, onRemove: () => updateParams({ maxPrice: undefined }) });
-  if (sort !== "sales_desc") {
+  if (sort !== "recommend") {
     activeChips.push({
       key: "sort",
       label: `排序：${SORT_OPTIONS.find((option) => option.value === sort)?.label}`,
@@ -304,7 +319,10 @@ export function ProductsPage() {
               min={0}
               step="0.01"
               placeholder="最低价"
-              defaultValue={minPrice ?? ""}
+              value={priceDraft.minPrice}
+              onChange={(event) =>
+                setPriceDraft((current) => ({ ...current, minPrice: event.target.value }))
+              }
               className="h-9 w-24 rounded-lg px-3 text-center tabular-nums shadow-xs"
               aria-label="最低价格"
               onBlur={() => applyPrice("minPrice")}
@@ -321,7 +339,10 @@ export function ProductsPage() {
               min={0}
               step="0.01"
               placeholder="最高价"
-              defaultValue={maxPrice ?? ""}
+              value={priceDraft.maxPrice}
+              onChange={(event) =>
+                setPriceDraft((current) => ({ ...current, maxPrice: event.target.value }))
+              }
               className="h-9 w-24 rounded-lg px-3 text-center tabular-nums shadow-xs"
               aria-label="最高价格"
               onBlur={() => applyPrice("maxPrice")}

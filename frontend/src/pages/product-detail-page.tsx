@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -68,8 +68,9 @@ export function ProductDetailPage() {
   });
 
   const recommendations = useQuery({
-    queryKey: queryKeys.recommendations({ limit: 6, scene: "product" }),
-    queryFn: () => recommendationService.get({ limit: 6, scene: "product" }),
+    queryKey: queryKeys.recommendations({ limit: 6, scene: "product", productId: id }),
+    queryFn: () =>
+      recommendationService.get({ limit: 6, scene: "product", productId: id }),
     enabled: validId,
     staleTime: queryPolicy.recommendations.staleTime,
   });
@@ -79,6 +80,16 @@ export function ProductDetailPage() {
     [favorites.data],
   );
   const isFavorite = validId && favoriteIds.has(id);
+  const maxQuantity = Math.min(99, product.data?.stock ?? 1);
+
+  useEffect(() => {
+    setQuantity(1);
+    setShowAllReviews(false);
+  }, [id]);
+
+  useEffect(() => {
+    setQuantity((value) => Math.min(value, Math.max(1, maxQuantity)));
+  }, [maxQuantity]);
 
   const addMutation = useMutation({
     mutationFn: (input: { productId: number; quantity: number }) =>
@@ -187,7 +198,6 @@ export function ProductDetailPage() {
   const soldOut = data.stock <= 0;
   const stockLow = dict.data?.metrics?.stockLowThreshold ?? 10;
   const lowStock = data.stock > 0 && data.stock < stockLow;
-  const maxQuantity = Math.min(99, data.stock);
   const tags = splitTags(data.occasionTags);
   const festivalTags = splitTags(data.festivalTags);
   const related = recommendations.data?.items.filter((item) => item.productId !== id).slice(0, 4) ?? [];
@@ -444,9 +454,9 @@ export function ProductDetailPage() {
 
       <section>
         <SectionHeading
-          eyebrow="You may also like"
-          title="猜你喜欢"
-          description="结合当季与热度的其他花礼。"
+          eyebrow="Similar bouquets"
+          title="相似商品推荐"
+          description="以当前花礼为种子，结合品类、花语、场景与价位推荐。"
         />
         {recommendations.isLoading ? (
           <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">

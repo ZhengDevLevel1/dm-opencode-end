@@ -3,6 +3,7 @@ package com.flower.mall.security;
 import com.flower.mall.config.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -71,6 +72,7 @@ public class TokenStore {
         }
     }
 
+    @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.MINUTES)
     public void cleanupExpired() {
         Instant now = Instant.now();
         fallbackStore.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarHeart, RotateCcw, Sparkles, Sprout } from "lucide-react";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
 import { cartService, favoriteService, recommendationService } from "@/lib/services";
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Label } from "@/components/ui/label";
-import { CardSkeleton } from "@/components/ui/skeleton";
+import { RecommendationCardSkeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Progress } from "@/components/ui/progress";
@@ -68,7 +68,7 @@ export function RecommendationsPage() {
   }, [dict.data?.festivals, festival]);
 
   const query = useMemo(
-    () => ({ limit, festival, season, scene: "home" }),
+    () => ({ limit, festival, season, scene: "recommendations" as const }),
     [limit, festival, season],
   );
 
@@ -76,6 +76,7 @@ export function RecommendationsPage() {
     queryKey: queryKeys.recommendations(query),
     queryFn: () => recommendationService.get(query),
     staleTime: queryPolicy.recommendations.staleTime,
+    placeholderData: keepPreviousData,
   });
 
   const favoriteIds = useMemo(
@@ -234,7 +235,7 @@ export function RecommendationsPage() {
       {recommendations.isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: Math.min(limit, 8) }).map((_, index) => (
-            <CardSkeleton key={index} />
+            <RecommendationCardSkeleton key={index} />
           ))}
         </div>
       ) : recommendations.isError ? (

@@ -18,6 +18,7 @@ import com.flower.mall.security.AuthUser;
 import com.flower.mall.security.JwtService;
 import com.flower.mall.security.TokenStore;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -66,7 +67,14 @@ public class AuthService {
         user.setEmail(email);
         user.setRole(UserRole.CUSTOMER.name());
         user.setStatus(UserStatus.ENABLED.name());
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException exception) {
+            if (isEmailDuplicate(exception)) {
+                throw BusinessException.of(ErrorCode.EMAIL_ALREADY_REGISTERED);
+            }
+            throw BusinessException.of(ErrorCode.USERNAME_EXISTS);
+        }
         return UserVO.from(userMapper.selectById(user.getId()));
     }
 
@@ -140,5 +148,10 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isEmailDuplicate(DuplicateKeyException exception) {
+        String message = exception.getMostSpecificCause().getMessage();
+        return message != null && message.toLowerCase(Locale.ROOT).contains("email");
     }
 }

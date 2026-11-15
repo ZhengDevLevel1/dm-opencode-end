@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
+import { invalidateCatalogQueries } from "@/lib/query-invalidation";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { useDict } from "@/hooks/queries";
@@ -220,20 +221,17 @@ export function AdminProductsPage() {
       adminService.setProductStatus(product.id, next),
     onSuccess: (product) => {
       toast.success(product.status === "ON_SALE" ? "商品已上架" : "商品已下架", product.name);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-      void queryClient.invalidateQueries({ queryKey: ["products"] });
-      void queryClient.invalidateQueries({ queryKey: ["product", product.id] });
+      invalidateCatalogQueries(queryClient, product.id);
     },
     onError: (error) => toast.error("状态更新失败", getErrorMessage(error)),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (product: ProductVO) => adminService.deleteProduct(product.id),
-    onSuccess: () => {
+    onSuccess: (_, product) => {
       toast.success("商品已删除", "删除后公开接口不再展示该商品。");
       setDeleting(null);
-      void queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-      void queryClient.invalidateQueries({ queryKey: ["products"] });
+      invalidateCatalogQueries(queryClient, product.id);
     },
     onError: (error) => toast.error("删除失败", getErrorMessage(error)),
   });

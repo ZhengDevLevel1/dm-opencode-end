@@ -37,7 +37,7 @@
 | `payment` | Mock payment creation, idempotent callback, refund status |
 | `fulfillment` | Accept order and advance fulfillment nodes to completion |
 | `review` | Product reviews, duplicate-review guard, admin reply/moderation |
-| `recommendation` | TF-IDF content recommendation, behavior profile, context, weights, logs, persona evaluation |
+| `recommendation` | TF-IDF content recommendation, behavior profile, scene-aware weights and diversity, seed-similar product recommendations, catalog ranking, context, logs, persona evaluation |
 | `stats` | Sales/order/product/review overview and charts |
 | `dict` | Categories, order/payment/fulfillment status options |
 | `log` | AOP-based operation log recording and admin query |
@@ -47,7 +47,7 @@
 ## Repository layout
 
 - `backend/`: the Spring Boot application; run Maven commands from this directory.
-- `backend/db/`: MySQL `schema.sql`, demo `data.sql`, and incremental migration SQL files.
+- `backend/db/`: `flower_shop.sql` one-shot init (full schema + demo data), plus split `schema.sql`, demo `data.sql`, and incremental migration SQL files.
 - `backend/src/main/java/com/flower/mall/`: production code (`common`, `config`, `security`, `support`, `module`).
 - `backend/src/main/resources/`: `application.yml` and logging configuration.
 - `backend/src/test/java/` and `backend/src/test/resources/`: H2-backed integration/unit tests and test data.
@@ -66,7 +66,8 @@
 ## Frontend conventions
 
 - Routing and role guards live in `frontend/src/app/router.tsx`; protected pages use `RequireAuth` and `RequireRole`.
-- API access goes through `frontend/src/lib/api-client.ts` and `frontend/src/lib/services.ts`; server state uses TanStack Query hooks from `frontend/src/hooks/queries.ts`.
+- API access goes through `frontend/src/lib/api-client.ts` and `frontend/src/lib/services.ts`; server state uses TanStack Query hooks from `frontend/src/hooks/queries.ts`, and mutations invalidate related keys through `frontend/src/lib/query-invalidation.ts`.
+- Lazy route modules are registered in `frontend/src/app/route-loaders.ts` and preloaded on nav hover/focus; the auth store hydrates a cached user immediately and revalidates `/api/auth/me` in the background so authenticated refreshes do not flash the login page.
 - Styling uses Tailwind v4 semantic tokens from `frontend/src/styles/globals.css` (`bg-card`, `border-border`, `text-muted-foreground`, etc.) instead of raw palette values where possible.
 - Filter/sort dropdowns on the product list, smart recommendation, staff inventory, and admin products/users/reviews pages use `frontend/src/components/ui/custom-select.tsx` (`CustomSelect`). It is a fully custom listbox with click-outside close, arrow-key/Enter/Escape navigation, selected check mark, and a spring open animation. Its panel is rendered through a portal with fixed positioning so it is not clipped inside dialogs.
 - Admin product/user dialogs use `CustomSelect` with `react-hook-form` via `Controller`; do not use native `register` with it.
@@ -77,24 +78,26 @@
 ## Core domain flows
 
 - Authentication: JWT contains user id, username, role, and `jti`. `TokenStore` keeps session validity in Redis when enabled, with an in-memory fallback when Redis is disabled or unavailable.
+- Account identity: `sys_user.email` is trimmed/lowercased and enforced unique by `uk_user_email`; registration, admin create/update, profile updates, and email-code scenes return `409/1009` on duplicates. JWT authentication uses `UserDetailsServiceImpl`'s 30-second per-user cache, evicted on password, role, status, email, nickname, or avatar changes.
 - Shopping: customers browse/search products, receive recommendations, then add items to cart or favorites. Cart quantity per product is capped at 99 and cannot exceed current stock.
 - Order and payment: creating an order deducts stock atomically and writes inventory movements. Mock payment callback moves the order from `PENDING_PAYMENT` to `PAID` and increases sales counts.
 - Fulfillment: staff accept a paid order, then advance `ACCEPTED -> PREPARING -> DELIVERING -> SIGNED`; signing completes the order. Illegal node jumps are rejected.
 - After-sales/refund: only completed orders can request after-sales. Approval refunds the paid record, restores stock, and decreases sales; rejection returns the order to `COMPLETED`.
-- Recommendation: combines TF-IDF/cosine content similarity with purchase/favorite/review behavior, category distribution, favorite tags, festival/season context, popularity, and rating. Cold-start users fall back to festival/season and popularity signals. Admin can adjust four weights and run five-persona Top-10 evaluation.
-- Consistency: stock changes use conditional SQL updates; order/payment/cancellation/refund paths invalidate product-detail and hot-product caches after stock or sales changes.
+- Recommendation: combines TF-IDF/cosine content similarity with purchase/favorite/review behavior, category distribution, favorite tags, festival/season context, popularity, and rating. Scenes (`home`, `catalog`, `recommendations`, `product`, `garden`) control effective weights, behavior confidence, category diversity, and reason labels; `product` requires `productId` and excludes the seed while blending seed 0.75 / behavior 0.25. Cold-start users fall back to festival/season and popularity signals. Admin can adjust per-scene weights and a global fallback weight, and run five-persona Top-10 evaluation. `GET /api/products?sort=recommend` reuses the catalog scene for default public product sorting (disabled for keyword searches; admin/staff lists keep explicit sorts). Recommendation catalog snapshots and user behavior profiles are cached in-process for 30 seconds by default (`app.recommendation.product-cache-seconds` / `behavior-cache-seconds`); catalog invalidates on product, inventory, order, payment, and review changes, while behavior profiles invalidate on favorites, orders, payment, and reviews.
+- Consistency: stock changes use conditional SQL updates; order/payment/cancellation/refund paths invalidate product-detail and hot-product caches after stock or sales changes. When a write runs inside a transaction, cache evictions are deferred until commit so rollbacks never expose a cache miss for unchanged data.
 - Image upload: authenticated users post JPG/PNG/WEBP/GIF files (max 5MB) with category `avatar/product/background`; `FileStorageService` stores objects in MinIO and returns a public URL. Avatar URL persists in `sys_user.avatar_url`, product images in `product.image_url`, and background images stay in theme localStorage.
 
 ## Data, configuration, and local run
 
-- Main database: MySQL 8 database `flower_shop`. Import `backend/db/schema.sql` then `backend/db/data.sql`; the application does not auto-initialize the main database (`spring.sql.init.mode=never`).
+- Main database: MySQL 8 database `flower_shop`. Import `backend/db/flower_shop.sql` for a complete fresh install (or import `backend/db/schema.sql` then `backend/db/data.sql`); the application does not auto-initialize the main database (`spring.sql.init.mode=never`).
 - Default MySQL connection: `localhost:3306/flower_shop`, username `root`, password `1234`; override with `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`.
 - Default server port is `8080`; override with `SERVER_PORT`.
 - Redis defaults to `localhost:6379`; disable or avoid depending on it with `APP_REDIS_ENABLED=false` during local development.
-- Product-detail and hot-product caches are controlled by `app.cache.*`; recommendation candidate limit is controlled by `app.recommendation.candidate-limit`.
+- Product-detail and hot-product caches are controlled by `app.cache.*`; recommendation candidate limit is controlled by `app.recommendation.candidate-limit`, and the public `sort=recommend` catalog scan cap by `app.recommendation.catalog-scan-limit` (default 500). Recommendation catalog and behavior caches default to 30 seconds via `app.recommendation.product-cache-seconds` / `behavior-cache-seconds`. Tag options and authenticated-user details use process-local caches invalidated by writes (user cache TTL 30 seconds).
 - MinIO uploads are controlled by `app.minio.*`; set `MINIO_ENABLED=true` and configure `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, and optionally `MINIO_PUBLIC_URL`. The backend auto-creates the bucket by default (`MINIO_AUTO_CREATE_BUCKET=true`) and applies a public-read policy (`MINIO_PUBLIC_READ=true`); the bucket must still be publicly reachable or fronted by a public CDN URL.
-- Email verification codes use Spring Mail over QQ SMTP (`smtp.qq.com`); override `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, and `MAIL_PASSWORD` (authorization code) as needed. Codes are held in memory for 5 minutes with a 60-second resend interval and 5 failed attempts per code. `POST /api/auth/email-code` supports `scene=LOGIN|REGISTER|CHANGE_PASSWORD|CHANGE_EMAIL`; password changes accept either the old password or a `CHANGE_PASSWORD` code, and changing the email requires a `CHANGE_EMAIL` code sent to the new address.
-- Existing MySQL installations need `backend/db/migration_20261104_add_user_avatar.sql` to add `sys_user.avatar_url`, `backend/db/migration_20261105_add_appearance_setting.sql` to add the `appearance_setting` table, `backend/db/migration_20261108_add_user_theme_preference.sql` to add the per-user `user_theme_preference` table plus the `tag_option` / `tag_type_setting` tag management tables and `metric_config` metrics table, and `backend/db/migration_20261108_add_sidebar_pinned.sql` to add `user_theme_preference.sidebar_pinned`, and `backend/db/migration_20261108_add_auth_appearance_theme.sql` to add `appearance_setting.auth_palette`, `auth_accent`, and `auth_custom_accent` for the admin-managed login-page palette and accent, and `backend/db/migration_20261108_add_tag_home_display.sql` to add `tag_option.home_visible` / `home_sort_order` for the admin-managed home category and scene display; fresh installs get all from `schema.sql`.
+- Email verification codes use Spring Mail over QQ SMTP (`smtp.qq.com`); set `MAIL_USERNAME` and `MAIL_PASSWORD` (authorization code), and override `MAIL_HOST`/`MAIL_PORT` if needed. Codes are held in memory for 5 minutes with a 60-second resend interval and 5 failed attempts per code; expired entries are also purged every 10 minutes by a scheduled task. `POST /api/auth/email-code` supports `scene=LOGIN|REGISTER|CHANGE_PASSWORD|CHANGE_EMAIL`; password changes accept either the old password or a `CHANGE_PASSWORD` code, and changing the email requires a `CHANGE_EMAIL` code sent to the new address. SMTP credentials are intentionally not committed; rotate the QQ SMTP authorization code manually and supply `MAIL_PASSWORD` through the environment.
+- Set `JWT_SECRET` (at least 32 bytes) for stable sessions; when omitted the backend generates a temporary key at startup, so existing tokens are invalidated on restart.
+- Existing MySQL installations need `backend/db/migration_20261104_add_user_avatar.sql` to add `sys_user.avatar_url`, `backend/db/migration_20261105_add_appearance_setting.sql` to add the `appearance_setting` table, `backend/db/migration_20261108_add_user_theme_preference.sql` to add the per-user `user_theme_preference` table plus the `tag_option` / `tag_type_setting` tag management tables and `metric_config` metrics table, and `backend/db/migration_20261108_add_sidebar_pinned.sql` to add `user_theme_preference.sidebar_pinned`, and `backend/db/migration_20261108_add_auth_appearance_theme.sql` to add `appearance_setting.auth_palette`, `auth_accent`, and `auth_custom_accent` for the admin-managed login-page palette and accent, and `backend/db/migration_20261108_add_tag_home_display.sql` to add `tag_option.home_visible` / `home_sort_order` for the admin-managed home category and scene display, and `backend/db/migration_20261115_add_user_email_unique.sql` to normalize existing emails and add `sys_user.uk_user_email` (the migration aborts when duplicates exist), and `backend/db/migration_20261115_add_recommendation_scene_weight.sql` to add and seed the `recommendation_scene_weight` table; fresh installs get all from `flower_shop.sql` (or `schema.sql` + `data.sql`).
 - Run from `backend/` with `mvn spring-boot:run`, or run the packaged jar `backend/target/flower-shop-backend-1.0.0.jar`.
 - Run from `frontend/` with Node.js 20+: `npm install`, copy `.env.example` to `.env`, then `npm run dev`. Vite serves `http://localhost:5173` and proxies `/api` to `http://localhost:8080`.
 - Frontend environment: `VITE_API_BASE_URL` defaults to `/api`; `VITE_IMAGE_BASE_URL` is optional for product images.
@@ -106,14 +109,14 @@
   - `alice / alice123`
   - `bob / customer123`
   - `disabled / customer123` (disabled account)
-- Demo data highlights: product `15` is off-shelf, product `16` has low stock, orders `1`–`5` cover completed/pending/cancelled/paid states, and review/favorite/weight/log samples are seeded.
+- Demo data highlights: product `15` is off-shelf, product `16` has low stock, orders `1`–`5` cover completed/pending/cancelled/paid states, and review/favorite/weight/scene-weight/log samples are seeded.
 
 ## Key API areas
 
 - Public: `POST /api/auth/login`, `POST /api/auth/login/email`, `POST /api/auth/email-code`, `POST /api/auth/register`, `GET /api/products/**`, `GET /api/recommendations`, `GET /api/reviews/products/**`, `GET /api/dict/**`, `GET /api/appearance/auth-background`.
 - Customer: `GET/PUT /api/auth/me`, `PUT /api/auth/password`, `POST /api/auth/logout`, `POST /api/files/images`, `/api/cart/**`, `/api/favorites/**`, `/api/orders/**`, `/api/payments/**`, `POST /api/reviews`, `GET /api/reviews/my`.
 - Staff: `/api/staff/orders/**`, `/api/staff/products/{id}/stock`, `GET /api/staff/inventory`.
-- Admin: `/api/admin/users/**`, `/api/admin/products/**`, `/api/admin/recommendations/**`, `/api/admin/reviews/**`, `/api/admin/stats/**`, `GET /api/admin/operation-logs`, `PUT /api/admin/appearance/auth-background`.
+- Admin: `/api/admin/users/**`, `/api/admin/products/**`, `/api/admin/recommendations/**` (including `GET/PUT /api/admin/recommendations/scene-weights`), `/api/admin/reviews/**`, `/api/admin/stats/**`, `GET /api/admin/operation-logs`, `PUT /api/admin/appearance/auth-background`.
 - Full frontend-oriented API reference: `docs/backend-api.md`.
 
 ## Agent skills
@@ -132,15 +135,19 @@ Single-context: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
 - Image upload work is complete: MinIO storage service, `/api/files/images`, `sys_user.avatar_url`, and frontend avatar/product/background pickers with broken-URL fallbacks. A local MinIO smoke test passed for all three upload categories, public URL fetch, and avatar update/clear through `PUT /api/auth/me`.
 - Email verification code work is complete: Spring Mail/QQ SMTP configuration, `POST /api/auth/email-code`, `POST /api/auth/login/email`, registration email-code validation, 5-minute TTL, 60-second resend interval, and matching login/register UI components. Account security also supports changing the password with a `CHANGE_PASSWORD` code sent to the bound email, and the profile page requires a `CHANGE_EMAIL` code sent to the new address before changing the email.
 - Tag management work is complete: `CATEGORY` tags are the single source for product categories, admins can manage category tags, and the tag page configures home category/scene visibility and order (`homeCategories` / `homeOccasions`).
-- `docs/backend-api.md` is complete; its endpoint table was checked against the source: 73 source endpoints and 73 documented endpoints match with no extras or omissions.
-- `mvn -B -ntp test` passes 46/46 tests (including appearance background palette/accent, auth email-code, tag home-display, and sold-out auto-off-shelf integration tests).
+- Scene-aware recommendation work is complete: `RecommendationScene`/`RecommendationMode`, per-scene weight table and admin API, scene-specific confidence/diversity/reasons, product-detail seed-similar recommendations, default public catalog `sort=recommend`, and frontend scene/admin/product/home integration.
+- Security/cache hardening is complete: email uniqueness, 30-second JWT user cache with write eviction, recommendation catalog/behavior caches, tag option cache, scheduled token/code/cache cleanup, and transaction-deferred cache eviction.
+- `docs/backend-api.md` is complete; its endpoint table was checked against the source: 84 source endpoints and 84 documented endpoints match with no extras or omissions.
+- `backend/db/flower_shop.sql` was imported twice into a scratch MySQL 8 database successfully: 19 tables, 6 users, 16 products, 5 orders, and 4 scene weights; the scratch database was dropped afterward.
+- `mvn -B -ntp test` passes 60/60 tests (including appearance background palette/accent, auth email-code, tag home-display, email uniqueness, user access cache, cache eviction after commit, recommendation engine/ranking, scene weights with refreshed timestamps, product seed recommendations, and sold-out auto-off-shelf integration tests).
 - Run `mvn -B -ntp -DskipTests package` to build `backend\target\flower-shop-backend-1.0.0.jar`.
 - Frontend `npm run typecheck`, `npm run lint`, and `npm run build` pass. Lint reports 6 `react-refresh/only-export-components` warnings (no errors).
+- A 23-route Edge headless smoke passed earlier against the MySQL-backed backend and Vite dev server: public, customer, staff, and admin pages, command palette open/close, and authenticated refresh; no console errors or API 5xx responses. After the scene-recommendation work, a focused Edge smoke passed for default catalog recommend sort, product-detail seed-similar cards, the recommendations page, and the admin scene-weight tab (4 scenes, 16 sliders, save initially disabled, editing enables save, save persists, no console errors or API 5xx). The earlier smoke caught and fixed duplicate occasion/festival tag keys on staff inventory.
 
 ## Remaining uncovered items
 
-- Location dimension is not modeled. `RecommendationQuery.scene` is accepted but does not affect recommendation results.
-- MinIO upload has been manually smoke-tested against local MySQL and MinIO; automated tests still use H2 with Redis and MinIO disabled. Redis and full real-environment end-to-end flows remain uncovered.
-- Email-code integration tests mock `JavaMailSender`; real QQ SMTP delivery still needs a manual smoke test with valid network access.
-- The frontend has no automated test suite; verification is currently `npm run typecheck`, `npm run lint`, and `npm run build`.
+- Location dimension is not modeled. Scene-aware recommendation is implemented; `scene=product` requires `productId`, and public `sort=recommend` catalogs are capped by `app.recommendation.catalog-scan-limit`.
+- MinIO upload has been manually smoke-tested against local MySQL and MinIO; automated tests still use H2 with Redis and MinIO disabled. Redis-backed caching/session behavior and multi-instance cache invalidation remain uncovered, and the recommendation/tag/user caches are process-local.
+- Email-code integration tests mock `JavaMailSender`; real QQ SMTP delivery and authorization-code rotation still need a manual check with valid network access.
+- The frontend has no automated test suite; verification is currently `npm run typecheck`, `npm run lint`, `npm run build`, and the manual Edge headless smoke.
 - Changes are not committed to Git.

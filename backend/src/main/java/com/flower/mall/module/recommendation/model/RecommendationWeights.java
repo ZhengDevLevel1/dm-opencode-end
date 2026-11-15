@@ -1,5 +1,6 @@
 package com.flower.mall.module.recommendation.model;
 
+import com.flower.mall.module.recommendation.entity.RecommendationSceneWeight;
 import com.flower.mall.module.recommendation.entity.RecommendationWeight;
 
 import java.math.BigDecimal;
@@ -9,6 +10,17 @@ public record RecommendationWeights(double content, double popularity, double fe
     public static final RecommendationWeights DEFAULT = new RecommendationWeights(0.40, 0.20, 0.25, 0.15);
 
     public static RecommendationWeights from(RecommendationWeight entity) {
+        if (entity == null) {
+            return DEFAULT;
+        }
+        return new RecommendationWeights(
+                toDouble(entity.getContentWeight()),
+                toDouble(entity.getPopularityWeight()),
+                toDouble(entity.getFestivalWeight()),
+                toDouble(entity.getRatingWeight()));
+    }
+
+    public static RecommendationWeights from(RecommendationSceneWeight entity) {
         if (entity == null) {
             return DEFAULT;
         }

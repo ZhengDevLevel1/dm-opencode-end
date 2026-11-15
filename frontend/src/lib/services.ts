@@ -43,6 +43,8 @@ import type {
   RecommendationLogVO,
   RecommendationQueryParams,
   RecommendationResponse,
+  RecommendationSceneWeightVO,
+  RecommendationSceneWeightsRequest,
   RecommendationStatsVO,
   RecommendationWeightRequest,
   RecommendationWeightsVO,
@@ -214,6 +216,10 @@ export const adminService = {
   weights: () => api.get<RecommendationWeightsVO>("/admin/recommendations/weights"),
   saveWeights: (body: RecommendationWeightRequest) =>
     api.put<RecommendationWeightsVO>("/admin/recommendations/weights", body),
+  sceneWeights: () =>
+    api.get<RecommendationSceneWeightVO[]>("/admin/recommendations/scene-weights"),
+  saveSceneWeights: (body: RecommendationSceneWeightsRequest) =>
+    api.put<RecommendationSceneWeightVO[]>("/admin/recommendations/scene-weights", body),
   recommendationLogs: (query: RecommendationLogQuery) =>
     api.get<PageResult<RecommendationLogVO>>("/admin/recommendations/logs", { query }),
   evaluation: () =>

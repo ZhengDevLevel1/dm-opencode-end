@@ -15,6 +15,8 @@ import com.flower.mall.module.payment.dto.PaymentVO;
 import com.flower.mall.module.payment.entity.PaymentRecord;
 import com.flower.mall.module.payment.mapper.PaymentRecordMapper;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
+import com.flower.mall.module.recommendation.service.UserBehaviorService;
 import com.flower.mall.support.CacheKeys;
 import com.flower.mall.support.CacheService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,8 @@ public class PaymentService {
     private final OrderItemMapper orderItemMapper;
     private final ProductMapper productMapper;
     private final CacheService cacheService;
+    private final RecommendationCatalogCache catalogCache;
+    private final UserBehaviorService userBehaviorService;
 
     @Transactional
     public PaymentVO createOrGet(Long orderId) {
@@ -116,6 +120,8 @@ public class PaymentService {
             cacheService.evict(CacheKeys.productDetail(item.getProductId()));
         }
         cacheService.evict(CacheKeys.HOT_PRODUCTS);
+        catalogCache.invalidate();
+        userBehaviorService.evict(order.getUserId());
         return PaymentVO.from(paymentRecordMapper.selectById(payment.getId()));
     }
 

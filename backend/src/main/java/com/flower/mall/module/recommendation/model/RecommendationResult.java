@@ -5,5 +5,6 @@ import java.util.List;
 public record RecommendationResult(RecommendationContext context,
                                    RecommendationWeights weights,
                                    boolean coldStart,
+                                   RecommendationMode mode,
                                    List<ScoredProduct> items) {
 }

@@ -38,6 +38,7 @@ export type InventoryChangeType =
   | "AFTER_SALE_RESTORE";
 
 export type ProductSort =
+  | "recommend"
   | "sales_desc"
   | "price_asc"
   | "price_desc"
@@ -45,6 +46,19 @@ export type ProductSort =
   | "rating_desc"
   | "stock_asc"
   | "stock_desc";
+
+export type RecommendationScene =
+  | "home"
+  | "catalog"
+  | "recommendations"
+  | "product"
+  | "garden";
+
+export type RecommendationMode =
+  | "PERSONALIZED"
+  | "CONTEXT_COLD_START"
+  | "SEED_SIMILAR"
+  | "CATALOG_POPULAR";
 
 export type StockLevel = "ALL" | "LOW" | "SUFFICIENT" | "OVERSTOCK";
 
@@ -499,7 +513,8 @@ export interface RecommendationQueryParams {
   limit?: number;
   festival?: string;
   season?: SeasonSuitability;
-  scene?: string;
+  scene?: RecommendationScene;
+  productId?: number;
 }
 
 export interface RecommendationWeightsVO {
@@ -516,6 +531,25 @@ export interface RecommendationWeightRequest {
   popularityWeight: number;
   festivalWeight: number;
   ratingWeight: number;
+}
+
+export interface RecommendationSceneWeightVO extends RecommendationWeightRequest {
+  scene: RecommendationScene;
+  sceneLabel: string;
+  maxPerCategory: number;
+  seedRequired: boolean;
+  enabled: boolean;
+  updatedBy?: number;
+  updatedAt?: string;
+}
+
+export interface RecommendationSceneWeightRequest extends RecommendationWeightRequest {
+  scene: RecommendationScene;
+  enabled?: boolean;
+}
+
+export interface RecommendationSceneWeightsRequest {
+  scenes: RecommendationSceneWeightRequest[];
 }
 
 export interface RecommendationItemVO {
@@ -547,7 +581,10 @@ export interface RecommendationResponse {
   season: SeasonSuitability;
   seasonLabel: string;
   festival?: string;
-  scene: string;
+  scene: RecommendationScene;
+  sceneLabel: string;
+  seedProductId?: number;
+  mode: RecommendationMode;
   generatedAt: string;
   weights: RecommendationWeightsVO;
   items: RecommendationItemVO[];

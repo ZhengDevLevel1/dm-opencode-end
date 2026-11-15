@@ -59,7 +59,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const classes = cn(
-      "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-[color,background-color,border-color,box-shadow,scale,opacity] duration-150 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
+      "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-md font-medium transition-[color,background-color,border-color,box-shadow,scale,opacity] duration-150 ease-out focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
       variantClass[variant],
       sizeClass[size],
       className,
@@ -84,8 +84,16 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={classes}
         {...props}
       >
-        {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-        {children}
+        {loading ? (
+          <>
+            <span className="invisible inline-flex items-center gap-2" aria-hidden>
+              {children}
+            </span>
+            <Loader2 className="absolute h-4 w-4 animate-spin" aria-hidden />
+          </>
+        ) : (
+          children
+        )}
       </button>
     );
   },

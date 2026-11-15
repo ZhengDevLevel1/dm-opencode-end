@@ -80,7 +80,7 @@ export function OrdersPage() {
       if (patch.page <= 1) next.delete("page");
       else next.set("page", String(patch.page));
     }
-    setParams(next);
+    setParams(next, { replace: true });
   };
 
   const invalidateOrder = (orderId: number) => {

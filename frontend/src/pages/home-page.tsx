@@ -29,7 +29,11 @@ import { ProductImage } from "@/components/domain/product-image";
 import { Price } from "@/components/domain/price";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CardSkeleton, ProductGridSkeleton, Skeleton } from "@/components/ui/skeleton";
+import {
+  ProductGridSkeleton,
+  RecommendationCardSkeleton,
+  Skeleton,
+} from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { ProductVO } from "@/types/api";
@@ -143,6 +147,7 @@ export function HomePage() {
   };
 
   const heroRec = recommendations.data?.items[0];
+  const recommendationCards = recommendations.data?.items.slice(1, 5) ?? [];
   const categories = dict.data?.homeCategories ?? dict.data?.categories ?? [];
   const occasions =
     dict.data?.homeOccasions ?? (dict.data?.occasions ?? OCCASION_TAG_OPTIONS).slice(0, 6);
@@ -307,7 +312,7 @@ export function HomePage() {
         {recommendations.isLoading ? (
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, index) => (
-              <CardSkeleton key={index} />
+              <RecommendationCardSkeleton key={index} />
             ))}
           </div>
         ) : recommendations.isError ? (
@@ -331,7 +336,7 @@ export function HomePage() {
           />
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {recommendations.data?.items.slice(0, 4).map((item) => (
+            {recommendationCards.map((item) => (
               <RecommendationCard
                 key={item.productId}
                 item={item}

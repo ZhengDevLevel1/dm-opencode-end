@@ -6,6 +6,8 @@ import com.flower.mall.config.AppProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -57,6 +59,30 @@ public class CacheService {
         if (!enabled) {
             return;
         }
+        afterCommit(() -> delete(key));
+    }
+
+    public void evictByPrefix(String prefix) {
+        if (!enabled) {
+            return;
+        }
+        afterCommit(() -> deleteByPrefix(prefix));
+    }
+
+    private void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+            return;
+        }
+        action.run();
+    }
+
+    private void delete(String key) {
         try {
             redisTemplate.delete(key);
         } catch (Exception exception) {
@@ -64,10 +90,7 @@ public class CacheService {
         }
     }
 
-    public void evictByPrefix(String prefix) {
-        if (!enabled) {
-            return;
-        }
+    private void deleteByPrefix(String prefix) {
         try {
             var keys = redisTemplate.keys(prefix + "*");
             if (keys != null && !keys.isEmpty()) {

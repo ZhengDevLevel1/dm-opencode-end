@@ -43,8 +43,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.qq.com}
     port: ${MAIL_PORT:465}
-    username: ${MAIL_USERNAME:3925442610@qq.com}
-    password: ${MAIL_PASSWORD:mjanwwtbshqscfcg}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     protocol: smtp
     default-encoding: UTF-8
     properties:
@@ -90,7 +90,7 @@ knife4j:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:flower-shop-recommendation-system-2026-secret-key-please-change-me}
+    secret: ${JWT_SECRET:}
     expiration-seconds: ${JWT_EXPIRATION:86400}
     issuer: flower-shop-backend
   redis:
@@ -101,6 +101,9 @@ app:
     hot-products-limit: 8
   recommendation:
     candidate-limit: 60
+    catalog-scan-limit: 500
+    product-cache-seconds: 30
+    behavior-cache-seconds: 30
   # MinIO 图片上传；本地未启动 MinIO 时保持 enabled=false
   minio:
     enabled: ${MINIO_ENABLED:true}

@@ -10,6 +10,7 @@ import com.flower.mall.module.favorite.mapper.UserFavoriteMapper;
 import com.flower.mall.module.product.dto.ProductVO;
 import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.recommendation.service.UserBehaviorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class FavoriteService {
 
     private final UserFavoriteMapper favoriteMapper;
     private final ProductMapper productMapper;
+    private final UserBehaviorService userBehaviorService;
 
     public List<ProductVO> list() {
         Long userId = SecurityUtils.currentUserId();
@@ -64,6 +66,7 @@ public class FavoriteService {
         favorite.setUserId(userId);
         favorite.setProductId(productId);
         favoriteMapper.insert(favorite);
+        userBehaviorService.evict(userId);
     }
 
     @Transactional
@@ -72,5 +75,6 @@ public class FavoriteService {
         favoriteMapper.delete(Wrappers.<UserFavorite>lambdaQuery()
                 .eq(UserFavorite::getUserId, userId)
                 .eq(UserFavorite::getProductId, productId));
+        userBehaviorService.evict(userId);
     }
 }

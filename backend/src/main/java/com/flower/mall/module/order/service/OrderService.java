@@ -26,6 +26,8 @@ import com.flower.mall.module.payment.entity.PaymentRecord;
 import com.flower.mall.module.payment.mapper.PaymentRecordMapper;
 import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
+import com.flower.mall.module.recommendation.service.UserBehaviorService;
 import com.flower.mall.module.user.entity.User;
 import com.flower.mall.module.user.mapper.UserMapper;
 import com.flower.mall.support.CacheKeys;
@@ -58,6 +60,8 @@ public class OrderService {
     private final PaymentRecordMapper paymentRecordMapper;
     private final UserMapper userMapper;
     private final CacheService cacheService;
+    private final RecommendationCatalogCache catalogCache;
+    private final UserBehaviorService userBehaviorService;
 
     @Transactional
     public OrderVO create(CreateOrderRequest request) {
@@ -140,6 +144,7 @@ public class OrderService {
         }
         cartService.removeItems(sortedItems);
         evictProductCaches(sortedItems.stream().map(CartItem::getProductId).toList());
+        userBehaviorService.evict(userId);
         Order saved = orderMapper.selectById(order.getId());
         OrderVO vo = OrderVO.from(saved, orderItems);
         fillBuyerInfo(List.of(saved), List.of(vo));
@@ -237,6 +242,7 @@ public class OrderService {
         restoreStock(order, InventoryChangeType.ORDER_CANCEL, "取消订单回补库存");
         closePendingPayments(orderId);
         evictProductCaches(items(orderId).stream().map(OrderItem::getProductId).toList());
+        userBehaviorService.evict(userId);
         return OrderVO.from(getRequired(orderId), items(orderId));
     }
 
@@ -265,6 +271,7 @@ public class OrderService {
             closePendingPayments(orderId);
         }
         evictProductCaches(items(orderId).stream().map(OrderItem::getProductId).toList());
+        userBehaviorService.evict(order.getUserId());
         return OrderVO.from(getRequired(orderId), items(orderId));
     }
 
@@ -319,6 +326,7 @@ public class OrderService {
             decreaseSales(orderItems);
             evictProductCaches(orderItems.stream().map(OrderItem::getProductId).toList());
         }
+        userBehaviorService.evict(order.getUserId());
         return OrderVO.from(getRequired(orderId), items(orderId));
     }
 
@@ -361,6 +369,7 @@ public class OrderService {
         productIds.stream().distinct().forEach(productId ->
                 cacheService.evict(CacheKeys.productDetail(productId)));
         cacheService.evict(CacheKeys.HOT_PRODUCTS);
+        catalogCache.invalidate();
     }
 
     private PageResult<OrderVO> toPageResult(IPage<Order> orderPage, boolean includeBuyer) {

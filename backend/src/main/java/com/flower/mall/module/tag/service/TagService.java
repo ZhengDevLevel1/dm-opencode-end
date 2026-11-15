@@ -19,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -26,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.regex.Pattern;
@@ -42,6 +46,8 @@ public class TagService {
 
     private final TagOptionMapper optionMapper;
     private final TagTypeSettingMapper settingMapper;
+    private final Map<TagType, List<TagOption>> optionCache = new ConcurrentHashMap<>();
+    private final AtomicBoolean initialized = new AtomicBoolean(false);
 
     public TagOverviewVO overview() {
         ensureInitialized();
@@ -62,41 +68,38 @@ public class TagService {
     }
 
     public List<String> names(TagType type) {
-        ensureInitialized();
-        return optionMapper.selectList(Wrappers.<TagOption>lambdaQuery()
-                        .eq(TagOption::getTagType, type.name())
-                        .orderByAsc(TagOption::getSortOrder)
-                        .orderByAsc(TagOption::getId))
-                .stream()
+        return optionsOf(type).stream()
                 .map(TagOption::getName)
                 .toList();
     }
 
     public List<TagOptionVO> options(TagType type) {
-        ensureInitialized();
-        return optionMapper.selectList(Wrappers.<TagOption>lambdaQuery()
-                        .eq(TagOption::getTagType, type.name())
-                        .orderByAsc(TagOption::getSortOrder)
-                        .orderByAsc(TagOption::getId))
-                .stream()
+        return optionsOf(type).stream()
                 .map(TagOptionVO::from)
                 .toList();
     }
 
     public List<String> homeNames(TagType type) {
-        ensureInitialized();
-        return optionMapper.selectList(Wrappers.<TagOption>lambdaQuery()
-                        .eq(TagOption::getTagType, type.name())
-                        .orderByAsc(TagOption::getHomeSortOrder)
-                        .orderByAsc(TagOption::getSortOrder)
-                        .orderByAsc(TagOption::getId))
-                .stream()
+        return optionsOf(type).stream()
                 .filter(option -> Boolean.TRUE.equals(option.getHomeVisible()))
+                .sorted((left, right) -> {
+                    int homeOrder = Integer.compare(
+                            left.getHomeSortOrder() == null ? Integer.MAX_VALUE : left.getHomeSortOrder(),
+                            right.getHomeSortOrder() == null ? Integer.MAX_VALUE : right.getHomeSortOrder());
+                    if (homeOrder != 0) {
+                        return homeOrder;
+                    }
+                    int sortOrder = Integer.compare(
+                            left.getSortOrder() == null ? Integer.MAX_VALUE : left.getSortOrder(),
+                            right.getSortOrder() == null ? Integer.MAX_VALUE : right.getSortOrder());
+                    return sortOrder != 0 ? sortOrder : Long.compare(left.getId(), right.getId());
+                })
                 .map(TagOption::getName)
                 .toList();
     }
 
     public int maxCount(TagType type) {
+        ensureInitialized();
         TagTypeSetting setting = settingMapper.selectById(type.name());
         return setting == null || setting.getMaxSelectCount() == null
                 ? DEFAULT_MAX_COUNTS.getOrDefault(type, 1)
@@ -148,6 +151,7 @@ public class TagService {
         } catch (DuplicateKeyException exception) {
             throw BusinessException.of(ErrorCode.CONFLICT, "该标签已存在");
         }
+        invalidate(type);
         return TagOptionVO.from(option);
     }
 
@@ -170,14 +174,17 @@ public class TagService {
         } catch (DuplicateKeyException exception) {
             throw BusinessException.of(ErrorCode.CONFLICT, "该标签已存在");
         }
+        invalidate(TagType.valueOf(option.getTagType()));
         return TagOptionVO.from(option);
     }
 
     @Transactional
     public void delete(Long id) {
-        if (optionMapper.deleteById(id) == 0) {
+        TagOption option = optionMapper.selectById(id);
+        if (option == null || optionMapper.deleteById(id) == 0) {
             throw BusinessException.of(ErrorCode.NOT_FOUND, "标签不存在");
         }
+        invalidate(TagType.valueOf(option.getTagType()));
     }
 
     @Transactional
@@ -230,9 +237,57 @@ public class TagService {
             option.setHomeSortOrder(index + 1);
             optionMapper.updateById(option);
         }
+        invalidate(type);
     }
 
-    private synchronized void ensureInitialized() {
+    private List<TagOption> optionsOf(TagType type) {
+        ensureInitialized();
+        return optionCache.computeIfAbsent(type, key -> optionMapper.selectList(
+                        Wrappers.<TagOption>lambdaQuery()
+                                .eq(TagOption::getTagType, key.name())
+                                .orderByAsc(TagOption::getSortOrder)
+                                .orderByAsc(TagOption::getId))
+                .stream()
+                .toList());
+    }
+
+    private void invalidate(TagType type) {
+        optionCache.remove(type);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    optionCache.remove(type);
+                }
+            });
+        }
+    }
+
+    private void ensureInitialized() {
+        if (initialized.get()) {
+            return;
+        }
+        synchronized (this) {
+            if (initialized.get()) {
+                return;
+            }
+            initializeDefaults();
+            initialized.set(true);
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                            optionCache.clear();
+                            initialized.set(false);
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    private void initializeDefaults() {
         for (TagType type : TagType.values()) {
             if (optionMapper.selectCount(Wrappers.<TagOption>lambdaQuery()
                     .eq(TagOption::getTagType, type.name())) == 0) {

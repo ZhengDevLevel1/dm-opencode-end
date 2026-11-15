@@ -39,6 +39,9 @@ public class AppProperties {
     @Data
     public static class Recommendation {
         private int candidateLimit = 60;
+        private int catalogScanLimit = 500;
+        private int productCacheSeconds = 30;
+        private int behaviorCacheSeconds = 30;
     }
 
     @Data

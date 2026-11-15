@@ -50,6 +50,7 @@ public enum ErrorCode {
 
     WEIGHT_INVALID(7001, 400, "推荐权重不合法，四项权重之和必须为1"),
     RECOMMENDATION_EMPTY(7002, 200, "暂无可推荐商品"),
+    RECOMMENDATION_SEED_REQUIRED(7003, 400, "商品详情推荐需要提供商品ID"),
 
     FILE_UPLOAD_DISABLED(8001, 503, "图片上传服务未启用"),
     FILE_TYPE_INVALID(8002, 400, "仅支持 JPG、PNG、WEBP、GIF 格式的图片"),

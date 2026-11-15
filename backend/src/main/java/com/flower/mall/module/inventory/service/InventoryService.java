@@ -11,6 +11,7 @@ import com.flower.mall.module.inventory.entity.InventoryRecord;
 import com.flower.mall.module.inventory.mapper.InventoryRecordMapper;
 import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
 import com.flower.mall.security.AuthUser;
 import com.flower.mall.support.CacheKeys;
 import com.flower.mall.support.CacheService;
@@ -28,6 +29,7 @@ public class InventoryService {
     private final ProductMapper productMapper;
     private final InventoryRecordMapper inventoryRecordMapper;
     private final CacheService cacheService;
+    private final RecommendationCatalogCache catalogCache;
 
     @Transactional
     public InventoryRecord adjustStock(Long productId, int delta, String remark) {
@@ -54,6 +56,7 @@ public class InventoryService {
                 StringUtils.hasText(remark) ? remark : "人工库存调整");
         cacheService.evict(CacheKeys.productDetail(productId));
         cacheService.evict(CacheKeys.HOT_PRODUCTS);
+        catalogCache.invalidate();
         return record;
     }
 

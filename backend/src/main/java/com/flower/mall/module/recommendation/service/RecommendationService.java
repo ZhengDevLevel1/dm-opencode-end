@@ -19,17 +19,23 @@ import com.flower.mall.module.recommendation.dto.RecommendationItemVO;
 import com.flower.mall.module.recommendation.dto.RecommendationLogVO;
 import com.flower.mall.module.recommendation.dto.RecommendationQuery;
 import com.flower.mall.module.recommendation.dto.RecommendationResponse;
+import com.flower.mall.module.recommendation.dto.RecommendationSceneWeightRequest;
+import com.flower.mall.module.recommendation.dto.RecommendationSceneWeightVO;
+import com.flower.mall.module.recommendation.dto.RecommendationSceneWeightsRequest;
 import com.flower.mall.module.recommendation.dto.RecommendationStatsVO;
 import com.flower.mall.module.recommendation.dto.RecommendationWeightRequest;
 import com.flower.mall.module.recommendation.dto.RecommendationWeightsVO;
 import com.flower.mall.module.recommendation.entity.RecommendationLog;
+import com.flower.mall.module.recommendation.entity.RecommendationSceneWeight;
 import com.flower.mall.module.recommendation.entity.RecommendationWeight;
 import com.flower.mall.module.recommendation.mapper.RecommendationLogMapper;
+import com.flower.mall.module.recommendation.mapper.RecommendationSceneWeightMapper;
 import com.flower.mall.module.recommendation.mapper.RecommendationWeightMapper;
 import com.flower.mall.module.recommendation.model.RecommendationCandidate;
 import com.flower.mall.module.recommendation.model.RecommendationContext;
 import com.flower.mall.module.recommendation.model.RecommendationLogLabels;
 import com.flower.mall.module.recommendation.model.RecommendationResult;
+import com.flower.mall.module.recommendation.model.RecommendationScene;
 import com.flower.mall.module.metric.service.MetricConfigService;
 import com.flower.mall.module.recommendation.model.RecommendationWeights;
 import com.flower.mall.module.recommendation.model.ScoredProduct;
@@ -69,8 +75,10 @@ public class RecommendationService {
     private static final long WEIGHT_ID = 1L;
 
     private final ProductMapper productMapper;
+    private final RecommendationCatalogCache catalogCache;
     private final UserBehaviorService userBehaviorService;
     private final RecommendationWeightMapper weightMapper;
+    private final RecommendationSceneWeightMapper sceneWeightMapper;
     private final RecommendationLogMapper logMapper;
     private final UserMapper userMapper;
     private final RecommendationEngine engine;
@@ -83,16 +91,19 @@ public class RecommendationService {
         UserBehaviorData behavior = authUser == null
                 ? UserBehaviorData.empty()
                 : userBehaviorService.load(authUser.getId());
-        RecommendationContext context = resolveContext(query);
-        List<Product> products = productMapper.selectList(Wrappers.<Product>lambdaQuery()
-                .eq(Product::getStatus, ProductStatus.ON_SALE.name())
-                .orderByDesc(Product::getSalesCount));
+        RecommendationScene scene = RecommendationScene.parse(query.getScene());
+        if (scene.seedRequired() && query.getProductId() == null) {
+            throw BusinessException.of(ErrorCode.RECOMMENDATION_SEED_REQUIRED);
+        }
+        RecommendationContext context = resolveContext(query, scene);
+        List<Product> products = new ArrayList<>(catalogCache.onSaleProducts());
+        ensureSeedProduct(products, context.seedProductId());
         List<RecommendationCandidate> candidates = products.stream()
                 .map(this::toCandidate)
                 .toList();
-        RecommendationWeight weightEntity = getOrCreateWeights();
+        RecommendationWeights weights = sceneWeights(scene);
         RecommendationResult result = engine.recommend(candidates, behavior, context,
-                RecommendationWeights.from(weightEntity),
+                weights,
                 properties.getRecommendation().getCandidateLimit(),
                 Math.min(Math.max(query.getLimit(), 1), 50));
 
@@ -102,13 +113,52 @@ public class RecommendationService {
                 .season(result.context().season().name())
                 .seasonLabel(result.context().season().getLabel())
                 .festival(result.context().festival())
-                .scene(result.context().scene())
+                .scene(result.context().sceneCode())
+                .sceneLabel(result.context().scene().label())
+                .seedProductId(result.context().seedProductId())
+                .mode(result.mode().code())
                 .generatedAt(result.context().generatedAt())
-                .weights(RecommendationWeightsVO.from(weightEntity))
+                .weights(RecommendationWeightsVO.from(result.weights()))
                 .items(result.items().stream().map(this::toItemVO).toList())
                 .build();
         saveLog(authUser == null ? null : authUser.getId(), response, result);
         return response;
+    }
+
+    private void ensureSeedProduct(List<Product> products, Long productId) {
+        if (productId == null || products.stream().anyMatch(product -> Objects.equals(product.getId(), productId))) {
+            return;
+        }
+        Product product = productMapper.selectById(productId);
+        if (product == null) {
+            throw BusinessException.of(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+        if (!ProductStatus.ON_SALE.name().equals(product.getStatus())) {
+            throw BusinessException.of(ErrorCode.PRODUCT_OFF_SHELF);
+        }
+        products.add(product);
+    }
+
+    public List<Long> rankCatalog(List<Product> products) {
+        if (products == null || products.isEmpty()) {
+            return List.of();
+        }
+        List<RecommendationCandidate> candidates = products.stream()
+                .map(this::toCandidate)
+                .toList();
+        AuthUser authUser = SecurityUtils.currentUserOrNull();
+        UserBehaviorData behavior = authUser == null
+                ? UserBehaviorData.empty()
+                : userBehaviorService.load(authUser.getId());
+        RecommendationContext context = RecommendationContext.of(currentSeason(),
+                FestivalCalendar.detect(LocalDate.now()).orElse(null),
+                RecommendationScene.CATALOG, null);
+        int limit = Math.max(products.size(), 1);
+        RecommendationResult result = engine.recommend(candidates, behavior, context,
+                sceneWeights(RecommendationScene.CATALOG), limit, limit);
+        return result.items().stream()
+                .map(item -> item.product().getId())
+                .toList();
     }
 
     public RecommendationWeightsVO getWeights() {
@@ -132,8 +182,90 @@ public class RecommendationService {
         entity.setFestivalWeight(festivalWeight);
         entity.setRatingWeight(ratingWeight);
         entity.setUpdatedBy(SecurityUtils.currentUserId());
+        entity.setUpdatedAt(null);
         weightMapper.updateById(entity);
         return RecommendationWeightsVO.from(weightMapper.selectById(entity.getId()));
+    }
+
+    public List<RecommendationSceneWeightVO> getSceneWeights() {
+        return RecommendationScene.CONFIGURABLE.stream()
+                .map(this::toSceneWeightVO)
+                .toList();
+    }
+
+    @Transactional
+    public List<RecommendationSceneWeightVO> updateSceneWeights(RecommendationSceneWeightsRequest request) {
+        Set<String> seen = new LinkedHashSet<>();
+        for (RecommendationSceneWeightRequest item : request.getScenes()) {
+            RecommendationScene scene = RecommendationScene.fromCode(item.getScene());
+            if (scene == null || !scene.configurable()) {
+                throw BusinessException.of(ErrorCode.BAD_REQUEST, "推荐场景不合法");
+            }
+            if (!seen.add(scene.code())) {
+                throw BusinessException.of(ErrorCode.BAD_REQUEST, "推荐场景不能重复");
+            }
+            BigDecimal contentWeight = item.getContentWeight().setScale(3, RoundingMode.HALF_UP);
+            BigDecimal popularityWeight = item.getPopularityWeight().setScale(3, RoundingMode.HALF_UP);
+            BigDecimal festivalWeight = item.getFestivalWeight().setScale(3, RoundingMode.HALF_UP);
+            BigDecimal ratingWeight = item.getRatingWeight().setScale(3, RoundingMode.HALF_UP);
+            BigDecimal roundedSum = contentWeight.add(popularityWeight)
+                    .add(festivalWeight).add(ratingWeight);
+            if (roundedSum.compareTo(BigDecimal.ONE) != 0
+                    || item.sum().subtract(BigDecimal.ONE).abs()
+                    .compareTo(BigDecimal.valueOf(0.001)) > 0) {
+                throw BusinessException.of(ErrorCode.WEIGHT_INVALID);
+            }
+            RecommendationSceneWeight entity = sceneWeightMapper.selectById(scene.code());
+            boolean insert = entity == null;
+            if (insert) {
+                entity = new RecommendationSceneWeight();
+                entity.setScene(scene.code());
+            }
+            entity.setContentWeight(contentWeight);
+            entity.setPopularityWeight(popularityWeight);
+            entity.setFestivalWeight(festivalWeight);
+            entity.setRatingWeight(ratingWeight);
+            entity.setEnabled(item.getEnabled() == null || item.getEnabled());
+            entity.setUpdatedBy(SecurityUtils.currentUserId());
+            entity.setUpdatedAt(null);
+            if (insert) {
+                sceneWeightMapper.insert(entity);
+            } else {
+                sceneWeightMapper.updateById(entity);
+            }
+        }
+        return getSceneWeights();
+    }
+
+    public RecommendationWeights sceneWeights(RecommendationScene scene) {
+        RecommendationScene policy = scene == null
+                ? RecommendationScene.HOME
+                : scene.policyScene();
+        RecommendationSceneWeight entity = sceneWeightMapper.selectById(policy.code());
+        if (entity != null && Boolean.TRUE.equals(entity.getEnabled())) {
+            return RecommendationWeights.from(entity);
+        }
+        return RecommendationWeights.from(getOrCreateWeights());
+    }
+
+    private RecommendationSceneWeightVO toSceneWeightVO(RecommendationScene scene) {
+        RecommendationSceneWeight entity = sceneWeightMapper.selectById(scene.code());
+        RecommendationWeights weights = entity != null && Boolean.TRUE.equals(entity.getEnabled())
+                ? RecommendationWeights.from(entity)
+                : RecommendationWeights.from(getOrCreateWeights());
+        return RecommendationSceneWeightVO.builder()
+                .scene(scene.code())
+                .sceneLabel(scene.label())
+                .contentWeight(BigDecimal.valueOf(weights.content()))
+                .popularityWeight(BigDecimal.valueOf(weights.popularity()))
+                .festivalWeight(BigDecimal.valueOf(weights.festival()))
+                .ratingWeight(BigDecimal.valueOf(weights.rating()))
+                .maxPerCategory(scene.maxPerCategory())
+                .seedRequired(scene.seedRequired())
+                .enabled(entity == null || Boolean.TRUE.equals(entity.getEnabled()))
+                .updatedBy(entity == null ? null : entity.getUpdatedBy())
+                .updatedAt(entity == null ? null : entity.getUpdatedAt())
+                .build();
     }
 
     public PageResult<RecommendationLogVO> pageLogs(long page, long size, Long userId, String keyword,
@@ -228,13 +360,11 @@ public class RecommendationService {
     }
 
     public RecommendationEvaluationVO evaluatePersonas() {
-        List<Product> productEntities = productMapper.selectList(Wrappers.<Product>lambdaQuery()
-                .eq(Product::getStatus, ProductStatus.ON_SALE.name())
-                .orderByDesc(Product::getSalesCount));
-        List<RecommendationCandidate> products = productEntities.stream()
+        List<RecommendationCandidate> products = catalogCache.onSaleProducts().stream()
                 .map(this::toCandidate)
                 .toList();
-        RecommendationWeights weights = RecommendationWeights.from(getOrCreateWeights());
+        RecommendationEngine.PreparedDocuments documents =
+                engine.prepareDocuments(products, UserBehaviorData.empty());
         int candidateLimit = properties.getRecommendation().getCandidateLimit();
 
         List<PersonaDefinition> personas = List.of(
@@ -273,8 +403,8 @@ public class RecommendationService {
         Set<Long> allRecommended = new LinkedHashSet<>();
         List<RecommendationEvaluationVO.PersonaResult> results = new ArrayList<>();
         for (PersonaDefinition persona : personas) {
-            RecommendationResult result = engine.recommend(products, persona.behavior(),
-                    persona.context(), weights, candidateLimit, 10);
+            RecommendationResult result = engine.recommendWithDocuments(documents, products, persona.behavior(),
+                    persona.context(), sceneWeights(persona.context().scene()), candidateLimit, 10);
             List<ScoredProduct> items = result.items();
             int evaluatedCount = Math.min(items.size(), 10);
             long hits = items.stream()
@@ -420,8 +550,8 @@ public class RecommendationService {
                 .build();
     }
 
-    private RecommendationContext resolveContext(RecommendationQuery query) {
-        SeasonSuitability season = SeasonSuitability.ofMonth(LocalDate.now().getMonthValue());
+    private RecommendationContext resolveContext(RecommendationQuery query, RecommendationScene scene) {
+        SeasonSuitability season = currentSeason();
         if (StringUtils.hasText(query.getSeason())) {
             try {
                 season = SeasonSuitability.valueOf(query.getSeason().toUpperCase(Locale.ROOT));
@@ -432,7 +562,11 @@ public class RecommendationService {
         String festival = StringUtils.hasText(query.getFestival())
                 ? query.getFestival().trim()
                 : FestivalCalendar.detect(LocalDate.now()).orElse(null);
-        return RecommendationContext.of(season, festival, query.getScene());
+        return RecommendationContext.of(season, festival, scene, query.getProductId());
+    }
+
+    private SeasonSuitability currentSeason() {
+        return SeasonSuitability.ofMonth(LocalDate.now().getMonthValue());
     }
 
     private RecommendationCandidate toCandidate(Product product) {
@@ -469,7 +603,7 @@ public class RecommendationService {
         try {
             RecommendationLog logEntity = new RecommendationLog();
             logEntity.setUserId(userId);
-            logEntity.setScene(result.context().scene());
+            logEntity.setScene(result.context().sceneCode());
             logEntity.setFestival(result.context().festival());
             logEntity.setSeason(result.context().season().name());
             logEntity.setColdStart(result.coldStart() ? 1 : 0);
@@ -485,6 +619,10 @@ public class RecommendationService {
                 map.put("popularity", item.popularityScore());
                 map.put("festivalSeason", item.festivalSeasonScore());
                 map.put("rating", item.ratingScore());
+                map.put("mode", result.mode().code());
+                if (result.context().seedProductId() != null) {
+                    map.put("seedProductId", result.context().seedProductId());
+                }
                 map.put("reason", item.reason());
                 return map;
             }).toList();

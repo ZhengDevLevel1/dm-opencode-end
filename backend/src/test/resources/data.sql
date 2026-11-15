@@ -79,6 +79,12 @@ INSERT INTO user_favorite (id, user_id, product_id, created_at) VALUES
 (5, 4, 11, DATEADD('DAY', -22, CURRENT_TIMESTAMP)),
 (6, 4, 8, DATEADD('DAY', -6, CURRENT_TIMESTAMP));
 
+INSERT INTO recommendation_scene_weight (scene, content_weight, popularity_weight, festival_weight, rating_weight, enabled, updated_by, updated_at) VALUES
+('home', 0.300, 0.230, 0.330, 0.140, 1, 1, DATEADD('DAY', -30, CURRENT_TIMESTAMP)),
+('catalog', 0.250, 0.310, 0.260, 0.180, 1, 1, DATEADD('DAY', -30, CURRENT_TIMESTAMP)),
+('recommendations', 0.460, 0.150, 0.240, 0.150, 1, 1, DATEADD('DAY', -30, CURRENT_TIMESTAMP)),
+('product', 0.550, 0.090, 0.220, 0.140, 1, 1, DATEADD('DAY', -30, CURRENT_TIMESTAMP));
+
 INSERT INTO recommendation_weight (id, content_weight, popularity_weight, festival_weight, rating_weight, updated_by, updated_at) VALUES
 (1, 0.400, 0.200, 0.250, 0.150, 1, DATEADD('DAY', -30, CURRENT_TIMESTAMP));
 

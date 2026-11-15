@@ -372,7 +372,12 @@ export function StoreBoardPage() {
 
         <footer className="flex flex-wrap items-center justify-between gap-2 pb-2 text-[11px] text-muted-foreground">
           <span>花屿 Bloom Isle · 门店看板只读模式</span>
-          <span>数据生成于 {formatDateTime(new Date().toISOString())}</span>
+          <span>
+            数据生成于{" "}
+            {overview.dataUpdatedAt
+              ? formatDateTime(new Date(overview.dataUpdatedAt).toISOString())
+              : "—"}
+          </span>
         </footer>
       </main>
     </div>

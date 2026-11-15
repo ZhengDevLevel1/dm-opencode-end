@@ -3,6 +3,7 @@ package com.flower.mall.module.recommendation.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.flower.mall.common.enums.OrderStatus;
 import com.flower.mall.common.enums.ReviewStatus;
+import com.flower.mall.config.AppProperties;
 import com.flower.mall.module.favorite.entity.UserFavorite;
 import com.flower.mall.module.favorite.mapper.UserFavoriteMapper;
 import com.flower.mall.module.metric.service.MetricConfigService;
@@ -16,9 +17,12 @@ import com.flower.mall.module.recommendation.model.RecommendationCandidate;
 import com.flower.mall.module.recommendation.model.UserBehaviorData;
 import com.flower.mall.module.review.entity.Review;
 import com.flower.mall.module.review.mapper.ReviewMapper;
+import com.flower.mall.support.TransactionCacheSupport;
 import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -26,6 +30,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -39,11 +45,38 @@ public class UserBehaviorService {
     private final UserFavoriteMapper favoriteMapper;
     private final ReviewMapper reviewMapper;
     private final MetricConfigService metricConfigService;
+    private final AppProperties properties;
+    private final Map<Long, CachedBehavior> cache = new ConcurrentHashMap<>();
 
     public UserBehaviorData load(Long userId) {
         if (userId == null) {
             return UserBehaviorData.empty();
         }
+        long ttlSeconds = Math.max(properties.getRecommendation().getBehaviorCacheSeconds(), 1);
+        CachedBehavior cached = cache.get(userId);
+        Instant now = Instant.now();
+        if (cached != null && cached.expiresAt().isAfter(now)) {
+            return cached.data();
+        }
+        UserBehaviorData data = loadFromDatabase(userId);
+        cache.put(userId, new CachedBehavior(data, now.plusSeconds(ttlSeconds)));
+        TransactionCacheSupport.onRollback(() -> cache.remove(userId));
+        return data;
+    }
+
+    public void evict(Long userId) {
+        if (userId != null) {
+            cache.remove(userId);
+        }
+    }
+
+    @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.MINUTES)
+    public void cleanupExpired() {
+        Instant now = Instant.now();
+        cache.entrySet().removeIf(entry -> !entry.getValue().expiresAt().isAfter(now));
+    }
+
+    private UserBehaviorData loadFromDatabase(Long userId) {
         List<Order> recentOrders = orderMapper.selectList(Wrappers.<Order>lambdaQuery()
                 .eq(Order::getUserId, userId)
                 .ge(Order::getCreatedAt, LocalDateTime.now().minusDays(30))
@@ -147,5 +180,8 @@ public class UserBehaviorService {
 
     private double round4(double value) {
         return Math.round(value * 10000.0) / 10000.0;
+    }
+
+    private record CachedBehavior(UserBehaviorData data, Instant expiresAt) {
     }
 }

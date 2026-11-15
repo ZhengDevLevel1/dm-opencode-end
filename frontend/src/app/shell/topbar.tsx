@@ -16,6 +16,7 @@ import {
   ReceiptText,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { preloadRoute } from "@/app/route-loaders";
 import { useAuthStore } from "@/stores/auth";
 import { useUiStore } from "@/stores/ui";
 import { useThemeStore } from "@/stores/theme";
@@ -146,6 +147,8 @@ export function Topbar() {
             <Link
               to="/favorites"
               aria-label="我的收藏"
+              onMouseEnter={() => preloadRoute("/favorites")}
+              onFocus={() => preloadRoute("/favorites")}
               className="relative hidden h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-accent-foreground sm:flex"
             >
               <Flower2 className="h-[18px] w-[18px]" />
@@ -154,6 +157,8 @@ export function Topbar() {
             <Link
               to="/cart"
               aria-label="购物车"
+              onMouseEnter={() => preloadRoute("/cart")}
+              onFocus={() => preloadRoute("/cart")}
               className="relative flex h-10 w-10 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             >
               <ShoppingBag className="h-[18px] w-[18px]" />
@@ -165,6 +170,8 @@ export function Topbar() {
         {isStaff ? (
           <Link
             to="/staff/orders"
+            onMouseEnter={() => preloadRoute("/staff/orders")}
+            onFocus={() => preloadRoute("/staff/orders")}
             className="relative hidden h-10 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground lg:flex"
           >
             <span>待接单</span>
@@ -227,11 +234,23 @@ export function Topbar() {
           </DropdownMenu>
         ) : (
           <div className="ml-1 flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => navigate("/login")}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onMouseEnter={() => preloadRoute("/login")}
+              onFocus={() => preloadRoute("/login")}
+              onClick={() => navigate("/login")}
+            >
               <LogIn className="h-4 w-4" />
               登录
             </Button>
-            <Button size="sm" className="hidden sm:inline-flex" onClick={() => navigate("/register")}>
+            <Button
+              size="sm"
+              className="hidden sm:inline-flex"
+              onMouseEnter={() => preloadRoute("/register")}
+              onFocus={() => preloadRoute("/register")}
+              onClick={() => navigate("/register")}
+            >
               注册
             </Button>
           </div>

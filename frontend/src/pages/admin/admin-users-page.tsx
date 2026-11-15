@@ -33,11 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Dialog } from "@/components/ui/dialog";
-import {
-  DropdownItem,
-  DropdownMenu,
-  DropdownSeparator,
-} from "@/components/ui/dropdown-menu";
+import { DropdownItem, DropdownMenu } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
@@ -356,11 +352,6 @@ export function AdminUsersPage() {
                         <DropdownItem onClick={() => setResetting(user)}>
                           <KeyRound className="h-3.5 w-3.5" />
                           重置密码
-                        </DropdownItem>
-                        <DropdownSeparator />
-                        <DropdownItem onClick={() => setEditing(user)}>
-                          <UsersRound className="h-3.5 w-3.5" />
-                          查看角色与状态
                         </DropdownItem>
                       </DropdownMenu>
                     </TD>

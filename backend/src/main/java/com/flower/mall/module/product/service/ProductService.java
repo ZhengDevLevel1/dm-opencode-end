@@ -19,6 +19,8 @@ import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.common.api.PageResult;
 import com.flower.mall.module.metric.service.MetricConfigService;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
+import com.flower.mall.module.recommendation.service.RecommendationService;
 import com.flower.mall.module.tag.service.TagService;
 import com.flower.mall.support.CacheKeys;
 import com.flower.mall.support.CacheService;
@@ -29,8 +31,14 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +47,8 @@ public class ProductService {
     private final ProductMapper productMapper;
     private final InventoryService inventoryService;
     private final CacheService cacheService;
+    private final RecommendationCatalogCache catalogCache;
+    private final RecommendationService recommendationService;
     private final AppProperties properties;
     private final TagService tagService;
     private final MetricConfigService metricConfigService;
@@ -91,8 +101,51 @@ public class ProductService {
         }
         wrapper.ge(query.getMinPrice() != null, Product::getPrice, query.getMinPrice());
         wrapper.le(query.getMaxPrice() != null, Product::getPrice, query.getMaxPrice());
+        if (useRecommendSort(query, adminView)) {
+            return recommendPage(query, wrapper);
+        }
         applySort(wrapper, query.getSort());
         return productMapper.selectPage(new Page<>(page, size), wrapper);
+    }
+
+    private boolean useRecommendSort(ProductQuery query, boolean adminView) {
+        return !adminView
+                && !StringUtils.hasText(query.getKeyword())
+                && (!StringUtils.hasText(query.getSort())
+                || "recommend".equalsIgnoreCase(query.getSort()));
+    }
+
+    private IPage<Product> recommendPage(ProductQuery query, LambdaQueryWrapper<Product> wrapper) {
+        long page = Math.max(query.getPage(), 1);
+        long size = Math.min(Math.max(query.getSize(), 1), 100);
+        long total = productMapper.selectCount(wrapper);
+        int scanLimit = Math.max(properties.getRecommendation().getCatalogScanLimit(), 1);
+        if (total > scanLimit) {
+            wrapper.orderByDesc(Product::getSalesCount)
+                    .orderByDesc(Product::getId)
+                    .last("LIMIT " + scanLimit);
+        }
+        List<Product> filtered = productMapper.selectList(wrapper);
+        Map<Long, Product> byId = filtered.stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+        List<Product> ranked = new ArrayList<>();
+        Set<Long> added = new HashSet<>();
+        for (Long productId : recommendationService.rankCatalog(filtered)) {
+            Product product = byId.get(productId);
+            if (product != null && added.add(productId)) {
+                ranked.add(product);
+            }
+        }
+        for (Product product : filtered) {
+            if (added.add(product.getId())) {
+                ranked.add(product);
+            }
+        }
+        int from = (int) Math.min((page - 1) * size, ranked.size());
+        int to = (int) Math.min(from + size, ranked.size());
+        Page<Product> result = new Page<>(page, size, total);
+        result.setRecords(ranked.subList(from, to));
+        return result;
     }
 
     public PageResult<ProductVO> pageVO(ProductQuery query, boolean adminView) {
@@ -264,5 +317,6 @@ public class ProductService {
     private void evictCaches(Long productId) {
         cacheService.evict(CacheKeys.productDetail(productId));
         cacheService.evict(CacheKeys.HOT_PRODUCTS);
+        catalogCache.invalidate();
     }
 }
