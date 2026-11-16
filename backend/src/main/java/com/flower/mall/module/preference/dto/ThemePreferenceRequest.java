@@ -31,6 +31,15 @@ public class ThemePreferenceRequest {
     @Pattern(regexp = "^#[0-9a-fA-F]{6}$", message = "自定义强调色格式不正确")
     private String customAccent;
 
+    @NotBlank(message = "字体风格不能为空")
+    @Pattern(regexp = "default|serif|rounded|kai", message = "字体风格不合法")
+    private String fontFamily;
+
+    @NotNull(message = "字体大小不能为空")
+    @DecimalMin(value = "12", message = "字体大小不能小于12")
+    @DecimalMax(value = "20", message = "字体大小不能大于20")
+    private Double fontSize;
+
     @NotBlank(message = "圆角不能为空")
     @Pattern(regexp = "compact|default|comfortable|round", message = "圆角不合法")
     private String radius;

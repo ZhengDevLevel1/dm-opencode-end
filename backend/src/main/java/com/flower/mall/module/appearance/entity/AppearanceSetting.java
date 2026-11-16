@@ -46,6 +46,14 @@ public class AppearanceSetting {
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String authCustomAccent;
 
+    /** 登录页字体风格：default / serif / rounded / kai */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private String authFontFamily;
+
+    /** 登录页字体大小（px） */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private Double authFontSize;
+
     private Long updatedBy;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

@@ -24,6 +24,10 @@ public class UserThemePreference {
 
     private String customAccent;
 
+    private String fontFamily;
+
+    private Double fontSize;
+
     private String radius;
 
     private String density;

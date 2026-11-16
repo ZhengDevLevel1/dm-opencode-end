@@ -13,12 +13,19 @@ export type RadiusId = "compact" | "default" | "comfortable" | "round";
 export type DensityId = "compact" | "comfortable";
 export type SidebarStyleId = "follow" | "panel" | "accent";
 export type BackgroundId = "solid" | "gradient" | "image";
+export type FontFamilyId = "default" | "serif" | "rounded" | "kai";
+
+export const DEFAULT_FONT_SIZE = 14;
+export const MIN_FONT_SIZE = 12;
+export const MAX_FONT_SIZE = 20;
 
 export interface ThemeState {
   mode: ThemeMode;
   palette: PaletteId;
   accent: AccentId;
   customAccent: string;
+  fontFamily: FontFamilyId;
+  fontSize: number;
   radius: RadiusId;
   density: DensityId;
   sidebarStyle: SidebarStyleId;
@@ -45,6 +52,8 @@ const DEFAULT_THEME = {
   palette: "default" as PaletteId,
   accent: "sky" as AccentId,
   customAccent: "#38bdf8",
+  fontFamily: "default" as FontFamilyId,
+  fontSize: DEFAULT_FONT_SIZE,
   radius: "default" as RadiusId,
   density: "comfortable" as DensityId,
   sidebarStyle: "follow" as SidebarStyleId,
@@ -57,6 +66,27 @@ const DEFAULT_THEME = {
   backgroundBlur: DEFAULT_BACKGROUND_BLUR,
   componentOpacity: DEFAULT_COMPONENT_OPACITY,
 };
+
+const LEGACY_FONT_FAMILIES: Record<string, FontFamilyId> = {
+  sans: "default",
+  round: "rounded",
+  hand: "kai",
+  decol: "serif",
+  pixel: "default",
+};
+
+function normalizeLegacyFontFamily(value: unknown): FontFamilyId {
+  if (value === "default" || value === "serif" || value === "rounded" || value === "kai") {
+    return value;
+  }
+  return LEGACY_FONT_FAMILIES[String(value)] ?? "default";
+}
+
+function clampFontSize(value: unknown): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) return DEFAULT_FONT_SIZE;
+  return Math.min(MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, numeric));
+}
 
 export const useThemeStore = create<ThemeState>()(
   persist(
@@ -91,8 +121,9 @@ export const useThemeStore = create<ThemeState>()(
     }),
     {
       name: "flower.theme",
-      version: 3,
-      // v2：默认模糊由 6px 调整为 0；v3：移除「无背景」，旧值归并为纯色。
+      version: 6,
+      // v2：默认模糊由 6px 调整为 0；v3：移除「无背景」，旧值归并为纯色；
+      // v4：新增字体风格；v5：新增字号；v6：恢复四种系统字体。
       migrate: (persisted, version) => {
         const state = (persisted ?? {}) as Partial<ThemeState>;
         const next = { ...state } as ThemeState;
@@ -101,6 +132,12 @@ export const useThemeStore = create<ThemeState>()(
         }
         if (version < 3 && (state.background as string | undefined) === "none") {
           next.background = "solid";
+        }
+        if (version < 5) {
+          next.fontSize = clampFontSize(next.fontSize);
+        }
+        if (version < 6) {
+          next.fontFamily = normalizeLegacyFontFamily(next.fontFamily);
         }
         return next;
       },

@@ -537,6 +537,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
     "palette": "rose-pine-dawn",
     "accent": "custom",
     "customAccent": "#b4637a",
+    "fontFamily": "serif",
+    "fontSize": 16,
     "updatedAt": "2026-11-05T10:30:00"
   },
   "timestamp": 1760000000000
@@ -552,7 +554,10 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 - `palette`：登录页表面配色，可选 `default` / `rose-pine-dawn` / `catppuccin-latte` / `everforest-light` / `rose-pine`，默认 `default`。
 - `accent`：登录页强调色，可选 `sky` / `blue` / `violet` / `rose` / `emerald` / `amber` / `orange` / `custom`，默认 `sky`。
 - `customAccent`：`accent` 为 `custom` 时使用的 `#RRGGBB` 颜色，默认 `#38bdf8`。
-- 配色仅作用于登录页与注册页，不改变已登录用户本机的个人外观偏好。
+- `fontFamily`：登录页与注册页字体风格，可选 `default` / `serif` / `rounded` / `kai`，默认 `default`。
+- `fontSize`：登录页与注册页基础字号（px），取值 `12–20`，默认 `14`。
+- 历史六字体值会在读取时归并为四种系统字体：`sans`/`pixel` → `default`，`round` → `rounded`，`hand` → `kai`，`decol` → `serif`。
+- 配色、字体与字号仅作用于登录页与注册页，不改变已登录用户本机的个人外观偏好。
 
 `PUT /api/admin/appearance/auth-background`（管理员）
 
@@ -565,14 +570,16 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
   "componentOpacity": 0.9,
   "palette": "rose-pine-dawn",
   "accent": "custom",
-  "customAccent": "#b4637a"
+  "customAccent": "#b4637a",
+  "fontFamily": "serif",
+  "fontSize": 16
 }
 ```
 
 - `imageUrl` 传空字符串或空白字符表示清除背景，响应中 `imageUrl` 为 `null`。
 - `backgroundType` 省略时按 `imageUrl` 是否有值推断为 `IMAGE`/`NONE`；传 `GRADIENT` 时无需图片。
-- 三个调节参数与配色字段均可省略；省略时保持服务端已有值，便于旧客户端只更新图片。
-- 配色字段取值非法或 `customAccent` 不是 `#RRGGBB` 时返回 `400`。
+- 三个调节参数、配色、字体与字号字段均可省略；省略时保持服务端已有值，便于旧客户端只更新图片。
+- 配色字段取值非法、`fontFamily` 不在允许范围、`fontSize` 不在 `12–20` 或 `customAccent` 不是 `#RRGGBB` 时返回 `400`。
 
 ### 4.7 用户外观偏好
 
@@ -591,6 +598,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
   "palette": "rose-pine",
   "accent": "rose",
   "customAccent": "#c25b6a",
+  "fontFamily": "default",
+  "fontSize": 15.5,
   "radius": "round",
   "density": "comfortable",
   "sidebarStyle": "follow",
@@ -614,6 +623,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | `palette` | `default` / `rose-pine-dawn` / `catppuccin-latte` / `everforest-light` / `rose-pine` |
 | `accent` | `sky` / `blue` / `violet` / `rose` / `emerald` / `amber` / `orange` / `custom` |
 | `customAccent` | `#RRGGBB` |
+| `fontFamily` | `default` / `serif` / `rounded` / `kai` |
+| `fontSize` | `12–20`，默认 `14` |
 | `radius` | `compact` / `default` / `comfortable` / `round` |
 | `density` | `compact` / `comfortable` |
 | `sidebarStyle` | `follow` / `panel` / `accent` |

@@ -305,6 +305,8 @@ CREATE TABLE appearance_setting (
     auth_palette VARCHAR(32) NOT NULL DEFAULT 'default' COMMENT '默认表面配色',
     auth_accent VARCHAR(32) NOT NULL DEFAULT 'sky' COMMENT '登录页强调色',
     auth_custom_accent VARCHAR(16) NOT NULL DEFAULT '#38bdf8' COMMENT '自定义强调色 #RRGGBB',
+    auth_font_family VARCHAR(20) NOT NULL DEFAULT 'default' COMMENT '登录页字体风格：default/serif/rounded/kai',
+    auth_font_size DOUBLE NOT NULL DEFAULT 14 COMMENT '登录页字体大小（px）',
     updated_by BIGINT DEFAULT NULL,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
@@ -348,6 +350,8 @@ CREATE TABLE user_theme_preference (
     palette VARCHAR(40) NOT NULL DEFAULT 'default',
     accent VARCHAR(20) NOT NULL DEFAULT 'sky',
     custom_accent VARCHAR(20) NOT NULL DEFAULT '#38bdf8',
+    font_family VARCHAR(20) NOT NULL DEFAULT 'default',
+    font_size DOUBLE NOT NULL DEFAULT 14,
     radius VARCHAR(20) NOT NULL DEFAULT 'default',
     density VARCHAR(20) NOT NULL DEFAULT 'comfortable',
     sidebar_style VARCHAR(20) NOT NULL DEFAULT 'follow',

@@ -35,7 +35,7 @@
 ```text
 .
 ├── backend/                 # Spring Boot 后端
-│   ├── db/                  # flower_shop.sql 完整初始化 / 拆分脚本 / 增量迁移
+│   ├── db/                  # flower_shop.sql 一键初始化 / 增量迁移
 │   ├── src/main/java/com/flower/mall/
 │   │   ├── common/          # 统一响应、分页、枚举、异常
 │   │   ├── config/          # 安全、MyBatis-Plus、OpenAPI 配置
@@ -75,13 +75,17 @@
 mysql -uroot -p < backend/db/flower_shop.sql
 ```
 
-`flower_shop.sql` 已整合建库、全部表结构、演示数据和默认配置，会自动创建并使用 `flower_shop`。也可以继续分别导入 `backend/db/schema.sql` 和 `backend/db/data.sql`。
+`flower_shop.sql` 已整合建库、全部表结构、演示数据和默认配置，会自动创建并使用 `flower_shop`。
 
-已有旧库升级时，按需执行 `backend/db/` 下的增量迁移脚本，例如：
+已有旧库升级时，按时间顺序执行 `backend/db/` 下尚未应用的增量迁移脚本；四种系统字体预设与字号功能对应：
 
 ```bash
-mysql -uroot -p flower_shop < backend/db/migration_20261105_add_appearance_setting.sql
+mysql -uroot -p flower_shop < backend/db/migration_20261115_add_font_family.sql
+mysql -uroot -p flower_shop < backend/db/migration_20261115_font_presets_and_size.sql
+mysql -uroot -p flower_shop < backend/db/migration_20261116_restore_four_font_families.sql
 ```
+
+如果旧库已经执行过 `migration_20261115_add_font_family.sql`，可跳过第一个脚本；如果已经执行过六字体迁移，只需执行 `migration_20261116_restore_four_font_families.sql`。
 
 ### 2. 启动后端
 
@@ -184,6 +188,6 @@ npm run build
 
 ## 其他说明
 
-- 主题与外观（配色、圆角、密度、背景等）保存在浏览器 `localStorage`；登录/注册页背景由管理员配置并保存在服务端。
+- 主题与外观（配色、四种系统字体、字号、圆角、密度、背景等）保存在浏览器 `localStorage`；登录/注册页背景、配色、字体与字号由管理员配置并保存在服务端。
 - 库存变更使用条件 SQL 原子扣减，订单、支付、退款路径同步写库存流水并失效相关缓存。
 - 详细设计与实现说明见 `docs/系统设计与实现说明.md`。

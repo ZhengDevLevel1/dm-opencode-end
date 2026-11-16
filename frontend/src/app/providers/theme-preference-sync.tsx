@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { getErrorMessage } from "@/lib/api-client";
 import { preferenceService } from "@/lib/services";
 import { useAuthStore } from "@/stores/auth";
-import { useThemeStore, type ThemeState } from "@/stores/theme";
+import { DEFAULT_FONT_SIZE, useThemeStore, type ThemeState } from "@/stores/theme";
 import { useUiStore } from "@/stores/ui";
 import { toast } from "@/stores/toast";
 import type { ThemePreference, ThemePreferenceRequest } from "@/types/api";
@@ -20,6 +20,8 @@ function toPayload(state: ThemeState): ThemePayload {
     palette: state.palette,
     accent: state.accent,
     customAccent: state.customAccent,
+    fontFamily: state.fontFamily,
+    fontSize: state.fontSize,
     radius: state.radius,
     density: state.density,
     sidebarStyle: state.sidebarStyle,
@@ -41,6 +43,8 @@ function normalize(preference: ThemePreference): ThemePayload {
     palette: preference.palette,
     accent: preference.accent,
     customAccent: preference.customAccent,
+    fontFamily: preference.fontFamily,
+    fontSize: preference.fontSize ?? DEFAULT_FONT_SIZE,
     radius: preference.radius,
     density: preference.density,
     sidebarStyle: preference.sidebarStyle,
@@ -62,7 +66,10 @@ function serialize(payload: ThemePayload): string {
 
 function applyPayload(payload: ThemePayload) {
   const { sidebarPinned, ...theme } = payload;
-  useThemeStore.setState(theme);
+  useThemeStore.setState({
+    ...theme,
+    fontSize: theme.fontSize ?? DEFAULT_FONT_SIZE,
+  });
   useUiStore.getState().setSidebarPinned(sidebarPinned);
 }
 

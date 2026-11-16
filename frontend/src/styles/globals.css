@@ -56,6 +56,50 @@
   --radius-2xl: calc(var(--radius) + 4px);
 }
 
+/* ============================================================
+ * 字体风格
+ * 使用系统常见中文字体组合，避免额外网络字体依赖。
+ * 通过 data-font 同时支持全局主题与登录页局部作用域。
+ * ============================================================ */
+
+[data-font="default"] {
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-display: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC",
+    "SimSun", Georgia, serif;
+}
+
+[data-font="serif"] {
+  --font-sans: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC",
+    "SimSun", Georgia, serif;
+  --font-display: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC",
+    "SimSun", Georgia, serif;
+}
+
+[data-font="rounded"] {
+  --font-sans: "YouYuan", "Yuanti SC", "Hiragino Maru Gothic ProN",
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-display: "YouYuan", "Yuanti SC", "Hiragino Maru Gothic ProN",
+    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+}
+
+[data-font="kai"] {
+  --font-sans: "KaiTi", "STKaiti", "Kaiti SC", "Noto Serif SC", "Songti SC",
+    serif;
+  --font-display: "KaiTi", "STKaiti", "Kaiti SC", "Noto Serif SC", "Songti SC",
+    serif;
+}
+
+[data-font] {
+  font-family: var(--font-sans);
+}
+
+/* Tailwind 的 @theme inline 会把 font-display 编译成固定字体栈，
+ * 这里改为读取变量，使字体风格能够同步影响登录页标题。 */
+.font-display {
+  font-family: var(--font-display);
+}
+
 :root {
   --radius: 0.75rem;
 
@@ -637,8 +681,12 @@
 }
 
 html {
-  font-size: calc(14px * var(--ui-scale));
+  font-size: calc(14px * var(--ui-scale) * var(--font-scale, 1));
   -webkit-text-size-adjust: 100%;
+}
+
+html.auth-route {
+  font-size: calc(14px * var(--ui-scale) * var(--auth-font-scale, 1));
 }
 
 body {

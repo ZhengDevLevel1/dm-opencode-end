@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Data
 @Builder
@@ -14,6 +15,8 @@ public class ThemePreferenceVO {
     private String palette;
     private String accent;
     private String customAccent;
+    private String fontFamily;
+    private Double fontSize;
     private String radius;
     private String density;
     private String sidebarStyle;
@@ -34,6 +37,8 @@ public class ThemePreferenceVO {
                 .palette(valueOr(entity.getPalette(), "default"))
                 .accent(valueOr(entity.getAccent(), "sky"))
                 .customAccent(valueOr(entity.getCustomAccent(), "#38bdf8"))
+                .fontFamily(normalizeFontFamily(entity.getFontFamily()))
+                .fontSize(entity.getFontSize() == null ? 14.0 : entity.getFontSize())
                 .radius(valueOr(entity.getRadius(), "default"))
                 .density(valueOr(entity.getDensity(), "comfortable"))
                 .sidebarStyle(valueOr(entity.getSidebarStyle(), "follow"))
@@ -52,5 +57,20 @@ public class ThemePreferenceVO {
 
     private static String valueOr(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    /** 把历史六字体值归并到当前四种系统字体。 */
+    private static String normalizeFontFamily(String value) {
+        if (value == null || value.isBlank()) {
+            return "default";
+        }
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "default" -> "default";
+            case "serif" -> "serif";
+            case "rounded", "round" -> "rounded";
+            case "kai", "hand" -> "kai";
+            case "decol" -> "serif";
+            default -> "default";
+        };
     }
 }

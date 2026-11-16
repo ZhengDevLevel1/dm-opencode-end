@@ -250,6 +250,8 @@ CREATE TABLE appearance_setting (
     auth_palette VARCHAR(32) DEFAULT 'default',
     auth_accent VARCHAR(32) DEFAULT 'sky',
     auth_custom_accent VARCHAR(16) DEFAULT '#38bdf8',
+    auth_font_family VARCHAR(20) DEFAULT 'default',
+    auth_font_size DOUBLE DEFAULT 14,
     updated_by BIGINT,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -287,6 +289,8 @@ CREATE TABLE user_theme_preference (
     palette VARCHAR(40) NOT NULL DEFAULT 'default',
     accent VARCHAR(20) NOT NULL DEFAULT 'sky',
     custom_accent VARCHAR(20) NOT NULL DEFAULT '#38bdf8',
+    font_family VARCHAR(20) NOT NULL DEFAULT 'default',
+    font_size DOUBLE NOT NULL DEFAULT 14,
     radius VARCHAR(20) NOT NULL DEFAULT 'default',
     density VARCHAR(20) NOT NULL DEFAULT 'comfortable',
     sidebar_style VARCHAR(20) NOT NULL DEFAULT 'follow',

@@ -19,10 +19,17 @@
           root.style.colorScheme = dark ? "dark" : "light";
           root.dataset.palette = state.palette || "default";
           root.dataset.accent = state.accent || "sky";
+          var fontMap = { sans: "default", round: "rounded", hand: "kai", decol: "serif", pixel: "default" };
+          var font = fontMap[state.fontFamily] || state.fontFamily || "default";
+          if (["default", "serif", "rounded", "kai"].indexOf(font) === -1) {
+            font = "default";
+          }
+          root.dataset.font = font;
           root.dataset.radius = state.radius || "default";
           root.dataset.density = state.density || "comfortable";
           root.dataset.sidebar = state.sidebarStyle || "follow";
           root.style.setProperty("--ui-scale", String(state.scale || 1));
+          root.style.setProperty("--font-scale", String((state.fontSize || 14) / 14));
           root.style.setProperty("--ui-surface-opacity", String(state.componentOpacity == null ? 1 : state.componentOpacity));
           root.style.setProperty("--app-bg-opacity", String(state.backgroundOpacity == null ? 0.82 : state.backgroundOpacity));
           root.style.setProperty("--app-bg-blur", (state.backgroundBlur == null ? 0 : state.backgroundBlur) + "px");

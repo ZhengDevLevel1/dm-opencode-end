@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useResolvedDark } from "@/app/providers/theme-provider";
 import { cn } from "@/lib/cn";
 import { buildCustomAccentVars, HEX_PATTERN } from "@/lib/custom-accent";
-import type { AccentId, PaletteId } from "@/stores/theme";
+import type { AccentId, FontFamilyId, PaletteId } from "@/stores/theme";
 
 /** 生成与 ThemeProvider 自定义强调色一致的一组 CSS 变量。 */
 function customAccentStyle(color: string): CSSProperties {
@@ -17,12 +17,14 @@ export function AuthThemeScope({
   palette,
   accent,
   customAccent,
+  fontFamily,
   className,
   children,
 }: {
   palette: PaletteId;
   accent: AccentId;
   customAccent: string;
+  fontFamily: FontFamilyId;
   className?: string;
   children: ReactNode;
 }) {
@@ -32,6 +34,7 @@ export function AuthThemeScope({
     <div
       data-palette={palette}
       data-accent={useCustomAccent ? undefined : accent === "custom" ? "sky" : accent}
+      data-font={fontFamily}
       className={cn(dark && "dark", className)}
       style={useCustomAccent ? customAccentStyle(customAccent) : undefined}
     >

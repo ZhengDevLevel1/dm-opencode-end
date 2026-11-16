@@ -1,4 +1,4 @@
-import type { AccentId, PaletteId } from "@/stores/theme";
+import type { AccentId, FontFamilyId, PaletteId } from "@/stores/theme";
 
 export interface ApiResponse<T> {
   code: number;
@@ -150,6 +150,10 @@ export interface AuthBackgroundVO {
   accent?: AccentId;
   /** 自定义强调色 #RRGGBB */
   customAccent?: string;
+  /** 登录页字体风格 */
+  fontFamily?: FontFamilyId;
+  /** 登录页字体大小（px） */
+  fontSize?: number;
   updatedAt?: string;
 }
 
@@ -162,6 +166,8 @@ export interface AuthBackgroundRequest {
   palette?: PaletteId;
   accent?: AccentId;
   customAccent?: string;
+  fontFamily?: FontFamilyId;
+  fontSize?: number;
 }
 
 export interface ChangePasswordRequest {
@@ -247,6 +253,8 @@ export interface ThemePreference {
   palette: "default" | "rose-pine-dawn" | "catppuccin-latte" | "everforest-light" | "rose-pine";
   accent: "sky" | "blue" | "violet" | "rose" | "emerald" | "amber" | "orange" | "custom";
   customAccent: string;
+  fontFamily: FontFamilyId;
+  fontSize: number;
   radius: "compact" | "default" | "comfortable" | "round";
   density: "compact" | "comfortable";
   sidebarStyle: "follow" | "panel" | "accent";

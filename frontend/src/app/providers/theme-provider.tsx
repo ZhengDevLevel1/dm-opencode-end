@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { buildCustomAccentVars } from "@/lib/custom-accent";
-import { useThemeStore } from "@/stores/theme";
+import { DEFAULT_FONT_SIZE, useThemeStore } from "@/stores/theme";
 
 const ResolvedThemeContext = createContext(false);
 
@@ -43,6 +43,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const palette = useThemeStore((state) => state.palette);
   const accent = useThemeStore((state) => state.accent);
   const customAccent = useThemeStore((state) => state.customAccent);
+  const fontFamily = useThemeStore((state) => state.fontFamily);
+  const fontSize = useThemeStore((state) => state.fontSize);
   const radius = useThemeStore((state) => state.radius);
   const density = useThemeStore((state) => state.density);
   const sidebarStyle = useThemeStore((state) => state.sidebarStyle);
@@ -78,10 +80,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     root.dataset.palette = palette;
     root.dataset.accent = accent;
+    root.dataset.font = fontFamily;
     root.dataset.radius = radius;
     root.dataset.density = density;
     root.dataset.sidebar = sidebarStyle;
     root.style.setProperty("--ui-scale", String(scale));
+    root.style.setProperty("--font-scale", String(fontSize / DEFAULT_FONT_SIZE));
     root.classList.toggle("reduce-motion", reduceMotion);
     root.classList.toggle("high-contrast", highContrast);
     root.dataset.background = background;
@@ -102,6 +106,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     palette,
     accent,
     customAccent,
+    fontFamily,
+    fontSize,
     radius,
     density,
     sidebarStyle,

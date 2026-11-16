@@ -5,6 +5,7 @@ import lombok.Data;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Data
 public class AuthBackgroundVO {
@@ -21,6 +22,10 @@ public class AuthBackgroundVO {
     public static final String DEFAULT_ACCENT = "sky";
     /** 默认自定义强调色 */
     public static final String DEFAULT_CUSTOM_ACCENT = "#38bdf8";
+    /** 默认字体风格 */
+    public static final String DEFAULT_FONT_FAMILY = "default";
+    /** 默认字体大小（px） */
+    public static final double DEFAULT_FONT_SIZE = 14.0;
 
     /** NONE / GRADIENT / IMAGE */
     private String backgroundType;
@@ -42,6 +47,12 @@ public class AuthBackgroundVO {
     /** 自定义强调色，#RRGGBB */
     private String customAccent;
 
+    /** 登录页字体风格 */
+    private String fontFamily;
+
+    /** 登录页字体大小（px） */
+    private Double fontSize;
+
     private LocalDateTime updatedAt;
 
     public static AuthBackgroundVO from(AppearanceSetting setting) {
@@ -53,6 +64,8 @@ public class AuthBackgroundVO {
         vo.setPalette(DEFAULT_PALETTE);
         vo.setAccent(DEFAULT_ACCENT);
         vo.setCustomAccent(DEFAULT_CUSTOM_ACCENT);
+        vo.setFontFamily(DEFAULT_FONT_FAMILY);
+        vo.setFontSize(DEFAULT_FONT_SIZE);
         if (setting != null) {
             vo.setImageUrl(setting.getAuthBackgroundImage());
             vo.setUpdatedAt(setting.getUpdatedAt());
@@ -75,6 +88,12 @@ public class AuthBackgroundVO {
             if (StringUtils.hasText(setting.getAuthCustomAccent())) {
                 vo.setCustomAccent(setting.getAuthCustomAccent());
             }
+            if (StringUtils.hasText(setting.getAuthFontFamily())) {
+                vo.setFontFamily(normalizeFontFamily(setting.getAuthFontFamily()));
+            }
+            if (setting.getAuthFontSize() != null) {
+                vo.setFontSize(setting.getAuthFontSize());
+            }
         }
         return vo;
     }
@@ -85,5 +104,18 @@ public class AuthBackgroundVO {
             return type.toUpperCase();
         }
         return StringUtils.hasText(imageUrl) ? "IMAGE" : "NONE";
+    }
+
+    /** 把历史六字体值归并到当前四种系统字体。 */
+    private static String normalizeFontFamily(String value) {
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "default" -> "default";
+            case "serif" -> "serif";
+            case "rounded", "round" -> "rounded";
+            case "kai", "hand" -> "kai";
+            case "decol" -> "serif";
+            case "sans", "pixel" -> DEFAULT_FONT_FAMILY;
+            default -> DEFAULT_FONT_FAMILY;
+        };
     }
 }

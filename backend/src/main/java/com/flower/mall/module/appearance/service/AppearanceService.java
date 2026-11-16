@@ -53,6 +53,12 @@ public class AppearanceService {
         if (request.getCustomAccent() != null) {
             setting.setAuthCustomAccent(request.getCustomAccent().toLowerCase(Locale.ROOT));
         }
+        if (request.getFontFamily() != null) {
+            setting.setAuthFontFamily(request.getFontFamily().toLowerCase(Locale.ROOT));
+        }
+        if (request.getFontSize() != null) {
+            setting.setAuthFontSize(request.getFontSize());
+        }
         setting.setUpdatedBy(SecurityUtils.currentUserId());
         setting.setUpdatedAt(null);
         settingMapper.updateById(setting);

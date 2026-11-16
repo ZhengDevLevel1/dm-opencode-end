@@ -48,6 +48,8 @@ public class ThemePreferenceService {
         target.setPalette(source.getPalette());
         target.setAccent(source.getAccent());
         target.setCustomAccent(source.getCustomAccent());
+        target.setFontFamily(source.getFontFamily());
+        target.setFontSize(source.getFontSize());
         target.setRadius(source.getRadius());
         target.setDensity(source.getDensity());
         target.setSidebarStyle(source.getSidebarStyle());

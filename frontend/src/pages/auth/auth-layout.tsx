@@ -1,9 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 import { Flower2, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { useResolvedDark } from "@/app/providers/theme-provider";
-import { useThemeStore } from "@/stores/theme";
+import { DEFAULT_FONT_SIZE, useThemeStore } from "@/stores/theme";
 import { runWithThemeTransition, nextThemeMode } from "@/lib/theme-transition";
 import { useAuthBackgroundQuery } from "@/hooks/queries";
 import { resolveImageUrl } from "@/lib/image";
@@ -49,7 +49,18 @@ export function AuthLayout({
   const reduced = Boolean(systemReducedMotion || reduceMotionSetting);
   const setTheme = useThemeStore((state) => state.set);
   const { data: authBackground } = useAuthBackgroundQuery();
+  const authFontSize = authBackground?.fontSize ?? DEFAULT_FONT_SIZE;
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("auth-route");
+    root.style.setProperty("--auth-font-scale", String(authFontSize / DEFAULT_FONT_SIZE));
+    return () => {
+      root.classList.remove("auth-route");
+      root.style.removeProperty("--auth-font-scale");
+    };
+  }, [authFontSize]);
   const resolvedImage = resolveImageUrl(authBackground?.imageUrl);
   const backgroundImage = resolvedImage && resolvedImage !== failedUrl ? resolvedImage : null;
   const backgroundType = (
@@ -68,6 +79,7 @@ export function AuthLayout({
       palette={authBackground?.palette ?? "default"}
       accent={authBackground?.accent ?? "sky"}
       customAccent={authBackground?.customAccent ?? "#38bdf8"}
+      fontFamily={authBackground?.fontFamily ?? "default"}
       className="relative flex min-h-screen bg-background"
     >
       {/* 背景：管理端配置的图片 / 渐变，未配置时使用品牌色环境光 */}

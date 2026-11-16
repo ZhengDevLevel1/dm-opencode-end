@@ -18,6 +18,7 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Sun,
+  Type,
   Upload,
   type LucideIcon,
 } from "lucide-react";
@@ -25,10 +26,14 @@ import {
   DEFAULT_BACKGROUND_BLUR,
   DEFAULT_BACKGROUND_OPACITY,
   DEFAULT_COMPONENT_OPACITY,
+  DEFAULT_FONT_SIZE,
+  MAX_FONT_SIZE,
+  MIN_FONT_SIZE,
   useThemeStore,
   type AccentId,
   type BackgroundId,
   type DensityId,
+  type FontFamilyId,
   type PaletteId,
   type RadiusId,
   type SidebarStyleId,
@@ -123,6 +128,17 @@ const accents: Array<{ value: AccentId; label: string; color: string }> = [
   { value: "orange", label: "暖橙", color: "#f97316" },
 ];
 
+const fontFamilies: Array<{
+  value: FontFamilyId;
+  label: string;
+  description: string;
+}> = [
+  { value: "default", label: "默认雅致", description: "正文黑体、标题宋体，保留花屿原有气质。" },
+  { value: "serif", label: "宋韵书卷", description: "宋体衬线，带一点花艺手账的雅致。" },
+  { value: "rounded", label: "柔和圆体", description: "笔画圆润，轻松亲切，适合节日氛围。" },
+  { value: "kai", label: "手写楷体", description: "楷体手写感，适合展示型页面与短文案。" },
+];
+
 const radii: Array<{ value: RadiusId; label: string }> = [
   { value: "compact", label: "紧凑" },
   { value: "default", label: "默认" },
@@ -163,7 +179,7 @@ type PasswordValues = z.infer<typeof passwordSchema>;
 type PasswordMode = "password" | "email";
 
 export function SettingsPage() {
-  // 仅订阅页面渲染需要的字段；缩放、遮罩、模糊由各自小组件独立订阅，
+  // 仅订阅页面渲染需要的字段；字号、缩放、遮罩、模糊由各自小组件独立订阅，
   // 拖拽滑动条时不会重渲染整个设置页，保证跟手不卡顿。
   const theme = useThemeStore(
     useShallow((state) => ({
@@ -171,6 +187,7 @@ export function SettingsPage() {
       palette: state.palette,
       accent: state.accent,
       customAccent: state.customAccent,
+      fontFamily: state.fontFamily,
       radius: state.radius,
       density: state.density,
       sidebarStyle: state.sidebarStyle,
@@ -346,6 +363,23 @@ export function SettingsPage() {
                       </button>
                     );
                   })}
+                </div>
+              </section>
+
+              <section className="ui-card p-5">
+                <SectionTitle
+                  icon={Type}
+                  title="字体风格"
+                  description="选择界面正文与标题的字体气质，会同步到当前账号。"
+                />
+                <div className="mt-4">
+                  <FontStylePicker
+                    value={theme.fontFamily}
+                    onChange={(fontFamily) => theme.set({ fontFamily })}
+                  />
+                  <div className="mt-4 border-t border-border/60 pt-4">
+                    <PersonalFontSizeControl />
+                  </div>
                 </div>
               </section>
 
@@ -889,6 +923,64 @@ function ScaleControl() {
   );
 }
 
+function PersonalFontSizeControl() {
+  const fontSize = useThemeStore((state) => state.fontSize);
+  const set = useThemeStore((state) => state.set);
+
+  return (
+    <FontSizeControl
+      value={fontSize}
+      onChange={(next) => set({ fontSize: Number(next.toFixed(1)) })}
+    />
+  );
+}
+
+function FontSizeControl({
+  value,
+  onChange,
+  hint = "调整界面正文与标题的基准字号，默认 14px。",
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  hint?: string;
+}) {
+  const reset = Math.abs(value - DEFAULT_FONT_SIZE) < 0.001;
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="font-medium">字体大小</span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground tabular">
+            {Number.isInteger(value) ? value : value.toFixed(1)}px
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[11px] text-muted-foreground"
+            onClick={() => onChange(DEFAULT_FONT_SIZE)}
+            disabled={reset}
+            title={`重置为 ${DEFAULT_FONT_SIZE}px`}
+          >
+            <RotateCcw className="h-3 w-3" />
+            重置
+          </Button>
+        </div>
+      </div>
+      <RangeSlider
+        min={MIN_FONT_SIZE}
+        max={MAX_FONT_SIZE}
+        step={0.1}
+        value={value}
+        onChange={onChange}
+        className="mt-2 w-full"
+        aria-label="字体大小"
+      />
+      <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>
+    </div>
+  );
+}
+
 function BackgroundSliders() {
   const backgroundOpacity = useThemeStore((state) => state.backgroundOpacity);
   const backgroundBlur = useThemeStore((state) => state.backgroundBlur);
@@ -1008,6 +1100,8 @@ interface AuthBackgroundDraft {
   palette: PaletteId;
   accent: AccentId;
   customAccent: string;
+  font: FontFamilyId;
+  fontSize: number;
 }
 
 const AUTH_BG_DEFAULTS: AuthBackgroundDraft = {
@@ -1018,6 +1112,8 @@ const AUTH_BG_DEFAULTS: AuthBackgroundDraft = {
   palette: "default",
   accent: "sky",
   customAccent: "#38bdf8",
+  font: "default",
+  fontSize: DEFAULT_FONT_SIZE,
 };
 
 const AUTH_CUSTOM_ACCENT_PATTERN = /^#[0-9a-fA-F]{6}$/;
@@ -1033,6 +1129,8 @@ function serializeAuthDraft(draft: AuthBackgroundDraft, type: AuthBackgroundType
     palette: draft.palette,
     accent: draft.accent,
     customAccent: draft.accent === "custom" ? draft.customAccent.toLowerCase() : "",
+    font: draft.font,
+    fontSize: Number(draft.fontSize.toFixed(1)),
   });
 }
 
@@ -1059,6 +1157,8 @@ function AuthBackgroundSection() {
       palette: data.palette ?? AUTH_BG_DEFAULTS.palette,
       accent: data.accent ?? AUTH_BG_DEFAULTS.accent,
       customAccent: data.customAccent ?? AUTH_BG_DEFAULTS.customAccent,
+      font: data.fontFamily ?? AUTH_BG_DEFAULTS.font,
+      fontSize: data.fontSize ?? AUTH_BG_DEFAULTS.fontSize,
     };
     const storedType = (data.backgroundType ?? (next.image ? "IMAGE" : "NONE")).toLowerCase();
     const nextType: AuthBackgroundType =
@@ -1082,6 +1182,8 @@ function AuthBackgroundSection() {
         customAccent: AUTH_CUSTOM_ACCENT_PATTERN.test(next.customAccent)
           ? next.customAccent.toLowerCase()
           : undefined,
+        fontFamily: next.font,
+        fontSize: Number(next.fontSize.toFixed(1)),
       }),
     onSuccess: (result, variables) => {
       queryClient.setQueryData(queryKeys.authBackground, result);
@@ -1094,6 +1196,8 @@ function AuthBackgroundSection() {
           palette: result.palette ?? AUTH_BG_DEFAULTS.palette,
           accent: result.accent ?? AUTH_BG_DEFAULTS.accent,
           customAccent: result.customAccent ?? AUTH_BG_DEFAULTS.customAccent,
+          font: result.fontFamily ?? AUTH_BG_DEFAULTS.font,
+          fontSize: result.fontSize ?? AUTH_BG_DEFAULTS.fontSize,
         },
         variables.mode,
       );
@@ -1173,6 +1277,27 @@ function AuthBackgroundSection() {
                 </button>
               );
             })}
+          </div>
+        </section>
+
+        <section className="ui-card p-5">
+          <SectionTitle
+            icon={Type}
+            title="字体风格"
+            description="登录页与注册页共用的字体气质，不影响访客个人偏好。"
+          />
+          <div className="mt-4">
+            <FontStylePicker
+              value={draft.font}
+              onChange={(font) => patchDraft({ font })}
+            />
+            <div className="mt-4 border-t border-border/60 pt-4">
+              <FontSizeControl
+                value={draft.fontSize}
+                onChange={(fontSize) => patchDraft({ fontSize })}
+                hint="作用于登录页与注册页的正文和标题，默认 14px。"
+              />
+            </div>
           </div>
         </section>
 
@@ -1301,7 +1426,7 @@ function AuthBackgroundSection() {
             description="登录页外观是全局配置，仅管理员可以修改。"
           />
           <ul className="mt-4 space-y-2 text-xs leading-relaxed text-muted-foreground">
-            <li>· 表面配色与强调色只作用于登录 / 注册页，不会改变已登录用户自己的外观偏好。</li>
+            <li>· 表面配色、强调色与字体风格只作用于登录 / 注册页，不会改变已登录用户自己的外观偏好。</li>
             <li>· 同时作用于登录页与注册页的背景区域，所有访客共享。</li>
             <li>· 自定义图片会先上传到图床，再作为背景地址保存。</li>
             <li>· 拖动滑块后约 0.6 秒自动保存，无需手动提交。</li>
@@ -1316,7 +1441,7 @@ function AuthBackgroundSection() {
             <AuthBackgroundPreview draft={draft} type={type} />
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            预览与登录页使用同一套配色、背景、遮罩与模糊参数。
+            预览与登录页使用同一套配色、字体、背景、遮罩与模糊参数。
           </p>
         </section>
       </aside>
@@ -1348,6 +1473,7 @@ function AuthBackgroundPreview({
       palette={draft.palette}
       accent={draft.accent}
       customAccent={draft.customAccent}
+      fontFamily={draft.font}
       className="relative h-40 overflow-hidden rounded-xl border border-border/60 bg-background"
     >
       {type === "gradient" ? (
@@ -1557,6 +1683,56 @@ function BackgroundPreview({
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+function FontStylePicker({
+  value,
+  onChange,
+}: {
+  value: FontFamilyId;
+  onChange: (value: FontFamilyId) => void;
+}) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {fontFamilies.map((font) => {
+        const active = value === font.value;
+        return (
+          <button
+            key={font.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(font.value)}
+            className={cn(
+              "rounded-xl border p-2.5 text-left transition-colors",
+              active
+                ? "border-primary/40 bg-primary/[0.04]"
+                : "border-border hover:bg-muted/40",
+            )}
+          >
+            <span
+              data-font={font.value}
+              className="block rounded-lg border border-border/60 bg-background px-3 py-2.5"
+            >
+              <span className="flex items-baseline justify-between gap-2">
+                <span className="font-display text-lg leading-none">花屿</span>
+                <span className="text-[10px] text-muted-foreground">Bloom Isle</span>
+              </span>
+              <span className="mt-1.5 block truncate text-[11px] text-muted-foreground">
+                朝露玫瑰 · 春日花礼
+              </span>
+            </span>
+            <span className="mt-2 flex items-center gap-1.5 text-xs font-medium">
+              {font.label}
+              {active ? <Check className="h-3.5 w-3.5 text-primary" /> : null}
+            </span>
+            <span className="mt-0.5 block text-[10px] text-muted-foreground">
+              {font.description}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

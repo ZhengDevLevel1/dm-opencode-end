@@ -40,7 +40,9 @@ class AppearanceIntegrationTest {
                 .andExpect(jsonPath("$.data.imageUrl").doesNotExist())
                 .andExpect(jsonPath("$.data.palette").value("default"))
                 .andExpect(jsonPath("$.data.accent").value("sky"))
-                .andExpect(jsonPath("$.data.customAccent").value("#38bdf8"));
+                .andExpect(jsonPath("$.data.customAccent").value("#38bdf8"))
+                .andExpect(jsonPath("$.data.fontFamily").value("default"))
+                .andExpect(jsonPath("$.data.fontSize").value(14.0));
     }
 
     @Test
@@ -53,7 +55,8 @@ class AppearanceIntegrationTest {
                                 {"imageUrl":"https://example.com/login-background.jpg",
                                  "backgroundType":"IMAGE",
                                  "backgroundOpacity":0.62,"backgroundBlur":12,"componentOpacity":0.85,
-                                 "palette":"rose-pine-dawn","accent":"custom","customAccent":"#B4637A"}
+                                 "palette":"rose-pine-dawn","accent":"custom","customAccent":"#B4637A",
+                                 "fontFamily":"rounded","fontSize":16.5}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.backgroundType").value("IMAGE"))
@@ -64,14 +67,18 @@ class AppearanceIntegrationTest {
                 .andExpect(jsonPath("$.data.componentOpacity").value(0.85))
                 .andExpect(jsonPath("$.data.palette").value("rose-pine-dawn"))
                 .andExpect(jsonPath("$.data.accent").value("custom"))
-                .andExpect(jsonPath("$.data.customAccent").value("#b4637a"));
+                .andExpect(jsonPath("$.data.customAccent").value("#b4637a"))
+                .andExpect(jsonPath("$.data.fontFamily").value("rounded"))
+                .andExpect(jsonPath("$.data.fontSize").value(16.5));
 
         mockMvc.perform(get("/api/appearance/auth-background"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.imageUrl")
                         .value("https://example.com/login-background.jpg"))
                 .andExpect(jsonPath("$.data.palette").value("rose-pine-dawn"))
-                .andExpect(jsonPath("$.data.accent").value("custom"));
+                .andExpect(jsonPath("$.data.accent").value("custom"))
+                .andExpect(jsonPath("$.data.fontFamily").value("rounded"))
+                .andExpect(jsonPath("$.data.fontSize").value(16.5));
 
         // 只更新图片时保留已保存的配色
         mockMvc.perform(put("/api/admin/appearance/auth-background")
@@ -84,7 +91,9 @@ class AppearanceIntegrationTest {
                 .andExpect(jsonPath("$.data.imageUrl").doesNotExist())
                 .andExpect(jsonPath("$.data.palette").value("rose-pine-dawn"))
                 .andExpect(jsonPath("$.data.accent").value("custom"))
-                .andExpect(jsonPath("$.data.customAccent").value("#b4637a"));
+                .andExpect(jsonPath("$.data.customAccent").value("#b4637a"))
+                .andExpect(jsonPath("$.data.fontFamily").value("rounded"))
+                .andExpect(jsonPath("$.data.fontSize").value(16.5));
     }
 
     @Test
@@ -103,6 +112,22 @@ class AppearanceIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"imageUrl":"","accent":"custom","customAccent":"red"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/admin/appearance/auth-background")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"imageUrl":"","fontFamily":"comic-sans"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(put("/api/admin/appearance/auth-background")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"imageUrl":"","fontSize":21}
                                 """))
                 .andExpect(status().isBadRequest());
     }

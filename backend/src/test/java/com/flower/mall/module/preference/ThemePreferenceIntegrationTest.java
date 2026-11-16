@@ -45,6 +45,8 @@ class ThemePreferenceIntegrationTest {
                   "palette": "rose-pine",
                   "accent": "rose",
                   "customAccent": "#c25b6a",
+                  "fontFamily": "kai",
+                  "fontSize": 15.5,
                   "radius": "round",
                   "density": "compact",
                   "sidebarStyle": "panel",
@@ -67,6 +69,8 @@ class ThemePreferenceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mode").value("dark"))
                 .andExpect(jsonPath("$.data.palette").value("rose-pine"))
+                .andExpect(jsonPath("$.data.fontFamily").value("kai"))
+                .andExpect(jsonPath("$.data.fontSize").value(15.5))
                 .andExpect(jsonPath("$.data.scale").value(1.05))
                 .andExpect(jsonPath("$.data.componentOpacity").value(0.9))
                 .andExpect(jsonPath("$.data.sidebarPinned").value(true));
@@ -75,6 +79,8 @@ class ThemePreferenceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.mode").value("dark"))
                 .andExpect(jsonPath("$.data.radius").value("round"))
+                .andExpect(jsonPath("$.data.fontFamily").value("kai"))
+                .andExpect(jsonPath("$.data.fontSize").value(15.5))
                 .andExpect(jsonPath("$.data.sidebarPinned").value(true));
 
         mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(alice)))
@@ -90,9 +96,47 @@ class ThemePreferenceIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"mode":"dark","palette":"rose-pine","accent":"rose",
-                                 "customAccent":"#c25b6a","radius":"round","density":"compact",
-                                 "sidebarStyle":"panel","scale":2.0,"reduceMotion":true,
-                                 "highContrast":false,"background":"gradient",
+                                 "customAccent":"#c25b6a","fontFamily":"default","fontSize":14,"radius":"round",
+                                 "density":"compact","sidebarStyle":"panel","scale":2.0,
+                                 "reduceMotion":true,"highContrast":false,"background":"gradient",
+                                 "backgroundImage":"","backgroundOpacity":0.7,
+                                 "backgroundBlur":8,"componentOpacity":0.9,
+                                 "sidebarPinned":false}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void invalidFontFamilyIsRejected() throws Exception {
+        String customer = login("customer", "customer123");
+        mockMvc.perform(put("/api/auth/preferences")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"dark","palette":"rose-pine","accent":"rose",
+                                 "customAccent":"#c25b6a","fontFamily":"comic-sans","fontSize":14,"radius":"round",
+                                 "density":"compact","sidebarStyle":"panel","scale":1.0,
+                                 "reduceMotion":true,"highContrast":false,"background":"gradient",
+                                 "backgroundImage":"","backgroundOpacity":0.7,
+                                 "backgroundBlur":8,"componentOpacity":0.9,
+                                 "sidebarPinned":false}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void invalidFontSizeIsRejected() throws Exception {
+        String customer = login("customer", "customer123");
+        mockMvc.perform(put("/api/auth/preferences")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"dark","palette":"rose-pine","accent":"rose",
+                                 "customAccent":"#c25b6a","fontFamily":"default","fontSize":21,"radius":"round",
+                                 "density":"compact","sidebarStyle":"panel","scale":1.0,
+                                 "reduceMotion":true,"highContrast":false,"background":"gradient",
                                  "backgroundImage":"","backgroundOpacity":0.7,
                                  "backgroundBlur":8,"componentOpacity":0.9,
                                  "sidebarPinned":false}

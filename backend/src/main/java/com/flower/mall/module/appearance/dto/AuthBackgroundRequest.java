@@ -41,4 +41,13 @@ public class AuthBackgroundRequest {
 
     @Pattern(regexp = "^#[0-9a-fA-F]{6}$", message = "自定义强调色需为6位十六进制颜色")
     private String customAccent;
+
+    @Pattern(
+            regexp = "(?i)^(default|serif|rounded|kai)$",
+            message = "字体风格不合法")
+    private String fontFamily;
+
+    @DecimalMin(value = "12", message = "字体大小不能小于12")
+    @DecimalMax(value = "20", message = "字体大小不能大于20")
+    private Double fontSize;
 }
