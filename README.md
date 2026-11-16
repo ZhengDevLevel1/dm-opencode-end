@@ -83,9 +83,10 @@ mysql -uroot -p < backend/db/flower_shop.sql
 mysql -uroot -p flower_shop < backend/db/migration_20261115_add_font_family.sql
 mysql -uroot -p flower_shop < backend/db/migration_20261115_font_presets_and_size.sql
 mysql -uroot -p flower_shop < backend/db/migration_20261116_restore_four_font_families.sql
+mysql -uroot -p flower_shop < backend/db/migration_20261116_add_address_book.sql
 ```
 
-如果旧库已经执行过 `migration_20261115_add_font_family.sql`，可跳过第一个脚本；如果已经执行过六字体迁移，只需执行 `migration_20261116_restore_four_font_families.sql`。
+如果旧库已经执行过 `migration_20261115_add_font_family.sql`，可跳过第一个脚本；如果已经执行过六字体迁移，只需执行 `migration_20261116_restore_four_font_families.sql`。地址簿与订单配送坐标对应最后的 `migration_20261116_add_address_book.sql`。
 
 ### 2. 启动后端
 
@@ -133,6 +134,10 @@ npm run dev
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | `/api` | 接口基础地址 |
 | `VITE_IMAGE_BASE_URL` | 空 | 商品/背景等相对图片地址前缀 |
+| `VITE_AMAP_KEY` | 空（需配置） | 高德地图 Web 端（JS API）Key |
+| `VITE_AMAP_SECURITY_CODE` | 空（需配置） | 与 JS API Key 配套的安全密钥（securityJsCode） |
+
+地址地图选点与配送地图需要同时配置上述两个高德变量；未配置时地图显示不可用，地址仍可手动填写并保存。
 
 ## 演示账号
 

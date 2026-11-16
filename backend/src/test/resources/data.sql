@@ -6,6 +6,11 @@ INSERT INTO sys_user (id, username, password, nickname, phone, email, role, stat
 (5, 'bob', '$2a$10$UOWDZ803o1iJSyi9sC2D3.ZlTtg2qIYK0E8lZ9TaRLYe0OiV5w2CO', '新用户鲍勃', '13900000005', 'bob@flower.local', 'CUSTOMER', 'ENABLED', DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
 (6, 'disabled', '$2a$10$UOWDZ803o1iJSyi9sC2D3.ZlTtg2qIYK0E8lZ9TaRLYe0OiV5w2CO', '已停用用户', '13900000006', 'disabled@flower.local', 'CUSTOMER', 'DISABLED', DATEADD('DAY', -30, CURRENT_TIMESTAMP));
 
+INSERT INTO user_address (id, user_id, receiver_name, receiver_phone, label, province, city, district, detail_address, formatted_address, longitude, latitude, is_default, created_at) VALUES
+(1, 3, '小玫', '13900000003', '家', '上海市', '上海市', '徐汇区', '衡山路88号1号楼502', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, 1, DATEADD('DAY', -100, CURRENT_TIMESTAMP)),
+(2, 3, '小玫', '13900000003', '公司', '上海市', '上海市', '静安区', '南京西路1266号恒隆广场20层', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, 0, DATEADD('DAY', -80, CURRENT_TIMESTAMP)),
+(3, 4, '爱丽丝', '13900000004', '家', '上海市', '上海市', '静安区', '南京西路1266号', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, 1, DATEADD('DAY', -60, CURRENT_TIMESTAMP));
+
 INSERT INTO product (id, name, category, flower_meaning, occasion_tags, festival_tags, price, original_price, stock, image_url, description, season_suitability, sales_count, rating_avg, rating_count, status, created_at) VALUES
 (1, '经典红玫瑰礼盒·11朵', '玫瑰', '热烈爱情，至死不渝', '表白,纪念日,生日', '情人节,七夕', 199.00, 239.00, 120, '/images/products/rose-11.svg', '精选厄瓜多尔红玫瑰11朵，搭配尤加利叶与雾面礼盒，适合表白与纪念日。', 'ALL', 320, 4.80, 86, 'ON_SALE', DATEADD('DAY', -160, CURRENT_TIMESTAMP)),
 (2, '香槟玫瑰·99朵', '玫瑰', '天长地久，只此一人', '求婚,纪念日,表白', '情人节,七夕', 599.00, 699.00, 43, '/images/products/rose-99.svg', '99朵香槟玫瑰巨型花束，手工包扎，适合求婚与重要纪念日。', 'ALL', 96, 4.90, 30, 'ON_SALE', DATEADD('DAY', -155, CURRENT_TIMESTAMP)),
@@ -24,12 +29,12 @@ INSERT INTO product (id, name, category, flower_meaning, occasion_tags, festival
 (15, '下架测试百合', '百合', '测试商品', '日常', '', 99.00, 129.00, 10, '/images/products/lily-test.svg', '用于验证下架商品不可下单。', 'ALL', 0, 0.00, 0, 'OFF_SHELF', DATEADD('DAY', -60, CURRENT_TIMESTAMP)),
 (16, '康乃馨单支', '康乃馨', '感恩每一天', '母亲节,教师节,日常', '母亲节,教师节', 19.00, 29.00, 6, '/images/products/carnation-single.svg', '单支康乃馨，简单心意，适合日常表达感谢。', 'SPRING', 500, 4.20, 12, 'ON_SALE', DATEADD('DAY', -50, CURRENT_TIMESTAMP));
 
-INSERT INTO shop_order (id, order_no, user_id, total_amount, pay_amount, status, receiver_name, receiver_phone, receiver_address, remark, cancel_reason, paid_at, completed_at, version, created_at) VALUES
-(1, 'FL202605010001', 3, 358.00, 358.00, 'COMPLETED', '小玫', '13900000003', '上海市徐汇区衡山路88号1号楼502', '请在工作日下午配送', NULL, DATEADD('DAY', -5, CURRENT_TIMESTAMP), DATEADD('DAY', -3, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -5, CURRENT_TIMESTAMP)),
-(2, 'FL202605020002', 4, 298.00, 298.00, 'COMPLETED', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', '母亲节礼物，请附贺卡', NULL, DATEADD('DAY', -10, CURRENT_TIMESTAMP), DATEADD('DAY', -8, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -10, CURRENT_TIMESTAMP)),
-(3, 'FL202605030003', 4, 238.00, 238.00, 'PENDING_PAYMENT', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', NULL, NULL, NULL, NULL, 0, DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
-(4, 'FL202605040004', 3, 599.00, 599.00, 'CANCELLED', '小玫', '13900000003', '上海市徐汇区衡山路88号1号楼502', NULL, '临时取消，改日再订', NULL, NULL, 0, DATEADD('DAY', -15, CURRENT_TIMESTAMP)),
-(5, 'FL202605050005', 4, 189.00, 189.00, 'PAID', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', '希望18点前送达', NULL, DATEADD('HOUR', -2, CURRENT_TIMESTAMP), NULL, 0, DATEADD('HOUR', -2, CURRENT_TIMESTAMP));
+INSERT INTO shop_order (id, order_no, user_id, total_amount, pay_amount, status, receiver_name, receiver_phone, receiver_address, receiver_longitude, receiver_latitude, remark, cancel_reason, paid_at, completed_at, version, created_at) VALUES
+(1, 'FL202605010001', 3, 358.00, 358.00, 'COMPLETED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, '请在工作日下午配送', NULL, DATEADD('DAY', -5, CURRENT_TIMESTAMP), DATEADD('DAY', -3, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -5, CURRENT_TIMESTAMP)),
+(2, 'FL202605020002', 4, 298.00, 298.00, 'COMPLETED', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '母亲节礼物，请附贺卡', NULL, DATEADD('DAY', -10, CURRENT_TIMESTAMP), DATEADD('DAY', -8, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -10, CURRENT_TIMESTAMP)),
+(3, 'FL202605030003', 4, 238.00, 238.00, 'PENDING_PAYMENT', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, NULL, NULL, NULL, NULL, 0, DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+(4, 'FL202605040004', 3, 599.00, 599.00, 'CANCELLED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, NULL, '临时取消，改日再订', NULL, NULL, 0, DATEADD('DAY', -15, CURRENT_TIMESTAMP)),
+(5, 'FL202605050005', 4, 189.00, 189.00, 'PAID', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '希望18点前送达', NULL, DATEADD('HOUR', -2, CURRENT_TIMESTAMP), NULL, 0, DATEADD('HOUR', -2, CURRENT_TIMESTAMP));
 
 INSERT INTO order_item (id, order_id, product_id, product_name, product_image, category, unit_price, quantity, subtotal, reviewed) VALUES
 (1, 1, 1, '经典红玫瑰礼盒·11朵', '/images/products/rose-11.svg', '玫瑰', 199.00, 1, 199.00, 1),

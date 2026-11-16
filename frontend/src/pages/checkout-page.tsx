@@ -1,21 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { AlertCircle, ArrowLeft, CreditCard, ShieldCheck } from "lucide-react";
-import { useCartQuery } from "@/hooks/queries";
-import { useAuthStore } from "@/stores/auth";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CreditCard,
+  MapPin,
+  MapPinned,
+  Plus,
+  ShieldCheck,
+} from "lucide-react";
+import { useAddressesQuery, useCartQuery } from "@/hooks/queries";
 import { orderService, paymentService } from "@/lib/services";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
+import { cn } from "@/lib/cn";
 import { formatCurrency, formatMoney } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
-import type { CartItemVO, OrderVO, PaymentVO } from "@/types/api";
+import type { AddressVO, CartItemVO, OrderVO, PaymentVO } from "@/types/api";
+import { AddressDialog } from "@/components/domain/address-dialog";
 import { ProductImage } from "@/components/domain/product-image";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog } from "@/components/ui/dialog";
@@ -24,28 +29,15 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-const schema = z.object({
-  receiverName: z.string().trim().min(1, "请填写收货人").max(50, "收货人最多 50 个字符"),
-  receiverPhone: z
-    .string()
-    .trim()
-    .regex(/^1[3-9]\d{9}$/, "请输入中国大陆手机号"),
-  receiverAddress: z
-    .string()
-    .trim()
-    .min(1, "请填写收货地址")
-    .max(255, "地址最多 255 个字符"),
-  remark: z.string().max(255, "备注最多 255 个字符").optional(),
-});
-
-type FormValues = z.infer<typeof schema>;
-
 export function CheckoutPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-  const user = useAuthStore((state) => state.user);
   const cart = useCartQuery();
+  const addresses = useAddressesQuery();
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [addressDialogOpen, setAddressDialogOpen] = useState(false);
+  const [remark, setRemark] = useState("");
   const [snapshot, setSnapshot] = useState<CartItemVO[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [payment, setPayment] = useState<PaymentVO | null>(null);
@@ -54,6 +46,7 @@ export function CheckoutPage() {
   const [createdOrder, setCreatedOrder] = useState<OrderVO | null>(null);
   const [paymentError, setPaymentError] = useState("");
   const paymentRef = useRef<PaymentVO | null>(null);
+  const pendingAddressId = useRef<number | null>(null);
 
   useEffect(() => {
     paymentRef.current = payment;
@@ -74,21 +67,30 @@ export function CheckoutPage() {
     if (!snapshot && initialItems.length > 0) setSnapshot(initialItems);
   }, [initialItems, snapshot]);
 
-  const items = snapshot ?? initialItems;
+  const addressList = useMemo(() => addresses.data ?? [], [addresses.data]);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: {
-      receiverName: user?.nickname || user?.username || "",
-      receiverPhone: user?.phone || "",
-      receiverAddress: "",
-      remark: "",
-    },
-  });
+  useEffect(() => {
+    if (pendingAddressId.current != null) {
+      if (addressList.some((address) => address.id === pendingAddressId.current)) {
+        setSelectedAddressId(pendingAddressId.current);
+        pendingAddressId.current = null;
+      }
+      return;
+    }
+    if (addressList.length === 0) {
+      setSelectedAddressId(null);
+      return;
+    }
+    if (selectedAddressId && addressList.some((address) => address.id === selectedAddressId)) {
+      return;
+    }
+    const fallback = addressList.find((address) => address.isDefault) ?? addressList[0];
+    setSelectedAddressId(fallback.id);
+  }, [addressList, selectedAddressId]);
+
+  const items = snapshot ?? initialItems;
+  const selectedAddress =
+    addressList.find((address) => address.id === selectedAddressId) ?? null;
 
   const subtotalCents = items.reduce(
     (total, item) => total + Math.round(item.subtotal * 100),
@@ -107,7 +109,7 @@ export function CheckoutPage() {
     void queryClient.invalidateQueries({ queryKey: ["admin"] });
   };
 
-  const handleCreateOrder = async (values: FormValues) => {
+  const handleCreateOrder = async () => {
     if (createdOrder) {
       navigate(`/orders/${createdOrder.id}`);
       return;
@@ -116,16 +118,23 @@ export function CheckoutPage() {
       toast.error("没有可结算的花礼", "请回到购物车重新选择。");
       return;
     }
+    if (!selectedAddress) {
+      toast.error("请选择收货地址", "可以新增地址或到地址簿管理常用地址。");
+      return;
+    }
     setSubmitting(true);
     setPaymentError("");
     let order: OrderVO | null = null;
     try {
       order = await orderService.create({
         cartItemIds: items.map((item) => item.id),
-        receiverName: values.receiverName.trim(),
-        receiverPhone: values.receiverPhone.trim(),
-        receiverAddress: values.receiverAddress.trim(),
-        remark: values.remark?.trim() || undefined,
+        addressId: selectedAddress.id,
+        receiverName: selectedAddress.receiverName,
+        receiverPhone: selectedAddress.receiverPhone,
+        receiverAddress: selectedAddress.fullAddress,
+        receiverLongitude: selectedAddress.longitude,
+        receiverLatitude: selectedAddress.latitude,
+        remark: remark.trim() || undefined,
       });
       setCreatedOrder(order);
       invalidateAfterOrder();
@@ -151,6 +160,9 @@ export function CheckoutPage() {
         } else if (error.code === 3001) {
           toast.error("购物车已变化", "正在刷新购物车，请重新确认。");
           void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+        } else if (error.code === 9001) {
+          toast.error("收货地址已失效", "请重新选择地址。");
+          void queryClient.invalidateQueries({ queryKey: queryKeys.addresses });
         } else {
           toast.error("下单失败", error.message);
         }
@@ -267,65 +279,114 @@ export function CheckoutPage() {
         </div>
       ) : null}
 
-      <form onSubmit={handleSubmit(handleCreateOrder)} noValidate>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleCreateOrder();
+        }}
+        noValidate
+      >
         <div className="grid items-start gap-5 lg:grid-cols-[1fr_340px]">
           <div className="space-y-5">
             <section className="ui-card p-5">
-              <h2 className="text-base font-semibold tracking-tight">收货信息</h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                地址只在本次订单中提交，系统没有地址簿。
-              </p>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="receiverName">收货人 *</Label>
-                  <Input
-                    id="receiverName"
-                    placeholder="收货人姓名"
-                    aria-invalid={Boolean(errors.receiverName)}
-                    {...register("receiverName")}
-                  />
-                  {errors.receiverName ? (
-                    <p className="text-xs text-destructive">{errors.receiverName.message}</p>
-                  ) : null}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">收货信息</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    从地址簿选择送达地址，地图选点会随订单同步给履约工作台。
+                  </p>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="receiverPhone">联系电话 *</Label>
-                  <Input
-                    id="receiverPhone"
-                    inputMode="tel"
-                    placeholder="11 位手机号"
-                    aria-invalid={Boolean(errors.receiverPhone)}
-                    {...register("receiverPhone")}
-                  />
-                  {errors.receiverPhone ? (
-                    <p className="text-xs text-destructive">{errors.receiverPhone.message}</p>
-                  ) : null}
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/addresses">
+                      <MapPinned className="h-3.5 w-3.5" />
+                      管理地址
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setAddressDialogOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    新增地址
+                  </Button>
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="receiverAddress">收货地址 *</Label>
-                  <Textarea
-                    id="receiverAddress"
-                    placeholder="省市区 + 详细地址"
-                    className="min-h-20"
-                    aria-invalid={Boolean(errors.receiverAddress)}
-                    {...register("receiverAddress")}
-                  />
-                  {errors.receiverAddress ? (
-                    <p className="text-xs text-destructive">{errors.receiverAddress.message}</p>
-                  ) : null}
+              </div>
+
+              {addresses.isLoading ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <Skeleton className="h-32 rounded-xl" />
+                  <Skeleton className="h-32 rounded-xl" />
                 </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="remark">订单备注</Label>
-                  <Textarea
-                    id="remark"
-                    placeholder="选填，例如送达前电话联系"
-                    className="min-h-16"
-                    {...register("remark")}
+              ) : addresses.isError ? (
+                <div className="mt-4">
+                  <ErrorState
+                    compact
+                    title="地址簿暂时不可用"
+                    description={getErrorMessage(addresses.error)}
+                    onRetry={() => void addresses.refetch()}
                   />
-                  {errors.remark ? (
-                    <p className="text-xs text-destructive">{errors.remark.message}</p>
-                  ) : null}
                 </div>
+              ) : addressList.length === 0 ? (
+                <div className="mt-4 rounded-xl border border-dashed border-border/70 px-4 py-8 text-center">
+                  <MapPinned className="mx-auto h-7 w-7 text-muted-foreground opacity-50" />
+                  <p className="mt-2 text-sm font-medium">还没有收货地址</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    新增一个常用地址后即可提交订单。
+                  </p>
+                  <Button
+                    className="mt-3"
+                    size="sm"
+                    onClick={() => setAddressDialogOpen(true)}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    新增收货地址
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {addressList.map((address) => (
+                    <AddressOptionCard
+                      key={address.id}
+                      address={address}
+                      selected={address.id === selectedAddressId}
+                      onSelect={() => setSelectedAddressId(address.id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {selectedAddress ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span className="break-all">{selectedAddress.fullAddress}</span>
+                  {typeof selectedAddress.longitude === "number" &&
+                  typeof selectedAddress.latitude === "number" ? (
+                    <Badge variant="secondary" className="ml-auto">
+                      已标注地图
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="ml-auto">
+                      未标注地图
+                    </Badge>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="mt-4 space-y-1.5">
+                <Label htmlFor="remark">订单备注</Label>
+                <Textarea
+                  id="remark"
+                  value={remark}
+                  onChange={(event) => setRemark(event.target.value)}
+                  maxLength={255}
+                  placeholder="选填，例如送达前电话联系"
+                  className="min-h-16"
+                />
+                <p className="text-right text-[11px] text-muted-foreground tabular">
+                  {remark.length}/255
+                </p>
               </div>
             </section>
 
@@ -387,10 +448,20 @@ export function CheckoutPage() {
             <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
               没有配送费、优惠或积分接口。最终金额以下单结果为准。
             </p>
-            <Button type="submit" className="mt-4 w-full" loading={submitting} disabled={Boolean(createdOrder)}>
+            <Button
+              type="submit"
+              className="mt-4 w-full"
+              loading={submitting}
+              disabled={Boolean(createdOrder) || !selectedAddress || addresses.isLoading}
+            >
               <CreditCard className="h-4 w-4" />
               {createdOrder ? "订单已创建" : "提交订单并支付"}
             </Button>
+            {!selectedAddress && !addresses.isLoading ? (
+              <p className="mt-2 text-center text-[11px] text-warning">
+                请先选择或新增收货地址。
+              </p>
+            ) : null}
             {createdOrder ? (
               <Button
                 type="button"
@@ -407,6 +478,15 @@ export function CheckoutPage() {
           </aside>
         </div>
       </form>
+
+      <AddressDialog
+        open={addressDialogOpen}
+        onOpenChange={setAddressDialogOpen}
+        onSaved={(saved) => {
+          pendingAddressId.current = saved.id;
+          setSelectedAddressId(saved.id);
+        }}
+      />
 
       <Dialog
         open={paymentOpen}
@@ -454,5 +534,58 @@ export function CheckoutPage() {
         </div>
       </Dialog>
     </div>
+  );
+}
+
+interface AddressOptionCardProps {
+  address: AddressVO;
+  selected: boolean;
+  onSelect: () => void;
+}
+
+function AddressOptionCard({ address, selected, onSelect }: AddressOptionCardProps) {
+  const hasCoordinate =
+    typeof address.longitude === "number" && typeof address.latitude === "number";
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={cn(
+        "rounded-xl border p-3.5 text-left transition-[border-color,background-color,box-shadow]",
+        selected
+          ? "border-primary bg-primary/[0.06] ring-2 ring-primary/20"
+          : "border-border hover:border-primary/40 hover:bg-muted/30",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Badge variant="secondary">{address.label || "家"}</Badge>
+          {address.isDefault ? <Badge>默认</Badge> : null}
+        </div>
+        <span
+          className={cn(
+            "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+            selected ? "border-primary bg-primary" : "border-border",
+          )}
+          aria-hidden
+        >
+          {selected ? <span className="h-1.5 w-1.5 rounded-full bg-primary-solid-foreground" /> : null}
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-medium">
+        {address.receiverName}
+        <span className="ml-2 text-[11px] font-normal text-muted-foreground tabular">
+          {address.receiverPhone}
+        </span>
+      </p>
+      <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+        {address.fullAddress}
+      </p>
+      <p className="mt-2 flex items-center gap-1 text-[11px] text-muted-foreground">
+        <MapPin className="h-3 w-3" />
+        {hasCoordinate ? "已标注配送地图" : "未标注地图坐标"}
+      </p>
+    </button>
   );
 }

@@ -16,6 +16,7 @@ DROP TABLE IF EXISTS user_favorite;
 DROP TABLE IF EXISTS cart_item;
 DROP TABLE IF EXISTS inventory_record;
 DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS user_address;
 DROP TABLE IF EXISTS sys_user;
 
 CREATE TABLE sys_user (
@@ -33,6 +34,26 @@ CREATE TABLE sys_user (
     deleted TINYINT NOT NULL DEFAULT 0,
     CONSTRAINT uk_user_username UNIQUE (username),
     CONSTRAINT uk_user_email UNIQUE (email)
+);
+
+CREATE TABLE user_address (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    receiver_name VARCHAR(50) NOT NULL,
+    receiver_phone VARCHAR(20) NOT NULL,
+    label VARCHAR(10) NOT NULL DEFAULT '家',
+    province VARCHAR(30),
+    city VARCHAR(30),
+    district VARCHAR(30),
+    detail_address VARCHAR(100) NOT NULL,
+    formatted_address VARCHAR(150),
+    longitude DECIMAL(10,7),
+    latitude DECIMAL(10,7),
+    is_default TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_address_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
 );
 
 CREATE TABLE product (
@@ -106,6 +127,8 @@ CREATE TABLE shop_order (
     receiver_name VARCHAR(50) NOT NULL,
     receiver_phone VARCHAR(20) NOT NULL,
     receiver_address VARCHAR(255) NOT NULL,
+    receiver_longitude DECIMAL(10,7),
+    receiver_latitude DECIMAL(10,7),
     remark VARCHAR(255),
     cancel_reason VARCHAR(200),
     after_sale_reason VARCHAR(500),

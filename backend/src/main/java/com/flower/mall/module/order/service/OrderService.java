@@ -12,6 +12,8 @@ import com.flower.mall.common.exception.BusinessException;
 import com.flower.mall.common.exception.ErrorCode;
 import com.flower.mall.common.util.OrderNoGenerator;
 import com.flower.mall.common.util.SecurityUtils;
+import com.flower.mall.module.address.dto.AddressVO;
+import com.flower.mall.module.address.service.AddressService;
 import com.flower.mall.module.cart.entity.CartItem;
 import com.flower.mall.module.cart.service.CartService;
 import com.flower.mall.module.inventory.service.InventoryService;
@@ -62,6 +64,7 @@ public class OrderService {
     private final CacheService cacheService;
     private final RecommendationCatalogCache catalogCache;
     private final UserBehaviorService userBehaviorService;
+    private final AddressService addressService;
 
     @Transactional
     public OrderVO create(CreateOrderRequest request) {
@@ -104,9 +107,14 @@ public class OrderService {
         order.setTotalAmount(total);
         order.setPayAmount(total);
         order.setStatus(OrderStatus.PENDING_PAYMENT.name());
-        order.setReceiverName(request.getReceiverName());
-        order.setReceiverPhone(request.getReceiverPhone());
-        order.setReceiverAddress(request.getReceiverAddress());
+        AddressVO address = request.getAddressId() == null
+                ? null
+                : addressService.resolveForOrder(userId, request.getAddressId());
+        order.setReceiverName(address == null ? request.getReceiverName() : address.getReceiverName());
+        order.setReceiverPhone(address == null ? request.getReceiverPhone() : address.getReceiverPhone());
+        order.setReceiverAddress(address == null ? request.getReceiverAddress() : address.getFullAddress());
+        order.setReceiverLongitude(address == null ? request.getReceiverLongitude() : address.getLongitude());
+        order.setReceiverLatitude(address == null ? request.getReceiverLatitude() : address.getLatitude());
         order.setRemark(request.getRemark());
         order.setVersion(0);
         orderMapper.insert(order);

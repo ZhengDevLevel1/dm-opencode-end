@@ -30,6 +30,8 @@ public class OrderVO {
     private String receiverName;
     private String receiverPhone;
     private String receiverAddress;
+    private BigDecimal receiverLongitude;
+    private BigDecimal receiverLatitude;
     private String remark;
     private String cancelReason;
     private String afterSaleReason;
@@ -51,6 +53,8 @@ public class OrderVO {
                 .receiverName(order.getReceiverName())
                 .receiverPhone(order.getReceiverPhone())
                 .receiverAddress(order.getReceiverAddress())
+                .receiverLongitude(order.getReceiverLongitude())
+                .receiverLatitude(order.getReceiverLatitude())
                 .remark(order.getRemark())
                 .cancelReason(order.getCancelReason())
                 .afterSaleReason(order.getAfterSaleReason())

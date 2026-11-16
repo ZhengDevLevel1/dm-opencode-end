@@ -3,7 +3,7 @@
 -- ------------------------------------------------------------
 -- 本文件由 schema.sql、data.sql 与全部增量迁移脚本整合而成，
 -- 已包含头像、外观设置、标签管理、主题偏好、推荐场景权重、
--- 邮箱唯一约束等最新结构，适用于全新数据库一键初始化。
+-- 邮箱唯一约束、地址簿与订单配送坐标等最新结构，适用于全新数据库一键初始化。
 --
 -- 执行方式（Windows / Linux / macOS）：
 --   mysql -uroot -p < backend/db/flower_shop.sql
@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS user_favorite;
 DROP TABLE IF EXISTS cart_item;
 DROP TABLE IF EXISTS inventory_record;
 DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS user_address;
 DROP TABLE IF EXISTS sys_user;
 SET FOREIGN_KEY_CHECKS = 1;
 
@@ -56,6 +57,28 @@ CREATE TABLE sys_user (
     UNIQUE KEY uk_user_email (email),
     KEY idx_user_role_status (role, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+CREATE TABLE user_address (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    receiver_name VARCHAR(50) NOT NULL,
+    receiver_phone VARCHAR(20) NOT NULL,
+    label VARCHAR(10) NOT NULL DEFAULT '家',
+    province VARCHAR(30) DEFAULT NULL,
+    city VARCHAR(30) DEFAULT NULL,
+    district VARCHAR(30) DEFAULT NULL,
+    detail_address VARCHAR(100) NOT NULL,
+    formatted_address VARCHAR(150) DEFAULT NULL,
+    longitude DECIMAL(10,7) DEFAULT NULL,
+    latitude DECIMAL(10,7) DEFAULT NULL,
+    is_default TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_address_user_default (user_id, is_default),
+    CONSTRAINT fk_address_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户地址簿';
 
 CREATE TABLE product (
     id BIGINT NOT NULL AUTO_INCREMENT COMMENT '商品ID',
@@ -138,6 +161,8 @@ CREATE TABLE shop_order (
     receiver_name VARCHAR(50) NOT NULL,
     receiver_phone VARCHAR(20) NOT NULL,
     receiver_address VARCHAR(255) NOT NULL,
+    receiver_longitude DECIMAL(10,7) DEFAULT NULL,
+    receiver_latitude DECIMAL(10,7) DEFAULT NULL,
     remark VARCHAR(255) DEFAULT NULL,
     cancel_reason VARCHAR(200) DEFAULT NULL,
     after_sale_reason VARCHAR(500) DEFAULT NULL,
@@ -377,6 +402,11 @@ INSERT INTO sys_user (id, username, password, nickname, phone, email, role, stat
 (5, 'bob', '$2a$10$UOWDZ803o1iJSyi9sC2D3.ZlTtg2qIYK0E8lZ9TaRLYe0OiV5w2CO', '新用户鲍勃', '13900000005', 'bob@flower.local', 'CUSTOMER', 'ENABLED', DATE_SUB(NOW(), INTERVAL 1 DAY)),
 (6, 'disabled', '$2a$10$UOWDZ803o1iJSyi9sC2D3.ZlTtg2qIYK0E8lZ9TaRLYe0OiV5w2CO', '已停用用户', '13900000006', 'disabled@flower.local', 'CUSTOMER', 'DISABLED', DATE_SUB(NOW(), INTERVAL 30 DAY));
 
+INSERT INTO user_address (id, user_id, receiver_name, receiver_phone, label, province, city, district, detail_address, formatted_address, longitude, latitude, is_default, created_at) VALUES
+(1, 3, '小玫', '13900000003', '家', '上海市', '上海市', '徐汇区', '衡山路88号1号楼502', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, 1, DATE_SUB(NOW(), INTERVAL 100 DAY)),
+(2, 3, '小玫', '13900000003', '公司', '上海市', '上海市', '静安区', '南京西路1266号恒隆广场20层', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, 0, DATE_SUB(NOW(), INTERVAL 80 DAY)),
+(3, 4, '爱丽丝', '13900000004', '家', '上海市', '上海市', '静安区', '南京西路1266号', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, 1, DATE_SUB(NOW(), INTERVAL 60 DAY));
+
 INSERT INTO product (id, name, category, flower_meaning, occasion_tags, festival_tags, price, original_price, stock, image_url, description, season_suitability, sales_count, rating_avg, rating_count, status, created_at) VALUES
 (1, '经典红玫瑰礼盒·11朵', '玫瑰', '热烈爱情，至死不渝', '表白,纪念日,生日', '情人节,七夕', 199.00, 239.00, 120, '/images/products/rose-11.svg', '精选厄瓜多尔红玫瑰11朵，搭配尤加利叶与雾面礼盒，适合表白与纪念日。', 'ALL', 320, 4.80, 86, 'ON_SALE', DATE_SUB(NOW(), INTERVAL 160 DAY)),
 (2, '香槟玫瑰·99朵', '玫瑰', '天长地久，只此一人', '求婚,纪念日,表白', '情人节,七夕', 599.00, 699.00, 43, '/images/products/rose-99.svg', '99朵香槟玫瑰巨型花束，手工包扎，适合求婚与重要纪念日。', 'ALL', 96, 4.90, 30, 'ON_SALE', DATE_SUB(NOW(), INTERVAL 155 DAY)),
@@ -395,12 +425,12 @@ INSERT INTO product (id, name, category, flower_meaning, occasion_tags, festival
 (15, '下架测试百合', '百合', '测试商品', '日常', '', 99.00, 129.00, 10, '/images/products/lily-test.svg', '用于验证下架商品不可下单。', 'ALL', 0, 0.00, 0, 'OFF_SHELF', DATE_SUB(NOW(), INTERVAL 60 DAY)),
 (16, '康乃馨单支', '康乃馨', '感恩每一天', '母亲节,教师节,日常', '母亲节,教师节', 19.00, 29.00, 6, '/images/products/carnation-single.svg', '单支康乃馨，简单心意，适合日常表达感谢。', 'SPRING', 500, 4.20, 12, 'ON_SALE', DATE_SUB(NOW(), INTERVAL 50 DAY));
 
-INSERT INTO shop_order (id, order_no, user_id, total_amount, pay_amount, status, receiver_name, receiver_phone, receiver_address, remark, cancel_reason, paid_at, completed_at, version, created_at) VALUES
-(1, 'FL202605010001', 3, 358.00, 358.00, 'COMPLETED', '小玫', '13900000003', '上海市徐汇区衡山路88号1号楼502', '请在工作日下午配送', NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY), 0, DATE_SUB(NOW(), INTERVAL 5 DAY)),
-(2, 'FL202605020002', 4, 298.00, 298.00, 'COMPLETED', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', '母亲节礼物，请附贺卡', NULL, DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_SUB(NOW(), INTERVAL 8 DAY), 0, DATE_SUB(NOW(), INTERVAL 10 DAY)),
-(3, 'FL202605030003', 4, 238.00, 238.00, 'PENDING_PAYMENT', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', NULL, NULL, NULL, NULL, 0, DATE_SUB(NOW(), INTERVAL 1 DAY)),
-(4, 'FL202605040004', 3, 599.00, 599.00, 'CANCELLED', '小玫', '13900000003', '上海市徐汇区衡山路88号1号楼502', NULL, '临时取消，改日再订', NULL, NULL, 0, DATE_SUB(NOW(), INTERVAL 15 DAY)),
-(5, 'FL202605050005', 4, 189.00, 189.00, 'PAID', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', '希望18点前送达', NULL, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, 0, DATE_SUB(NOW(), INTERVAL 2 HOUR));
+INSERT INTO shop_order (id, order_no, user_id, total_amount, pay_amount, status, receiver_name, receiver_phone, receiver_address, receiver_longitude, receiver_latitude, remark, cancel_reason, paid_at, completed_at, version, created_at) VALUES
+(1, 'FL202605010001', 3, 358.00, 358.00, 'COMPLETED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, '请在工作日下午配送', NULL, DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 3 DAY), 0, DATE_SUB(NOW(), INTERVAL 5 DAY)),
+(2, 'FL202605020002', 4, 298.00, 298.00, 'COMPLETED', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '母亲节礼物，请附贺卡', NULL, DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_SUB(NOW(), INTERVAL 8 DAY), 0, DATE_SUB(NOW(), INTERVAL 10 DAY)),
+(3, 'FL202605030003', 4, 238.00, 238.00, 'PENDING_PAYMENT', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, NULL, NULL, NULL, NULL, 0, DATE_SUB(NOW(), INTERVAL 1 DAY)),
+(4, 'FL202605040004', 3, 599.00, 599.00, 'CANCELLED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, NULL, '临时取消，改日再订', NULL, NULL, 0, DATE_SUB(NOW(), INTERVAL 15 DAY)),
+(5, 'FL202605050005', 4, 189.00, 189.00, 'PAID', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '希望18点前送达', NULL, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, 0, DATE_SUB(NOW(), INTERVAL 2 HOUR));
 
 INSERT INTO order_item (id, order_id, product_id, product_name, product_image, category, unit_price, quantity, subtotal, reviewed) VALUES
 (1, 1, 1, '经典红玫瑰礼盒·11朵', '/images/products/rose-11.svg', '玫瑰', 199.00, 1, 199.00, 1),

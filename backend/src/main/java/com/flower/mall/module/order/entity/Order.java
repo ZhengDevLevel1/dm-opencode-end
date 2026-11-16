@@ -35,6 +35,10 @@ public class Order {
 
     private String receiverAddress;
 
+    private BigDecimal receiverLongitude;
+
+    private BigDecimal receiverLatitude;
+
     private String remark;
 
     private String cancelReason;

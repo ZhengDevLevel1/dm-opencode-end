@@ -7,6 +7,7 @@ export const queryKeys = {
   hotProducts: ["hot-products"] as const,
   recommendations: (params: object) => ["recommendations", params] as const,
   cart: ["cart"] as const,
+  addresses: ["addresses"] as const,
   favorites: ["favorites"] as const,
   orders: (params: object) => ["orders", params] as const,
   order: (id: number) => ["order", id] as const,

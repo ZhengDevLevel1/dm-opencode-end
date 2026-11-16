@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
-import { appearanceService, cartService, dictService, favoriteService } from "@/lib/services";
+import {
+  addressService,
+  appearanceService,
+  cartService,
+  dictService,
+  favoriteService,
+} from "@/lib/services";
 import { useAuthStore } from "@/stores/auth";
 import type { AuthBackgroundVO } from "@/types/api";
 
@@ -57,6 +63,16 @@ export function useCartQuery(enabled = true) {
     queryFn: cartService.list,
     enabled: enabled && authenticated,
     staleTime: queryPolicy.cart.staleTime,
+  });
+}
+
+export function useAddressesQuery(enabled = true) {
+  const authenticated = useAuthStore((state) => Boolean(state.user));
+  return useQuery({
+    queryKey: queryKeys.addresses,
+    queryFn: addressService.list,
+    enabled: enabled && authenticated,
+    staleTime: 30 * 1000,
   });
 }
 

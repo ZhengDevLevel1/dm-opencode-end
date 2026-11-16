@@ -56,7 +56,10 @@ public enum ErrorCode {
     FILE_TYPE_INVALID(8002, 400, "仅支持 JPG、PNG、WEBP、GIF 格式的图片"),
     FILE_TOO_LARGE(8003, 400, "图片大小不能超过5MB"),
     FILE_UPLOAD_FAILED(8004, 500, "图片上传失败，请检查 MinIO 配置"),
-    FILE_CATEGORY_INVALID(8005, 400, "图片分类不合法");
+    FILE_CATEGORY_INVALID(8005, 400, "图片分类不合法"),
+
+    ADDRESS_NOT_FOUND(9001, 404, "地址不存在"),
+    ADDRESS_LIMIT_EXCEEDED(9002, 409, "地址簿最多保存10个地址");
 
     private final int code;
     private final int status;

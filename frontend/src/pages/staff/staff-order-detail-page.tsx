@@ -23,6 +23,7 @@ import { toast } from "@/stores/toast";
 import type { FulfillmentNode, OrderStatus } from "@/types/api";
 import { OrderStatusBadge, fulfillmentNodeLabel } from "@/components/domain/status-badge";
 import { ProductImage } from "@/components/domain/product-image";
+import { DeliveryMap } from "@/components/domain/delivery-map";
 import { FulfillmentTimeline } from "@/components/domain/fulfillment-timeline";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -495,6 +496,27 @@ export function StaffOrderDetailPage() {
                 </div>
               </div>
             </dl>
+            <div className="mt-4 border-t border-border/60 pt-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  配送地图
+                </h3>
+                {typeof orderData.receiverLongitude === "number" &&
+                typeof orderData.receiverLatitude === "number" ? (
+                  <span className="font-mono-ui text-[11px] text-muted-foreground">
+                    {orderData.receiverLongitude.toFixed(6)},{" "}
+                    {orderData.receiverLatitude.toFixed(6)}
+                  </span>
+                ) : null}
+              </div>
+              <DeliveryMap
+                longitude={orderData.receiverLongitude}
+                latitude={orderData.receiverLatitude}
+                address={orderData.receiverAddress}
+                height={260}
+              />
+            </div>
             {orderData.remark || orderData.cancelReason || orderData.afterSaleReason ? (
               <div className="mt-4 space-y-2.5 border-t border-border/60 pt-4 text-sm">
                 {orderData.remark ? (

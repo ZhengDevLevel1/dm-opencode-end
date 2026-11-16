@@ -306,6 +306,12 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | GET | `/api/favorites` | 登录 | `ApiResponse<ProductVO[]>` |
 | POST | `/api/favorites/{productId}` | 登录 | `ApiResponse<Void>` |
 | DELETE | `/api/favorites/{productId}` | 登录 | `ApiResponse<Void>` |
+| GET | `/api/addresses` | 登录 | `ApiResponse<AddressVO[]>` |
+| POST | `/api/addresses` | 登录 | `ApiResponse<AddressVO>` |
+| GET | `/api/addresses/{id}` | 登录 | `ApiResponse<AddressVO>` |
+| PUT | `/api/addresses/{id}` | 登录 | `ApiResponse<AddressVO>` |
+| DELETE | `/api/addresses/{id}` | 登录 | `ApiResponse<Void>` |
+| PUT | `/api/addresses/{id}/default` | 登录 | `ApiResponse<AddressVO>` |
 | POST | `/api/orders` | 登录 | `ApiResponse<OrderVO>` |
 | GET | `/api/orders` | 登录 | `ApiResponse<PageResult<OrderVO>>` |
 | GET | `/api/orders/{id}` | 登录 | `ApiResponse<OrderVO>` |
@@ -639,6 +645,40 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 - 最长 500 字符；更新会记录操作日志（模块「外观管理」）。
 - 数据保存在 `appearance_setting` 表单行记录（`id=1`），首次读取或更新时自动创建。
 
+### 4.8 地址簿
+
+地址簿按账号保存，结算时可传 `addressId` 让后端快照收货信息；高德地图选点坐标会随地址保存，并写入订单用于履约地图。
+
+| 方法 | 路径 | 权限 | 请求 | 响应 |
+| --- | --- | --- | --- | --- |
+| GET | `/api/addresses` | 登录 | 无 | `ApiResponse<AddressVO[]>` |
+| POST | `/api/addresses` | 登录 | `AddressSaveRequest` | `ApiResponse<AddressVO>` |
+| GET | `/api/addresses/{id}` | 登录 | 无 | `ApiResponse<AddressVO>` |
+| PUT | `/api/addresses/{id}` | 登录 | `AddressSaveRequest` | `ApiResponse<AddressVO>` |
+| DELETE | `/api/addresses/{id}` | 登录 | 无 | `ApiResponse<Void>` |
+| PUT | `/api/addresses/{id}/default` | 登录 | 无 | `ApiResponse<AddressVO>` |
+
+`AddressSaveRequest`
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `receiverName` | string | 是 | 最长 50 |
+| `receiverPhone` | string | 是 | 中国大陆手机号 |
+| `label` | string | 否 | 最长 10，默认「家」 |
+| `province` / `city` / `district` | string | 否 | 各最长 30 |
+| `detailAddress` | string | 是 | 最长 100 |
+| `formattedAddress` | string | 否 | 地图逆地理编码地址，最长 150 |
+| `longitude` / `latitude` | number | 否 | 必须同时提供；GCJ-02 坐标 |
+| `isDefault` | boolean | 否 | 设为默认地址 |
+
+说明：
+
+- 每个账号最多 10 个地址，超出返回 `409/9002`；地址不存在或不属于当前用户返回 `404/9001`。
+- 第一个地址自动成为默认地址；设置新默认地址会自动取消旧默认地址。
+- 删除默认地址后，剩余地址中最近更新的一个会自动成为默认地址；历史订单快照不受影响。
+- `AddressVO.fullAddress` 由省、市（与省相同时去重）、区、详细地址拼接；没有省市区时回退到 `formattedAddress`。
+- 地址与坐标只允许当前用户访问；下单时后端会校验 `addressId` 归属并覆盖请求里的收货快照字段。
+
 ## 5. 商品浏览与字典
 
 ### 5.1 公开商品接口
@@ -776,9 +816,11 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `cartItemIds` | number[] | 否 | 要结算的购物车记录 ID；不传或空数组表示结算整个购物车 |
-| `receiverName` | string | 是 | 最长 50 |
-| `receiverPhone` | string | 是 | 中国大陆手机号 |
-| `receiverAddress` | string | 是 | 最长 255 |
+| `addressId` | number | 否 | 地址簿 ID；提供时后端校验归属并覆盖收货快照字段 |
+| `receiverName` | string | 是 | 最长 50；兼容旧客户端，提供 `addressId` 时以地址簿为准 |
+| `receiverPhone` | string | 是 | 中国大陆手机号；提供 `addressId` 时以地址簿为准 |
+| `receiverAddress` | string | 是 | 最长 255；提供 `addressId` 时以地址簿为准 |
+| `receiverLongitude` / `receiverLatitude` | number | 否 | 未传 `addressId` 时的地图坐标，必须同时提供 |
 | `remark` | string | 否 | 最长 255 |
 
 `CancelOrderRequest`
@@ -798,9 +840,12 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 ```json
 {
   "cartItemIds": [1, 2],
+  "addressId": 1,
   "receiverName": "李同学",
   "receiverPhone": "13800138000",
   "receiverAddress": "上海市杨浦区示例路 1 号",
+  "receiverLongitude": 121.5201,
+  "receiverLatitude": 31.2596,
   "remark": "请在工作日送达"
 }
 ```
@@ -810,6 +855,7 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 - 后端按购物车中当前商品价格重新计算金额，忽略客户端传入的金额。
 - 下单会原子扣减库存并写入库存变动记录，订单初始状态为 `PENDING_PAYMENT`。
 - 成功后返回订单快照，包含 `items`；成功后对应购物车记录被删除。
+- 传 `addressId` 时，收货人、电话、地址和坐标来自地址簿快照，避免客户端伪造；地址不存在或不属于当前用户返回 `404/9001`。
 - 如果指定 `cartItemIds`，所有记录都必须属于当前用户，否则返回 `404/3001`。
 - 购物车为空返回 `400/3002`。
 - 商品下架、库存不足分别返回 `409/2002`、`409/2003`。
@@ -1755,6 +1801,8 @@ export interface OrderVO {
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  receiverLongitude?: number;
+  receiverLatitude?: number;
   remark?: string;
   cancelReason?: string;
   afterSaleReason?: string;
@@ -1764,11 +1812,46 @@ export interface OrderVO {
   items: OrderItemVO[];
 }
 
+export interface AddressVO {
+  id: number;
+  receiverName: string;
+  receiverPhone: string;
+  label: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  detailAddress: string;
+  formattedAddress?: string;
+  fullAddress: string;
+  longitude?: number;
+  latitude?: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddressSaveRequest {
+  receiverName: string;
+  receiverPhone: string;
+  label?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  detailAddress: string;
+  formattedAddress?: string;
+  longitude?: number;
+  latitude?: number;
+  isDefault?: boolean;
+}
+
 export interface CreateOrderRequest {
   cartItemIds?: number[];
+  addressId?: number;
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  receiverLongitude?: number;
+  receiverLatitude?: number;
   remark?: string;
 }
 

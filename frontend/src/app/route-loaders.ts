@@ -20,6 +20,8 @@ export const routeLoaders = {
     import("@/pages/order-detail-page").then((module) => ({
       default: module.OrderDetailPage,
     })),
+  addresses: () =>
+    import("@/pages/addresses-page").then((module) => ({ default: module.AddressesPage })),
   myReviews: () =>
     import("@/pages/my-reviews-page").then((module) => ({ default: module.MyReviewsPage })),
   favorites: () =>
@@ -89,6 +91,7 @@ const exactRoutes: Record<string, () => Promise<unknown>> = {
   "/cart": routeLoaders.cart,
   "/checkout": routeLoaders.checkout,
   "/orders": routeLoaders.orders,
+  "/addresses": routeLoaders.addresses,
   "/reviews": routeLoaders.myReviews,
   "/favorites": routeLoaders.favorites,
   "/profile": routeLoaders.profile,

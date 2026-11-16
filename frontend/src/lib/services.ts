@@ -1,5 +1,7 @@
 import { api } from "./api-client";
 import type {
+  AddressSaveRequest,
+  AddressVO,
   AdminReviewQuery,
   AdminUserCreateRequest,
   AdminUserQuery,
@@ -122,6 +124,16 @@ export const cartService = {
     api.put<CartItemVO>(`/cart/items/${id}`, body),
   remove: (id: number) => api.delete<void>(`/cart/items/${id}`),
   clear: () => api.delete<void>("/cart"),
+};
+
+export const addressService = {
+  list: () => api.get<AddressVO[]>("/addresses"),
+  detail: (id: number) => api.get<AddressVO>(`/addresses/${id}`),
+  create: (body: AddressSaveRequest) => api.post<AddressVO>("/addresses", body),
+  update: (id: number, body: AddressSaveRequest) =>
+    api.put<AddressVO>(`/addresses/${id}`, body),
+  setDefault: (id: number) => api.put<AddressVO>(`/addresses/${id}/default`, undefined),
+  remove: (id: number) => api.delete<void>(`/addresses/${id}`),
 };
 
 export const favoriteService = {

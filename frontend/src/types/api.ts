@@ -375,6 +375,8 @@ export interface OrderVO {
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  receiverLongitude?: number;
+  receiverLatitude?: number;
   remark?: string;
   cancelReason?: string;
   afterSaleReason?: string;
@@ -386,10 +388,45 @@ export interface OrderVO {
 
 export interface CreateOrderRequest {
   cartItemIds?: number[];
+  addressId?: number;
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  receiverLongitude?: number;
+  receiverLatitude?: number;
   remark?: string;
+}
+
+export interface AddressVO {
+  id: number;
+  receiverName: string;
+  receiverPhone: string;
+  label: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  detailAddress: string;
+  formattedAddress?: string;
+  fullAddress: string;
+  longitude?: number;
+  latitude?: number;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddressSaveRequest {
+  receiverName: string;
+  receiverPhone: string;
+  label?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  detailAddress: string;
+  formattedAddress?: string;
+  longitude?: number;
+  latitude?: number;
+  isDefault?: boolean;
 }
 
 export interface CancelOrderRequest {

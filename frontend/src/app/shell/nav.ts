@@ -3,6 +3,7 @@ import {
   ClipboardList,
   Flower2,
   LayoutDashboard,
+  MapPinned,
   MessageSquareText,
   MessagesSquare,
   PackageSearch,
@@ -110,6 +111,12 @@ export const navGroups: NavGroup[] = [
         to: "/orders",
         icon: ReceiptText,
         match: (path) => path === "/orders" || /^\/orders\/\d+/.test(path) || path === "/checkout",
+      },
+      {
+        label: "收货地址",
+        description: "常用地址与地图选点",
+        to: "/addresses",
+        icon: MapPinned,
       },
       {
         label: "我的评价",
@@ -238,6 +245,7 @@ const staticMeta: Record<string, RouteMeta> = {
   "/cart": { title: "购物车", description: "核对花礼与数量后去结算", icon: ShoppingBag },
   "/checkout": { title: "结算", description: "填写收货信息并完成模拟支付", icon: ReceiptText },
   "/orders": { title: "我的订单", description: "查看支付、履约与售后进度", icon: ReceiptText },
+  "/addresses": { title: "收货地址", description: "管理常用地址与地图配送点", icon: MapPinned },
   "/reviews": { title: "我的评价", description: "你留下的每一束花的故事", icon: MessageSquareText },
   "/profile": { title: "个人中心", description: "管理资料与登录密码", icon: UserRound },
   "/settings": { title: "外观与偏好", description: "主题、色板与界面密度", icon: Settings2 },

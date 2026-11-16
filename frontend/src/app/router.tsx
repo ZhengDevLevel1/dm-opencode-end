@@ -16,6 +16,7 @@ const CartPage = lazy(routeLoaders.cart);
 const CheckoutPage = lazy(routeLoaders.checkout);
 const OrdersPage = lazy(routeLoaders.orders);
 const OrderDetailPage = lazy(routeLoaders.orderDetail);
+const AddressesPage = lazy(routeLoaders.addresses);
 const MyReviewsPage = lazy(routeLoaders.myReviews);
 const FavoritesPage = lazy(routeLoaders.favorites);
 const ProfilePage = lazy(routeLoaders.profile);
@@ -86,6 +87,14 @@ export function AppRoutes() {
             element={
               <RequireAuth>
                 <OrderDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="addresses"
+            element={
+              <RequireAuth>
+                <AddressesPage />
               </RequireAuth>
             }
           />
