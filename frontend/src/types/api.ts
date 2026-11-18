@@ -272,6 +272,10 @@ export interface ThemePreference {
 
 export type ThemePreferenceRequest = Omit<ThemePreference, "updatedAt">;
 
+export interface MapPreference {
+  snapToLandmark: boolean;
+}
+
 export interface ProductVO {
   id: number;
   name: string;

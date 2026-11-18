@@ -52,6 +52,8 @@ public class UserThemePreference {
 
     private Boolean sidebarPinned;
 
+    private Boolean mapSnapToLandmark;
+
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 }

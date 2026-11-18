@@ -10,6 +10,7 @@ export interface AMapMap {
   remove: (overlay: unknown) => void;
   setCenter: (position: [number, number]) => void;
   setZoom: (zoom: number) => void;
+  getZoom: () => number;
   resize: () => void;
   destroy: () => void;
   on: (event: string, handler: (event: { lnglat: AMapLngLat }) => void) => void;
@@ -29,8 +30,25 @@ export interface AMapRegeocodeResult {
       province?: string | string[];
       city?: string | string[];
       district?: string | string[];
+      township?: string | string[];
     };
   };
+}
+
+export interface AMapGeocodeResult {
+  geocodes?: Array<{
+    location?: AMapLngLat;
+    formattedAddress?: string;
+    province?: string | string[];
+    city?: string | string[];
+    district?: string | string[];
+    addressComponent?: {
+      province?: string | string[];
+      city?: string | string[];
+      district?: string | string[];
+      township?: string | string[];
+    };
+  }>;
 }
 
 export interface AMapGeocoder {
@@ -38,12 +56,28 @@ export interface AMapGeocoder {
     position: [number, number],
     callback: (status: string, result: AMapRegeocodeResult) => void,
   ) => void;
+  getLocation: (
+    address: string,
+    callback: (status: string, result: AMapGeocodeResult) => void,
+  ) => void;
+}
+
+export interface AMapGeolocationResult {
+  position?: AMapLngLat;
+}
+
+export interface AMapGeolocation {
+  getCurrentPosition: (
+    callback: (status: string, result: AMapGeolocationResult) => void,
+  ) => void;
 }
 
 export interface AMapNamespace {
   Map: new (container: HTMLElement, options: Record<string, unknown>) => AMapMap;
   Marker: new (options: Record<string, unknown>) => AMapMarker;
   Geocoder: new (options?: Record<string, unknown>) => AMapGeocoder;
+  Geolocation?: new (options?: Record<string, unknown>) => AMapGeolocation;
+  plugin?: (plugins: string[], callback?: () => void) => void;
 }
 
 export interface PickedLocation {
@@ -53,6 +87,7 @@ export interface PickedLocation {
   province?: string;
   city?: string;
   district?: string;
+  township?: string;
   detailAddress?: string;
   geocoded: boolean;
 }
@@ -99,7 +134,7 @@ export function loadAMap(): Promise<AMapNamespace> {
     script.id = SCRIPT_ID;
     script.async = true;
     script.fetchPriority = "high";
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(getAMapKey())}&plugin=AMap.Geocoder`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(getAMapKey())}&plugin=AMap.Geocoder,AMap.Geolocation`;
     script.onload = () => {
       if (settled) return;
       settled = true;
@@ -170,6 +205,7 @@ export function reverseGeocode(
           province,
           city,
           district,
+          township: firstText(component?.township),
           detailAddress: deriveDetailAddress(formattedAddress, province, city, district),
           geocoded: Boolean(formattedAddress),
         });
@@ -181,7 +217,56 @@ export function reverseGeocode(
   });
 }
 
-function deriveDetailAddress(
+export function getCurrentPosition(
+  amap: AMapNamespace,
+): Promise<[number, number] | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: [number, number] | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const timer = window.setTimeout(() => finish(null), PLUGIN_TIMEOUT);
+
+    const run = () => {
+      if (!amap.Geolocation) {
+        window.clearTimeout(timer);
+        finish(null);
+        return;
+      }
+      try {
+        const geolocation = new amap.Geolocation({
+          enableHighAccuracy: true,
+          timeout: PLUGIN_TIMEOUT,
+          showButton: false,
+          panToLocation: false,
+          zoomToAccuracy: false,
+        });
+        geolocation.getCurrentPosition((status, result) => {
+          window.clearTimeout(timer);
+          if (status !== "complete" || !result.position) {
+            finish(null);
+            return;
+          }
+          finish(coordinateOf(result.position));
+        });
+      } catch {
+        window.clearTimeout(timer);
+        finish(null);
+      }
+    };
+
+    if (amap.Geolocation) run();
+    else if (typeof amap.plugin === "function") amap.plugin(["AMap.Geolocation"], run);
+    else {
+      window.clearTimeout(timer);
+      finish(null);
+    }
+  });
+}
+
+export function deriveDetailAddress(
   formattedAddress: string | undefined,
   province?: string,
   city?: string,

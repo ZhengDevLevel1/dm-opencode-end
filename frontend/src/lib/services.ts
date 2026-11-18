@@ -28,6 +28,7 @@ import type {
   InventoryRecord,
   LoginRequest,
   LoginResponse,
+  MapPreference,
   OperationLog,
   OperationLogQuery,
   OrderQuery,
@@ -109,6 +110,9 @@ export const preferenceService = {
   get: () => api.get<ThemePreference | null>("/auth/preferences"),
   save: (body: ThemePreferenceRequest) =>
     api.put<ThemePreference>("/auth/preferences", body),
+  getMap: () => api.get<MapPreference>("/auth/preferences/map"),
+  saveMap: (body: MapPreference) =>
+    api.put<MapPreference>("/auth/preferences/map", body),
 };
 
 export const productService = {

@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { MapPinned } from "lucide-react";
 import { getErrorMessage } from "@/lib/api-client";
+import {
+  getCityOptions,
+  getDistrictOptions,
+  normalizeMunicipalityCity,
+  PROVINCE_OPTIONS,
+  withCurrentOption,
+} from "@/lib/china-regions";
 import { queryKeys } from "@/lib/query-keys";
 import { addressService } from "@/lib/services";
 import { toast } from "@/stores/toast";
@@ -13,6 +20,7 @@ import type { AddressSaveRequest, AddressVO } from "@/types/api";
 import type { PickedLocation } from "@/lib/amap";
 import { AMapLocationPicker } from "@/components/domain/amap-location-picker";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +64,7 @@ export function AddressDialog({ open, onOpenChange, address, onSaved }: AddressD
   const {
     register,
     control,
+    getValues,
     handleSubmit,
     reset,
     setValue,
@@ -78,16 +87,41 @@ export function AddressDialog({ open, onOpenChange, address, onSaved }: AddressD
 
   const longitude = watch("longitude");
   const latitude = watch("latitude");
+  const province = watch("province");
+  const city = watch("city");
+  const district = watch("district");
+  const detailAddress = watch("detailAddress");
   const formattedAddress = watch("formattedAddress");
+  const provinceOptions = useMemo(
+    () => withCurrentOption(PROVINCE_OPTIONS, province),
+    [province],
+  );
+  const cityOptions = useMemo(
+    () => withCurrentOption(getCityOptions(province), city),
+    [city, province],
+  );
+  const districtOptions = useMemo(
+    () => withCurrentOption(getDistrictOptions(province, city), district),
+    [city, district, province],
+  );
+  const hasCoordinate = typeof longitude === "number" && typeof latitude === "number";
+  const hasAddressText = Boolean(
+    province?.trim() ||
+      city?.trim() ||
+      district?.trim() ||
+      detailAddress?.trim() ||
+      formattedAddress?.trim(),
+  );
 
   useEffect(() => {
     if (!open) return;
+    const nextProvince = address?.province ?? "";
     reset({
       receiverName: address?.receiverName ?? user?.nickname ?? user?.username ?? "",
       receiverPhone: address?.receiverPhone ?? user?.phone ?? "",
       label: address?.label ?? "家",
-      province: address?.province ?? "",
-      city: address?.city ?? "",
+      province: nextProvince,
+      city: normalizeMunicipalityCity(nextProvince, address?.city),
       district: address?.district ?? "",
       detailAddress: address?.detailAddress ?? "",
       formattedAddress: address?.formattedAddress ?? "",
@@ -97,9 +131,34 @@ export function AddressDialog({ open, onOpenChange, address, onSaved }: AddressD
     });
   }, [address, open, reset, user?.nickname, user?.phone, user?.username]);
 
+  const clearLocation = () => {
+    setValue("longitude", undefined, { shouldDirty: true });
+    setValue("latitude", undefined, { shouldDirty: true });
+    setValue("province", "", { shouldDirty: true });
+    setValue("city", "", { shouldDirty: true });
+    setValue("district", "", { shouldDirty: true });
+    setValue("detailAddress", "", { shouldDirty: true });
+    setValue("formattedAddress", "", { shouldDirty: true });
+  };
+
   const handlePick = (picked: PickedLocation) => {
-    if (picked.province) setValue("province", picked.province, { shouldDirty: true });
-    if (picked.city) setValue("city", picked.city, { shouldDirty: true });
+    const currentProvince = getValues("province");
+    const currentCity = getValues("city");
+    const nextProvince = picked.province ?? currentProvince;
+    if (picked.province && picked.province !== currentProvince) {
+      setValue("city", "", { shouldDirty: true });
+      setValue("district", "", { shouldDirty: true });
+    }
+    if (picked.province) {
+      setValue("province", picked.province, { shouldDirty: true });
+    }
+    if (picked.city) {
+      const nextCity = normalizeMunicipalityCity(nextProvince, picked.city);
+      if (nextCity !== currentCity) {
+        setValue("district", "", { shouldDirty: true });
+      }
+      setValue("city", nextCity, { shouldDirty: true });
+    }
     if (picked.district) setValue("district", picked.district, { shouldDirty: true });
     if (picked.detailAddress) {
       setValue("detailAddress", picked.detailAddress, { shouldDirty: true });
@@ -216,21 +275,72 @@ export function AddressDialog({ open, onOpenChange, address, onSaved }: AddressD
             <div>
               <h3 className="text-sm font-semibold tracking-tight">送达地址</h3>
               <p className="mt-1 text-[11px] text-muted-foreground">
-                地图选点会自动回填省市区和详细地址，也可以手动修改。
+                地图选点会自动回填省市区和详细地址，也可以按省、市、区县逐级选择或输入搜索。
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label htmlFor="address-province">省份</Label>
-                <Input id="address-province" placeholder="上海市" {...register("province")} />
+                <Controller
+                  control={control}
+                  name="province"
+                  render={({ field }) => (
+                    <CustomSelect
+                      id="address-province"
+                      options={provinceOptions}
+                      value={field.value}
+                      onChange={(value) => {
+                        field.onChange(value);
+                        setValue("city", "", { shouldDirty: true });
+                        setValue("district", "", { shouldDirty: true });
+                      }}
+                      placeholder="请选择省份"
+                      searchable
+                      searchPlaceholder="搜索省份"
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="address-city">城市</Label>
-                <Input id="address-city" placeholder="上海市" {...register("city")} />
+                <Controller
+                  control={control}
+                  name="city"
+                  render={({ field }) => (
+                    <CustomSelect
+                      id="address-city"
+                      options={cityOptions}
+                      value={field.value}
+                      onChange={(value) => {
+                        field.onChange(value);
+                        setValue("district", "", { shouldDirty: true });
+                      }}
+                      placeholder={province ? "请选择城市" : "请先选择省份"}
+                      searchable
+                      searchPlaceholder="搜索城市"
+                      disabled={!province}
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="address-district">区县</Label>
-                <Input id="address-district" placeholder="徐汇区" {...register("district")} />
+                <Controller
+                  control={control}
+                  name="district"
+                  render={({ field }) => (
+                    <CustomSelect
+                      id="address-district"
+                      options={districtOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder={city ? "请选择区县" : "请先选择城市"}
+                      searchable
+                      searchPlaceholder="搜索区县"
+                      disabled={!city}
+                    />
+                  )}
+                />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -291,26 +401,26 @@ export function AddressDialog({ open, onOpenChange, address, onSaved }: AddressD
           <AMapLocationPicker
             longitude={longitude}
             latitude={latitude}
+            province={province}
+            city={city}
+            district={district}
+            detailAddress={detailAddress}
             onPick={handlePick}
             height={360}
           />
           <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
             <span>
-              {typeof longitude === "number" && typeof latitude === "number"
-                ? `坐标 ${longitude.toFixed(6)}, ${latitude.toFixed(6)}`
+              {hasCoordinate
+                ? `坐标 ${longitude!.toFixed(6)}, ${latitude!.toFixed(6)}`
                 : "尚未选择地图坐标"}
             </span>
-            {typeof longitude === "number" && typeof latitude === "number" ? (
+            {hasCoordinate || hasAddressText ? (
               <button
                 type="button"
                 className="text-primary hover:underline"
-                onClick={() => {
-                  setValue("longitude", undefined);
-                  setValue("latitude", undefined);
-                  setValue("formattedAddress", "");
-                }}
+                onClick={clearLocation}
               >
-                清除选点
+                清除选点与地址
               </button>
             ) : null}
           </div>

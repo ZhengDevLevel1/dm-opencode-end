@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getSnapToLandmark, saveSnapToLandmark } from "@/lib/map-preferences";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
 import {
   addressService,
@@ -6,9 +7,11 @@ import {
   cartService,
   dictService,
   favoriteService,
+  preferenceService,
 } from "@/lib/services";
 import { useAuthStore } from "@/stores/auth";
-import type { AuthBackgroundVO } from "@/types/api";
+import { toast } from "@/stores/toast";
+import type { AuthBackgroundVO, MapPreference } from "@/types/api";
 
 const AUTH_BACKGROUND_CACHE_KEY = "flower.appearance.auth-background";
 const AUTH_BACKGROUND_MAX_AGE = 5 * 60 * 1000;
@@ -45,6 +48,53 @@ export function useAuthBackgroundQuery() {
     initialDataUpdatedAt: 0,
     staleTime: AUTH_BACKGROUND_MAX_AGE,
   });
+}
+
+export function useMapSnapPreference() {
+  const userId = useAuthStore((state) => state.user?.id);
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.mapPreference(userId);
+  const query = useQuery({
+    queryKey,
+    queryFn: async () => {
+      const data = await preferenceService.getMap();
+      saveSnapToLandmark(userId, data.snapToLandmark);
+      return data;
+    },
+    enabled: Boolean(userId),
+    initialData: () => ({ snapToLandmark: getSnapToLandmark(userId) }),
+    initialDataUpdatedAt: 0,
+    staleTime: 30 * 1000,
+  });
+  const mutation = useMutation({
+    mutationFn: preferenceService.saveMap,
+    onMutate: async (next) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<MapPreference>(queryKey);
+      queryClient.setQueryData<MapPreference>(queryKey, next);
+      saveSnapToLandmark(userId, next.snapToLandmark);
+      return { previous };
+    },
+    onError: (_error, _next, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+        saveSnapToLandmark(userId, context.previous.snapToLandmark);
+      }
+      void queryClient.invalidateQueries({ queryKey });
+      toast.error("自动跳转地标设置保存失败", "请检查网络后重试");
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKey, data);
+      saveSnapToLandmark(userId, data.snapToLandmark);
+    },
+  });
+  return {
+    snapToLandmark: query.data?.snapToLandmark ?? false,
+    setSnapToLandmark: (value: boolean) =>
+      mutation.mutate({ snapToLandmark: value }),
+    isLoading: query.isFetching,
+    isSaving: mutation.isPending,
+  };
 }
 
 export function useDict() {

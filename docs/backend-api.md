@@ -292,6 +292,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/auth/password` | 登录 | `ApiResponse<Void>` |
 | GET | `/api/auth/preferences` | 登录 | `ApiResponse<ThemePreferenceVO>` |
 | PUT | `/api/auth/preferences` | 登录 | `ApiResponse<ThemePreferenceVO>` |
+| GET | `/api/auth/preferences/map` | 登录 | `ApiResponse<MapPreferenceVO>` |
+| PUT | `/api/auth/preferences/map` | 登录 | `ApiResponse<MapPreferenceVO>` |
 | POST | `/api/files/images` | 登录 | `ApiResponse<FileUploadVO>` |
 | GET | `/api/dict/options` | 公开 | `ApiResponse<DictOptions>` |
 | GET | `/api/appearance/auth-background` | 公开 | `ApiResponse<AuthBackgroundVO>` |
@@ -389,6 +391,8 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/auth/password` | 登录 | 修改当前用户密码 |
 | GET | `/api/auth/preferences` | 登录 | 获取当前账号的外观偏好 |
 | PUT | `/api/auth/preferences` | 登录 | 保存当前账号的外观偏好 |
+| GET | `/api/auth/preferences/map` | 登录 | 获取当前账号的地图选点偏好 |
+| PUT | `/api/auth/preferences/map` | 登录 | 保存当前账号的地图选点偏好 |
 
 ### 4.2 请求体
 
@@ -641,7 +645,23 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | `backgroundBlur` | 0–30 |
 | `sidebarPinned` | boolean，左侧菜单栏是否固定，按账号保存 |
 
-表结构：`user_theme_preference`，主键 `user_id`，外键关联 `sys_user.id`。
+`GET /api/auth/preferences/map`（登录）
+
+- 返回 `ApiResponse<MapPreferenceVO>`；未保存时 `snapToLandmark` 为 `false`。
+- 地图选点偏好按账号保存，跨浏览器/设备登录同一账号时同步。
+
+`PUT /api/auth/preferences/map`（登录）
+
+```json
+{
+  "snapToLandmark": true
+}
+```
+
+- 只更新地图选点开关，不会覆盖用户的外观偏好；`snapToLandmark` 必填，缺失时返回 `400`。
+- 该开关控制地址选择器选点后是否自动跳转到最近地标。
+
+表结构：`user_theme_preference`，主键 `user_id`，外键关联 `sys_user.id`；地图选点偏好字段为 `map_snap_to_landmark`。
 - 最长 500 字符；更新会记录操作日志（模块「外观管理」）。
 - 数据保存在 `appearance_setting` 表单行记录（`id=1`），首次读取或更新时自动创建。
 

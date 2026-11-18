@@ -9,9 +9,10 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/cn";
+import { Input } from "@/components/ui/input";
 
 const PANEL_GAP = 6;
 const PANEL_MIN_WIDTH = 160;
@@ -52,6 +53,8 @@ export interface CustomSelectProps
   onChange: (value: string) => void;
   placeholder?: string;
   panelClassName?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }
 
 export function CustomSelect({
@@ -61,27 +64,34 @@ export function CustomSelect({
   placeholder,
   className,
   panelClassName,
+  searchable = false,
+  searchPlaceholder = "搜索选项",
   disabled,
   id,
   ...buttonProps
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [query, setQuery] = useState("");
   const [panelPosition, setPanelPosition] = useState<PanelPosition | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLUListElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const optionRefs = useRef<Array<HTMLLIElement | null>>([]);
   const listboxId = useId();
   const reduceMotion = useReducedMotion();
 
-  const allOptions: readonly CustomSelectOption[] =
+  const baseOptions: readonly CustomSelectOption[] =
     placeholder === undefined
       ? options
       : [{ value: "", label: placeholder }, ...options];
+  const normalizedQuery = searchable ? query.trim().toLowerCase() : "";
+  const allOptions = normalizedQuery
+    ? baseOptions.filter((option) => option.label.toLowerCase().includes(normalizedQuery))
+    : baseOptions;
 
-  const selectedIndex = allOptions.findIndex((option) => option.value === value);
-  const selectedOption = selectedIndex >= 0 ? allOptions[selectedIndex] : undefined;
+  const selectedOption = baseOptions.find((option) => option.value === value);
   const hasValue = Boolean(selectedOption && selectedOption.value !== "");
   const displayLabel = selectedOption?.label ?? placeholder ?? "";
   const firstEnabledIndex = allOptions.findIndex((option) => !option.disabled);
@@ -170,11 +180,26 @@ export function CustomSelect({
     optionRefs.current[highlightedIndex]?.scrollIntoView({ block: "nearest" });
   }, [highlightedIndex, isOpen]);
 
-  const openPanel = (preferredIndex: number) => {
+  useEffect(() => {
+    if (!isOpen || !searchable) return;
+    const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [isOpen, searchable]);
+
+  const openPanel = (position: "selected" | "last" = "selected") => {
+    setQuery("");
+    const selectedBaseIndex = baseOptions.findIndex((option) => option.value === value);
+    const firstBaseIndex = baseOptions.findIndex((option) => !option.disabled);
+    const lastBaseIndex = baseOptions.reduce(
+      (last, option, index) => (option.disabled ? last : index),
+      -1,
+    );
     const nextIndex =
-      preferredIndex >= 0 && !allOptions[preferredIndex]?.disabled
-        ? preferredIndex
-        : firstEnabledIndex;
+      position === "last"
+        ? lastBaseIndex
+        : selectedBaseIndex >= 0 && !baseOptions[selectedBaseIndex]?.disabled
+          ? selectedBaseIndex
+          : firstBaseIndex;
     updatePanelPosition();
     setHighlightedIndex(nextIndex);
     setIsOpen(true);
@@ -196,8 +221,47 @@ export function CustomSelect({
   const selectOption = (option: CustomSelectOption | undefined) => {
     if (!option || option.disabled) return;
     if (option.value !== value) onChange(option.value);
+    setQuery("");
     setIsOpen(false);
     triggerRef.current?.focus();
+  };
+
+  const handleSearchChange = (next: string) => {
+    setQuery(next);
+    const normalized = next.trim().toLowerCase();
+    const matches = normalized
+      ? baseOptions.filter((option) => option.label.toLowerCase().includes(normalized))
+      : baseOptions;
+    setHighlightedIndex(matches.findIndex((option) => !option.disabled));
+  };
+
+  const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        moveHighlight(1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        moveHighlight(-1);
+        break;
+      case "Enter":
+        event.preventDefault();
+        selectOption(allOptions[highlightedIndex]);
+        break;
+      case "Escape":
+        event.preventDefault();
+        setIsOpen(false);
+        triggerRef.current?.focus();
+        break;
+      case "Tab":
+        event.preventDefault();
+        setIsOpen(false);
+        triggerRef.current?.focus();
+        break;
+      default:
+        break;
+    }
   };
 
   const handleTriggerKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -205,12 +269,12 @@ export function CustomSelect({
       case "ArrowDown":
         event.preventDefault();
         if (isOpen) moveHighlight(1);
-        else openPanel(selectedIndex >= 0 ? selectedIndex : firstEnabledIndex);
+        else openPanel();
         break;
       case "ArrowUp":
         event.preventDefault();
         if (isOpen) moveHighlight(-1);
-        else openPanel(selectedIndex >= 0 ? selectedIndex : lastEnabledIndex);
+        else openPanel("last");
         break;
       case "Home":
         if (isOpen) {
@@ -228,7 +292,7 @@ export function CustomSelect({
       case " ":
         event.preventDefault();
         if (isOpen) selectOption(allOptions[highlightedIndex]);
-        else openPanel(selectedIndex >= 0 ? selectedIndex : firstEnabledIndex);
+        else openPanel();
         break;
       case "Escape":
         if (isOpen) {
@@ -273,7 +337,7 @@ export function CustomSelect({
         }
         onClick={() => {
           if (isOpen) setIsOpen(false);
-          else openPanel(selectedIndex >= 0 ? selectedIndex : firstEnabledIndex);
+          else openPanel();
         }}
         onKeyDown={handleTriggerKeyDown}
         className={cn(
@@ -296,10 +360,8 @@ export function CustomSelect({
       </button>
       {isOpen && panelPosition
         ? createPortal(
-            <motion.ul
+            <motion.div
               ref={panelRef}
-              id={listboxId}
-              role="listbox"
               style={panelStyle}
               initial={
                 reduceMotion
@@ -317,48 +379,85 @@ export function CustomSelect({
                   : { type: "spring", stiffness: 520, damping: 34, mass: 0.7 }
               }
               className={cn(
-                "fixed z-[70] overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-xl",
+                "fixed z-[70] flex flex-col overflow-hidden rounded-lg border border-border/70 bg-popover p-1 text-popover-foreground shadow-xl",
                 panelPosition.placement === "bottom" ? "origin-top" : "origin-bottom",
                 panelClassName,
               )}
             >
-              {allOptions.map((option, index) => {
-                const isSelected = option.value === value;
-                const isHighlighted = index === highlightedIndex;
-                return (
-                  <li
-                    key={`${option.value}-${index}`}
-                    ref={(node) => {
-                      optionRefs.current[index] = node;
-                    }}
-                    id={optionId(index)}
-                    role="option"
-                    aria-selected={isSelected}
-                    aria-disabled={option.disabled || undefined}
-                    onMouseEnter={() => {
-                      if (!option.disabled) setHighlightedIndex(index);
-                    }}
-                    onClick={() => selectOption(option)}
-                    className={cn(
-                      "flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-                      "hover:bg-sky-50 dark:hover:bg-accent",
-                      isHighlighted && "bg-sky-50 dark:bg-accent",
-                      isSelected && "font-semibold text-foreground",
-                      option.disabled && "pointer-events-none opacity-50",
-                    )}
-                  >
-                    <span className="truncate">{option.label}</span>
-                    <Check
+              {searchable ? (
+                <div className="shrink-0 border-b border-border/60 px-1 pb-1.5 pt-1">
+                  <div className="relative">
+                    <Search
                       aria-hidden
-                      className={cn(
-                        "h-3.5 w-3.5 shrink-0 text-primary transition-opacity",
-                        isSelected ? "opacity-100" : "opacity-0",
-                      )}
+                      className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
                     />
+                    <Input
+                      ref={searchInputRef}
+                      value={query}
+                      onChange={(event) => handleSearchChange(event.target.value)}
+                      onKeyDown={handleSearchKeyDown}
+                      placeholder={searchPlaceholder}
+                      aria-label={searchPlaceholder}
+                      aria-controls={listboxId}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className="h-9 pl-8"
+                    />
+                  </div>
+                </div>
+              ) : null}
+              <ul
+                id={listboxId}
+                role="listbox"
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-0"
+              >
+                {allOptions.length === 0 ? (
+                  <li
+                    role="presentation"
+                    className="px-3 py-5 text-center text-sm text-muted-foreground"
+                  >
+                    未找到匹配项
                   </li>
-                );
-              })}
-            </motion.ul>,
+                ) : (
+                  allOptions.map((option, index) => {
+                    const isSelected = option.value === value;
+                    const isHighlighted = index === highlightedIndex;
+                    return (
+                      <li
+                        key={`${option.value}-${index}`}
+                        ref={(node) => {
+                          optionRefs.current[index] = node;
+                        }}
+                        id={optionId(index)}
+                        role="option"
+                        aria-selected={isSelected}
+                        aria-disabled={option.disabled || undefined}
+                        onMouseEnter={() => {
+                          if (!option.disabled) setHighlightedIndex(index);
+                        }}
+                        onClick={() => selectOption(option)}
+                        className={cn(
+                          "flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                          "hover:bg-sky-50 dark:hover:bg-accent",
+                          isHighlighted && "bg-sky-50 dark:bg-accent",
+                          isSelected && "font-semibold text-foreground",
+                          option.disabled && "pointer-events-none opacity-50",
+                        )}
+                      >
+                        <span className="truncate">{option.label}</span>
+                        <Check
+                          aria-hidden
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0 text-primary transition-opacity",
+                            isSelected ? "opacity-100" : "opacity-0",
+                          )}
+                        />
+                      </li>
+                    );
+                  })
+                )}
+              </ul>
+            </motion.div>,
             document.body,
           )
         : null}

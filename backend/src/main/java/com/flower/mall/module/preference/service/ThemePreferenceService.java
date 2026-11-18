@@ -1,6 +1,8 @@
 package com.flower.mall.module.preference.service;
 
 import com.flower.mall.common.util.SecurityUtils;
+import com.flower.mall.module.preference.dto.MapPreferenceRequest;
+import com.flower.mall.module.preference.dto.MapPreferenceVO;
 import com.flower.mall.module.preference.dto.ThemePreferenceRequest;
 import com.flower.mall.module.preference.dto.ThemePreferenceVO;
 import com.flower.mall.module.preference.entity.UserThemePreference;
@@ -19,6 +21,32 @@ public class ThemePreferenceService {
     public ThemePreferenceVO get() {
         UserThemePreference preference = preferenceMapper.selectById(SecurityUtils.currentUserId());
         return preference == null ? null : ThemePreferenceVO.from(preference);
+    }
+
+    public MapPreferenceVO getMap() {
+        return MapPreferenceVO.from(preferenceMapper.selectById(SecurityUtils.currentUserId()));
+    }
+
+    @Transactional
+    public MapPreferenceVO updateMap(MapPreferenceRequest request) {
+        Long userId = SecurityUtils.currentUserId();
+        UserThemePreference preference = preferenceMapper.selectById(userId);
+        boolean create = preference == null;
+        if (create) {
+            preference = new UserThemePreference();
+            preference.setUserId(userId);
+        }
+        preference.setMapSnapToLandmark(request.getSnapToLandmark());
+        if (create) {
+            try {
+                preferenceMapper.insert(preference);
+            } catch (DuplicateKeyException ignored) {
+                preferenceMapper.updateById(preference);
+            }
+        } else {
+            preferenceMapper.updateById(preference);
+        }
+        return MapPreferenceVO.from(preferenceMapper.selectById(userId));
     }
 
     @Transactional

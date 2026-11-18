@@ -8,7 +8,9 @@ import {
   MapPin,
   MapPinned,
   Plus,
+  Search,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { useAddressesQuery, useCartQuery } from "@/hooks/queries";
 import { orderService, paymentService } from "@/lib/services";
@@ -21,6 +23,7 @@ import type { AddressVO, CartItemVO, OrderVO, PaymentVO } from "@/types/api";
 import { AddressDialog } from "@/components/domain/address-dialog";
 import { ProductImage } from "@/components/domain/product-image";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog } from "@/components/ui/dialog";
@@ -36,6 +39,7 @@ export function CheckoutPage() {
   const cart = useCartQuery();
   const addresses = useAddressesQuery();
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
+  const [addressQuery, setAddressQuery] = useState("");
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [remark, setRemark] = useState("");
   const [snapshot, setSnapshot] = useState<CartItemVO[] | null>(null);
@@ -68,6 +72,15 @@ export function CheckoutPage() {
   }, [initialItems, snapshot]);
 
   const addressList = useMemo(() => addresses.data ?? [], [addresses.data]);
+  const filteredAddressList = useMemo(() => {
+    const query = addressQuery.trim().toLowerCase();
+    if (!query) return addressList;
+    return addressList.filter((address) =>
+      [address.label, address.receiverName, address.receiverPhone, address.fullAddress].some(
+        (value) => value?.toLowerCase().includes(query),
+      ),
+    );
+  }, [addressList, addressQuery]);
 
   useEffect(() => {
     if (pendingAddressId.current != null) {
@@ -293,7 +306,7 @@ export function CheckoutPage() {
                 <div>
                   <h2 className="text-base font-semibold tracking-tight">收货信息</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    从地址簿选择送达地址，地图选点会随订单同步给履约工作台。
+                    搜索并选择送达地址，地图选点会随订单同步给履约工作台。
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -345,16 +358,73 @@ export function CheckoutPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {addressList.map((address) => (
-                    <AddressOptionCard
-                      key={address.id}
-                      address={address}
-                      selected={address.id === selectedAddressId}
-                      onSelect={() => setSelectedAddressId(address.id)}
-                    />
-                  ))}
-                </div>
+                <>
+                  <div className="mt-4 flex items-center gap-2">
+                    <div className="relative min-w-0 flex-1">
+                      <Search
+                        className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+                        aria-hidden
+                      />
+                      <Input
+                        id="checkout-address-search"
+                        value={addressQuery}
+                        onChange={(event) => setAddressQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") event.preventDefault();
+                          if (event.key === "Escape") setAddressQuery("");
+                        }}
+                        placeholder="搜索收货人、电话或地址"
+                        aria-label="搜索收货地址"
+                        autoComplete="off"
+                        className="h-9 pr-9 pl-9 text-sm"
+                      />
+                      {addressQuery ? (
+                        <button
+                          type="button"
+                          onClick={() => setAddressQuery("")}
+                          aria-label="清空地址搜索"
+                          className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground tabular">
+                      {filteredAddressList.length}/{addressList.length}
+                    </span>
+                  </div>
+
+                  {filteredAddressList.length === 0 ? (
+                    <div className="mt-3 rounded-xl border border-dashed border-border/70 px-4 py-6 text-center">
+                      <p className="text-sm font-medium">没有匹配的收货地址</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        换个关键词试试，或清空搜索查看全部地址。
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                        onClick={() => setAddressQuery("")}
+                      >
+                        清空搜索
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-3 max-h-[18rem] overflow-y-auto overscroll-contain pr-1">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {filteredAddressList.map((address) => (
+                          <AddressOptionCard
+                            key={address.id}
+                            address={address}
+                            selected={address.id === selectedAddressId}
+                            onSelect={() => setSelectedAddressId(address.id)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {selectedAddress ? (
@@ -485,6 +555,7 @@ export function CheckoutPage() {
         onSaved={(saved) => {
           pendingAddressId.current = saved.id;
           setSelectedAddressId(saved.id);
+          setAddressQuery("");
         }}
       />
 

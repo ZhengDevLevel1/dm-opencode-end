@@ -27,6 +27,7 @@ import { useLoginGuard } from "@/hooks/use-login-guard";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatNumber, splitTags } from "@/lib/format";
 import { toast } from "@/stores/toast";
+import type { CartItemVO } from "@/types/api";
 import { ProductImage } from "@/components/domain/product-image";
 import { Price } from "@/components/domain/price";
 import { Rating } from "@/components/domain/rating";
@@ -101,6 +102,23 @@ export function ProductDetailPage() {
     onError: (error) => toast.error("加入购物车失败", getErrorMessage(error)),
   });
 
+  const buyNowMutation = useMutation({
+    mutationFn: (input: { productId: number; quantity: number }) =>
+      cartService.add(input),
+    onSuccess: (item) => {
+      queryClient.setQueryData<CartItemVO[]>(queryKeys.cart, (items) => {
+        if (!items) return [item];
+        if (!items.some((existing) => existing.id === item.id)) {
+          return [item, ...items];
+        }
+        return items.map((existing) => (existing.id === item.id ? item : existing));
+      });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
+      navigate(`/checkout?items=${item.id}`);
+    },
+    onError: (error) => toast.error("无法立即购买", getErrorMessage(error)),
+  });
+
   const favoriteMutation = useMutation({
     mutationFn: (favorite: boolean) => (favorite ? favoriteService.add(id) : favoriteService.remove(id)),
     onSuccess: (_, favorite) => {
@@ -121,13 +139,9 @@ export function ProductDetailPage() {
 
   const handleBuyNow = async () => {
     if (!requireLogin() || !product.data) return;
-    try {
-      const item = await cartService.add({ productId: id, quantity });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.cart });
-      navigate(`/cart?selected=${item.id}`);
-    } catch (error) {
-      toast.error("无法立即购买", getErrorMessage(error));
-    }
+    await buyNowMutation
+      .mutateAsync({ productId: id, quantity })
+      .catch(() => undefined);
   };
 
   const handleFavorite = async () => {
@@ -317,9 +331,12 @@ export function ProductDetailPage() {
             <Button
               variant="outline"
               className="h-11 flex-1 sm:flex-none"
-              disabled={soldOut}
+              disabled={soldOut || buyNowMutation.isPending}
               onClick={handleBuyNow}
             >
+              {buyNowMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
               立即购买
             </Button>
             <Tooltip content={isFavorite ? "取消收藏" : "收藏花礼"}>

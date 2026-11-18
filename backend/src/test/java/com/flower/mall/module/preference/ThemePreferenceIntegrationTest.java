@@ -39,28 +39,7 @@ class ThemePreferenceIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
 
-        String body = """
-                {
-                  "mode": "dark",
-                  "palette": "rose-pine",
-                  "accent": "rose",
-                  "customAccent": "#c25b6a",
-                  "fontFamily": "kai",
-                  "fontSize": 15.5,
-                  "radius": "round",
-                  "density": "compact",
-                  "sidebarStyle": "panel",
-                  "scale": 1.05,
-                  "reduceMotion": true,
-                  "highContrast": false,
-                  "background": "gradient",
-                  "backgroundImage": "",
-                  "backgroundOpacity": 0.7,
-                  "backgroundBlur": 8,
-                  "componentOpacity": 0.9,
-                  "sidebarPinned": true
-                }
-                """;
+        String body = themePreferenceBody();
 
         mockMvc.perform(put("/api/auth/preferences")
                         .header("Authorization", bearer(customer))
@@ -86,6 +65,76 @@ class ThemePreferenceIntegrationTest {
         mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(alice)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    void mapPreferenceIsSavedPerUser() throws Exception {
+        String customer = login("customer", "customer123");
+        String alice = login("alice", "alice123");
+
+        mockMvc.perform(get("/api/auth/preferences/map").header("Authorization", bearer(customer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(false));
+
+        mockMvc.perform(put("/api/auth/preferences/map")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"snapToLandmark\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(true));
+
+        mockMvc.perform(get("/api/auth/preferences/map").header("Authorization", bearer(customer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(true));
+
+        mockMvc.perform(get("/api/auth/preferences/map").header("Authorization", bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(false));
+
+        mockMvc.perform(put("/api/auth/preferences/map")
+                        .header("Authorization", bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"snapToLandmark\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(true));
+
+        mockMvc.perform(get("/api/auth/preferences/map").header("Authorization", bearer(customer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(true));
+        mockMvc.perform(get("/api/auth/preferences/map").header("Authorization", bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(true));
+    }
+
+    @Test
+    void mapPreferenceRequiresValue() throws Exception {
+        String customer = login("customer", "customer123");
+        mockMvc.perform(put("/api/auth/preferences/map")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void themeUpdatePreservesMapPreference() throws Exception {
+        String customer = login("customer", "customer123");
+        mockMvc.perform(put("/api/auth/preferences/map")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"snapToLandmark\":true}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(put("/api/auth/preferences")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(themePreferenceBody()))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/auth/preferences/map").header("Authorization", bearer(customer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.snapToLandmark").value(true));
     }
 
     @Test
@@ -143,6 +192,31 @@ class ThemePreferenceIntegrationTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
+    }
+
+    private String themePreferenceBody() {
+        return """
+                {
+                  "mode": "dark",
+                  "palette": "rose-pine",
+                  "accent": "rose",
+                  "customAccent": "#c25b6a",
+                  "fontFamily": "kai",
+                  "fontSize": 15.5,
+                  "radius": "round",
+                  "density": "compact",
+                  "sidebarStyle": "panel",
+                  "scale": 1.05,
+                  "reduceMotion": true,
+                  "highContrast": false,
+                  "background": "gradient",
+                  "backgroundImage": "",
+                  "backgroundOpacity": 0.7,
+                  "backgroundBlur": 8,
+                  "componentOpacity": 0.9,
+                  "sidebarPinned": true
+                }
+                """;
     }
 
     private String login(String username, String password) throws Exception {

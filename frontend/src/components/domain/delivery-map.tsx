@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Loader2, MapPinned } from "lucide-react";
+import {
+  AlertCircle,
+  Loader2,
+  LocateFixed,
+  MapPinned,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { loadAMap, mapStyleUrl, type AMapMap, type AMapMarker } from "@/lib/amap";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
+
+const DEFAULT_ZOOM = 16;
+const MIN_ZOOM = 5;
+const MAX_ZOOM = 20;
 
 interface DeliveryMapProps {
   longitude?: number;
@@ -19,7 +31,9 @@ export function DeliveryMap({
   className,
 }: DeliveryMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<AMapMap | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
 
   const hasCoordinate = typeof longitude === "number" && typeof latitude === "number";
 
@@ -32,23 +46,32 @@ export function DeliveryMap({
     if (!container) return;
 
     setStatus("loading");
+    setZoom(DEFAULT_ZOOM);
     void loadAMap()
       .then((amap) => {
         if (disposed) return;
         const position: [number, number] = [longitude, latitude];
         map = new amap.Map(container, {
-          zoom: 16,
+          zoom: DEFAULT_ZOOM,
           center: position,
           mapStyle: mapStyleUrl(),
           viewMode: "2D",
           resizeEnable: true,
-          scrollWheel: false,
+          dragEnable: true,
+          zoomEnable: true,
+          doubleClickZoom: true,
+          scrollWheel: true,
         });
         marker = new amap.Marker({
           map,
           position,
           anchor: "bottom-center",
           title: address || "送达位置",
+        });
+        mapRef.current = map;
+        map.on("zoomend", () => {
+          if (disposed) return;
+          setZoom(map?.getZoom() ?? DEFAULT_ZOOM);
         });
         setStatus("ready");
       })
@@ -58,10 +81,27 @@ export function DeliveryMap({
 
     return () => {
       disposed = true;
+      mapRef.current = null;
       marker?.setMap(null);
       map?.destroy();
     };
   }, [address, hasCoordinate, latitude, longitude]);
+
+  const changeZoom = (delta: number) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, map.getZoom() + delta));
+    map.setZoom(next);
+    setZoom(next);
+  };
+
+  const resetView = () => {
+    const map = mapRef.current;
+    if (!map || typeof longitude !== "number" || typeof latitude !== "number") return;
+    map.setZoom(DEFAULT_ZOOM);
+    map.setCenter([longitude, latitude]);
+    setZoom(DEFAULT_ZOOM);
+  };
 
   if (!hasCoordinate) {
     return (
@@ -80,6 +120,9 @@ export function DeliveryMap({
       </div>
     );
   }
+
+  const controlClass =
+    "border-border/60 bg-card/95 shadow-sm backdrop-blur hover:bg-card";
 
   return (
     <div
@@ -104,6 +147,47 @@ export function DeliveryMap({
             请按收花信息中的文字地址配送，坐标仍已记录。
           </p>
         </div>
+      ) : null}
+      {status === "ready" ? (
+        <>
+          <div className="absolute right-2.5 top-2.5 flex flex-col gap-1.5">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className={controlClass}
+              title="放大地图"
+              aria-label="放大地图"
+              disabled={zoom >= MAX_ZOOM}
+              onClick={() => changeZoom(1)}
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className={controlClass}
+              title="缩小地图"
+              aria-label="缩小地图"
+              disabled={zoom <= MIN_ZOOM}
+              onClick={() => changeZoom(-1)}
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className={controlClass}
+              title="回到送达位置"
+              aria-label="回到送达位置"
+              onClick={resetView}
+            >
+              <LocateFixed className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="pointer-events-none absolute bottom-2.5 left-2.5 rounded-full bg-card/92 px-2.5 py-1 text-[11px] text-muted-foreground shadow-sm">
+            拖动查看周边，滚轮或按钮缩放
+          </div>
+        </>
       ) : null}
     </div>
   );

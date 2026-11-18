@@ -1,6 +1,8 @@
 package com.flower.mall.module.preference.controller;
 
 import com.flower.mall.common.api.ApiResponse;
+import com.flower.mall.module.preference.dto.MapPreferenceRequest;
+import com.flower.mall.module.preference.dto.MapPreferenceVO;
 import com.flower.mall.module.preference.dto.ThemePreferenceRequest;
 import com.flower.mall.module.preference.dto.ThemePreferenceVO;
 import com.flower.mall.module.preference.service.ThemePreferenceService;
@@ -32,5 +34,17 @@ public class ThemePreferenceController {
     @PutMapping
     public ApiResponse<ThemePreferenceVO> update(@Valid @RequestBody ThemePreferenceRequest request) {
         return ApiResponse.ok(themePreferenceService.update(request));
+    }
+
+    @Operation(summary = "获取当前用户的地图选点偏好")
+    @GetMapping("/map")
+    public ApiResponse<MapPreferenceVO> getMap() {
+        return ApiResponse.ok(themePreferenceService.getMap());
+    }
+
+    @Operation(summary = "保存当前用户的地图选点偏好")
+    @PutMapping("/map")
+    public ApiResponse<MapPreferenceVO> updateMap(@Valid @RequestBody MapPreferenceRequest request) {
+        return ApiResponse.ok(themePreferenceService.updateMap(request));
     }
 }
