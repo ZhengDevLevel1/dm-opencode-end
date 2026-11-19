@@ -46,8 +46,9 @@ public class OrderController {
     public ApiResponse<PageResult<OrderVO>> page(
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
-            @RequestParam(required = false) String status) {
-        return ApiResponse.ok(orderService.pageForUser(SecurityUtils.currentUserId(), page, size, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(orderService.pageForUser(SecurityUtils.currentUserId(), page, size, status, keyword));
     }
 
     @Operation(summary = "订单详情")

@@ -390,7 +390,7 @@ export function StaffOrderDetailPage() {
                 共 {orderData.items.reduce((total, item) => total + item.quantity, 0)} 件
               </span>
             </div>
-            <ul className="divide-y divide-border/60">
+            <ul className="max-h-96 divide-y divide-border/60 overflow-y-auto overscroll-contain">
               {orderData.items.map((item) => (
                 <li key={item.id} className="flex items-center gap-3 px-5 py-4">
                   <ProductImage

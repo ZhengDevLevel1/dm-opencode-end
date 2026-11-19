@@ -41,7 +41,7 @@ public class AuthController {
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "会员注册")
+    @Operation(summary = "消费者注册")
     @PostMapping("/register")
     public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request) {
         return ApiResponse.ok(authService.register(request));

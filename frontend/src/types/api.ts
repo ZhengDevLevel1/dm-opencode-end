@@ -735,6 +735,7 @@ export interface OrderQuery {
   page?: number;
   size?: number;
   status?: OrderStatus;
+  keyword?: string;
 }
 
 export interface StaffOrderQuery {
@@ -765,4 +766,5 @@ export interface AdminReviewQuery {
 export interface ReviewPageQuery {
   page?: number;
   size?: number;
+  keyword?: string;
 }

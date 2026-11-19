@@ -1,10 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ClipboardList, CreditCard, MessageSquareText, PackageOpen } from "lucide-react";
+import {
+  ChevronRight,
+  ClipboardList,
+  CreditCard,
+  MessageSquareText,
+  PackageOpen,
+  Search,
+} from "lucide-react";
 import { orderService } from "@/lib/services";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import type { OrderStatus, OrderVO } from "@/types/api";
@@ -15,6 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/ui/pagination";
+import { ListSearch } from "@/components/ui/list-search";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,8 +58,18 @@ export function OrdersPage() {
   const status = knownStatuses.includes(statusParam as OrderStatus)
     ? (statusParam as OrderStatus)
     : undefined;
+  const keywordParam = params.get("keyword") ?? "";
+  const [searchInput, setSearchInput] = useState(keywordParam);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
-  const query = useMemo(() => ({ page, size: PAGE_SIZE, status }), [page, status]);
+  useEffect(() => {
+    setSearchInput(keywordParam);
+  }, [keywordParam]);
+
+  const query = useMemo(
+    () => ({ page, size: pageSize, status, keyword: keywordParam.trim() || undefined }),
+    [page, pageSize, status, keywordParam],
+  );
   const orders = useQuery({
     queryKey: queryKeys.orders(query),
     queryFn: () => orderService.list(query),
@@ -69,11 +88,16 @@ export function OrdersPage() {
     [dict.data],
   );
 
-  const updateParams = (patch: { status?: string; page?: number }) => {
+  const updateParams = (patch: { status?: string; page?: number; keyword?: string }) => {
     const next = new URLSearchParams(params);
     if (patch.status !== undefined) {
       if (patch.status) next.set("status", patch.status);
       else next.delete("status");
+      next.delete("page");
+    }
+    if (patch.keyword !== undefined) {
+      if (patch.keyword) next.set("keyword", patch.keyword);
+      else next.delete("keyword");
       next.delete("page");
     }
     if (patch.page !== undefined) {
@@ -81,6 +105,15 @@ export function OrdersPage() {
       else next.set("page", String(patch.page));
     }
     setParams(next, { replace: true });
+  };
+
+  const submitSearch = () => {
+    updateParams({ keyword: searchInput.trim() });
+  };
+
+  const clearSearch = () => {
+    setSearchInput("");
+    updateParams({ keyword: "" });
   };
 
   const invalidateOrder = (orderId: number) => {
@@ -162,6 +195,37 @@ export function OrdersPage() {
         </Button>
       </div>
 
+      <form
+        className="ui-card flex flex-col gap-2 p-3 sm:flex-row sm:items-center"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submitSearch();
+        }}
+      >
+        <ListSearch
+          value={searchInput}
+          onChange={setSearchInput}
+          onSubmit={submitSearch}
+          onClear={clearSearch}
+          placeholder="搜索订单号、收货人或商品名"
+          aria-label="搜索订单"
+          containerClassName="flex-1"
+        />
+        <div className="flex shrink-0 items-center gap-2">
+          <Button type="submit" className="flex-1 sm:flex-none">
+            搜索
+          </Button>
+          {keywordParam ? (
+            <Button type="button" variant="secondary" onClick={clearSearch}>
+              重置
+            </Button>
+          ) : null}
+        </div>
+      </form>
+      {keywordParam ? (
+        <p className="-mt-2 px-1 text-[11px] text-muted-foreground">正在筛选“{keywordParam}”</p>
+      ) : null}
+
       <div className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
         <button
           type="button"
@@ -207,17 +271,27 @@ export function OrdersPage() {
         />
       ) : records.length === 0 ? (
         <EmptyState
-          icon={ClipboardList}
-          title={status ? "这个状态下还没有订单" : "还没有订单"}
+          icon={keywordParam ? Search : ClipboardList}
+          title={
+            keywordParam ? "没有找到相关订单" : status ? "这个状态下还没有订单" : "还没有订单"
+          }
           description={
-            status
-              ? "换一个状态看看，或者继续去挑一束当季花礼。"
-              : "挑一束花，让花艺师替你整理好送到收花人手上。"
+            keywordParam
+              ? `没有匹配“${keywordParam}”的订单，换个订单号、收货人或商品名试试。`
+              : status
+                ? "换一个状态看看，或者继续去挑一束当季花礼。"
+                : "挑一束花，让花艺师替你整理好送到收花人手上。"
           }
           action={
-            <Button asChild>
-              <Link to="/products">去挑花</Link>
-            </Button>
+            keywordParam ? (
+              <Button variant="outline" onClick={clearSearch}>
+                清空搜索
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link to="/products">去挑花</Link>
+              </Button>
+            )
           }
           className="py-20"
         />
@@ -239,8 +313,13 @@ export function OrdersPage() {
           page={orders.data.page}
           pages={orders.data.pages}
           total={orders.data.total}
-          pageSize={orders.data.size}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS.standard}
           onPageChange={(next) => updateParams({ page: next })}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            updateParams({ page: 1 });
+          }}
         />
       ) : null}
 

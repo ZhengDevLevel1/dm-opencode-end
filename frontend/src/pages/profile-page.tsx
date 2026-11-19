@@ -21,6 +21,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useFavoritesQuery } from "@/hooks/queries";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDate, formatNumber, maskPhone } from "@/lib/format";
+import { roleLabelOf } from "@/lib/permissions";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import { ImageUpload } from "@/components/domain/image-upload";
@@ -36,11 +37,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 
 const schema = z.object({
-  nickname: z.string().trim().max(30, "昵称最多 30 个字符").optional(),
+  nickname: z.string().trim().min(1, "请填写昵称").max(30, "昵称最多 30 个字符"),
   phone: z
     .string()
     .trim()
-    .refine((value) => !value || /^1[3-9]\d{9}$/.test(value), "请输入正确的手机号"),
+    .min(1, "请填写手机号")
+    .refine((value) => /^1[3-9]\d{9}$/.test(value), "请输入正确的手机号"),
   email: z
     .string()
     .trim()
@@ -96,6 +98,9 @@ export function ProfilePage() {
   });
 
   const emailValue = watch("email") ?? "";
+  const nicknameValue = watch("nickname") ?? "";
+  const phoneValue = watch("phone") ?? "";
+  const contactIncomplete = !nicknameValue.trim() || !phoneValue.trim();
   const currentEmail = (profile?.email ?? "").trim().toLowerCase();
   const nextEmail = emailValue.trim().toLowerCase();
   const emailEmpty = nextEmail.length === 0;
@@ -284,7 +289,7 @@ export function ProfilePage() {
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">@{profile.username}</p>
               <div className="mt-2 flex items-center gap-1.5">
-                <Badge variant="secondary">{profile.roleLabel}</Badge>
+                <Badge variant="secondary">{roleLabelOf(profile.role, profile.roleLabel)}</Badge>
                 <UserStatusBadge status={profile.status} label={profile.statusLabel} />
               </div>
             </div>
@@ -340,7 +345,7 @@ export function ProfilePage() {
         <section className="ui-card p-5 md:p-6">
           <h2 className="text-base font-semibold tracking-tight">编辑资料</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            手机号可以留空以清空；邮箱不能为空，修改邮箱需要通过新邮箱验证码校验。
+            昵称和手机号都需要填写；邮箱不能为空，修改邮箱需要通过新邮箱验证码校验。
           </p>
           <form
             onSubmit={handleSubmit(submitProfile)}
@@ -356,7 +361,7 @@ export function ProfilePage() {
               <Label htmlFor="nickname">昵称</Label>
               <Input
                 id="nickname"
-                placeholder="未填写时默认使用用户名"
+                placeholder="请输入昵称"
                 maxLength={30}
                 aria-invalid={Boolean(errors.nickname)}
                 {...register("nickname")}
@@ -421,12 +426,14 @@ export function ProfilePage() {
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
               <p className="text-[11px] text-muted-foreground">
-                修改成功后当前页面的资料会立即更新。
+                {contactIncomplete
+                  ? "昵称和手机号都填写后才能保存。"
+                  : "修改成功后当前页面的资料会立即更新。"}
               </p>
               <Button
                 type="submit"
                 loading={isSubmitting || updateProfile.isPending}
-                disabled={!isDirty || emailEmpty}
+                disabled={!isDirty || emailEmpty || contactIncomplete}
               >
                 <Save className="h-4 w-4" />
                 保存修改

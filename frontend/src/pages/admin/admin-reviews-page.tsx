@@ -14,12 +14,12 @@ import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatNumber } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { toast } from "@/stores/toast";
 import type { AdminReviewQuery, ReviewStatus, ReviewVO } from "@/types/api";
 import { Rating } from "@/components/domain/rating";
 import { ReviewStatusBadge } from "@/components/domain/status-badge";
 import { UserAvatar } from "@/components/domain/user-avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CustomSelect } from "@/components/ui/custom-select";
@@ -52,6 +52,7 @@ export function AdminReviewsPage() {
   const [keyword, setKeyword] = useState(keywordParam);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [replying, setReplying] = useState<ReviewVO | null>(null);
   const [statusTarget, setStatusTarget] = useState<{
     review: ReviewVO;
@@ -68,11 +69,11 @@ export function AdminReviewsPage() {
   const params = useMemo<AdminReviewQuery>(() => {
     return {
       page,
-      size: PAGE_SIZE,
+      size: pageSize,
       keyword: keyword.trim() || undefined,
       status: status ? (status as ReviewStatus) : undefined,
     };
-  }, [page, keyword, status]);
+  }, [page, pageSize, keyword, status]);
 
   const query = useQuery({
     queryKey: queryKeys.adminReviews(params),
@@ -266,11 +267,8 @@ export function AdminReviewsPage() {
                         </p>
                       ) : null}
                     </TD>
-                    <TD className="py-3">
+                    <TD className="whitespace-nowrap py-3">
                       <ReviewStatusBadge status={review.status} label={review.statusLabel} />
-                      <Badge variant="outline" className="mt-1 block w-fit">
-                        {review.rating} 分
-                      </Badge>
                     </TD>
                     <TD className="whitespace-nowrap py-3 text-[11px] text-muted-foreground tabular">
                       {formatDateTime(review.createdAt)}
@@ -325,8 +323,13 @@ export function AdminReviewsPage() {
               page={page}
               pages={query.data?.pages ?? 1}
               total={query.data?.total ?? 0}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.standard}
               onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
             />
           </div>
         ) : null}

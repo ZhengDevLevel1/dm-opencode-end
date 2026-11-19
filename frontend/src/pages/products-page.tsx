@@ -7,6 +7,7 @@ import { cartService, favoriteService, productService } from "@/lib/services";
 import { useDict, useFavoritesQuery } from "@/hooks/queries";
 import { useLoginGuard } from "@/hooks/use-login-guard";
 import { getErrorMessage } from "@/lib/api-client";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { FESTIVAL_TAG_OPTIONS, OCCASION_TAG_OPTIONS } from "@/lib/product-tags";
 import { toast } from "@/stores/toast";
 import type { ProductQuery, ProductSort, ProductVO, SeasonSuitability } from "@/types/api";
@@ -17,7 +18,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
-import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 
@@ -34,11 +34,6 @@ const FILTER_SELECT_CLASS =
   "h-9 w-full cursor-pointer rounded-lg border-border bg-card font-medium shadow-xs transition-[border-color,background-color,box-shadow] hover:border-primary/40 hover:bg-accent/40";
 
 const SEASON_VALUES: SeasonSuitability[] = ["SPRING", "SUMMER", "AUTUMN", "WINTER", "ALL"];
-const PAGE_SIZE_OPTIONS = [12, 24, 48];
-const PAGE_SIZE_SELECT_OPTIONS = PAGE_SIZE_OPTIONS.map((option) => ({
-  value: String(option),
-  label: `${option} 条`,
-}));
 
 export function ProductsPage() {
   const [params, setParams] = useSearchParams();
@@ -79,7 +74,7 @@ export function ProductsPage() {
     ? (seasonParam as SeasonSuitability)
     : undefined;
   const sizeParam = Number(params.get("size") ?? "12");
-  const size = PAGE_SIZE_OPTIONS.includes(sizeParam) ? sizeParam : 12;
+  const size = PAGE_SIZE_OPTIONS.cardGrid.includes(sizeParam) ? sizeParam : 12;
 
   const query = useMemo<ProductQuery>(() => {
     const result: ProductQuery = { page, size, sort };
@@ -387,26 +382,9 @@ export function ProductsPage() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
-          {products.data ? `共 ${products.data.total} 件花礼` : "正在整理花礼…"}
-        </p>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="page-size" className="text-xs text-muted-foreground">
-            每页
-          </Label>
-          <div className="w-24 shrink-0">
-            <CustomSelect
-              id="page-size"
-              aria-label="每页条数"
-              value={String(size)}
-              onChange={(next) => updateParams({ size: next }, true)}
-              options={PAGE_SIZE_SELECT_OPTIONS}
-              className={FILTER_SELECT_CLASS}
-            />
-          </div>
-        </div>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        {products.data ? `共 ${products.data.total} 件花礼` : "正在整理花礼…"}
+      </p>
 
       {products.isLoading ? (
         <ProductGridSkeleton count={size} />
@@ -447,6 +425,8 @@ export function ProductsPage() {
             total={products.data?.total ?? 0}
             pageSize={size}
             onPageChange={(next) => updateParams({ page: String(next) }, false)}
+            onPageSizeChange={(next) => updateParams({ size: String(next) }, true)}
+            pageSizeOptions={PAGE_SIZE_OPTIONS.cardGrid}
             className="pt-2"
           />
         </>

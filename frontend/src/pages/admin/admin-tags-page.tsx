@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
+import { ListSearch } from "@/components/ui/list-search";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { getErrorMessage } from "@/lib/api-client";
@@ -77,6 +78,7 @@ export function AdminTagsPage() {
   const [editing, setEditing] = useState<{ id: number; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TagOptionVO | null>(null);
   const [maxCount, setMaxCount] = useState("8");
+  const [tagKeyword, setTagKeyword] = useState("");
   const [homeDraft, setHomeDraft] = useState<HomeDraftItem[]>([]);
   const homeDraftTypeRef = useRef<TagType | null>(null);
 
@@ -101,6 +103,16 @@ export function AdminTagsPage() {
   useEffect(() => {
     setMaxCount(String(currentMax));
   }, [currentMax, activeType]);
+
+  const filteredTags = useMemo(() => {
+    const search = tagKeyword.trim().toLowerCase();
+    if (!search) return tags;
+    return tags.filter((tag) => tag.name.toLowerCase().includes(search));
+  }, [tags, tagKeyword]);
+
+  useEffect(() => {
+    setTagKeyword("");
+  }, [activeType]);
 
   const orderedTags = useMemo(
     () => [...tags].sort((a, b) => (a.homeSortOrder ?? 0) - (b.homeSortOrder ?? 0)),
@@ -268,7 +280,9 @@ export function AdminTagsPage() {
               </div>
             </div>
             <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[11px] text-muted-foreground">
-              共 {tags.length} 个
+              {tagKeyword.trim()
+                ? `筛选 ${filteredTags.length} / ${tags.length} 个`
+                : `共 ${tags.length} 个`}
             </span>
           </div>
 
@@ -298,6 +312,15 @@ export function AdminTagsPage() {
           </div>
 
           <div className="mt-5 border-t border-border/70 pt-4">
+            {!overview.isLoading && !overview.isError && tags.length > 0 ? (
+              <ListSearch
+                value={tagKeyword}
+                onChange={setTagKeyword}
+                placeholder={`搜索${meta.label}`}
+                aria-label={`搜索${meta.label}`}
+                containerClassName="mb-3"
+              />
+            ) : null}
             {overview.isLoading ? (
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: 8 }).map((_, index) => (
@@ -313,9 +336,23 @@ export function AdminTagsPage() {
               <p className="rounded-lg border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
                 还没有{meta.label}，在上方输入名称添加第一个。
               </p>
+            ) : filteredTags.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center">
+                <p className="text-xs text-muted-foreground">
+                  没有匹配“{tagKeyword.trim()}”的{meta.label}。
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setTagKeyword("")}
+                >
+                  清空搜索
+                </Button>
+              </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {tags.map((tag) => (
+              <div className="flex max-h-80 flex-wrap content-start gap-2 overflow-y-auto overscroll-contain pr-1">
+                {filteredTags.map((tag) => (
                   <TagChip
                     key={tag.id}
                     tag={tag}
@@ -467,6 +504,19 @@ function HomeDisplayPanel({
 }) {
   const isCategory = type === "CATEGORY";
   const visibleCount = items.filter((item) => item.visible).length;
+  const [keyword, setKeyword] = useState("");
+  const search = keyword.trim().toLowerCase();
+  const indexedItems = useMemo(
+    () =>
+      items
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => !search || item.name.toLowerCase().includes(search)),
+    [items, search],
+  );
+
+  useEffect(() => {
+    setKeyword("");
+  }, [type]);
 
   return (
     <section className="ui-card p-4 sm:p-5">
@@ -497,54 +547,67 @@ function HomeDisplayPanel({
         </p>
       ) : (
         <>
-          <ul className="mt-3 max-h-72 space-y-1.5 overflow-y-auto pr-0.5">
-            {items.map((item, index) => (
-              <li
-                key={item.id}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors",
-                  item.visible
-                    ? "border-border/70 bg-muted/20"
-                    : "border-dashed border-border/70 bg-transparent",
-                )}
-              >
-                <span className="w-4 shrink-0 text-center text-[10px] tabular-nums text-muted-foreground">
-                  {index + 1}
-                </span>
-                <span
+          <ListSearch
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="搜索标签"
+            aria-label="搜索首页展示标签"
+            containerClassName="mt-3"
+          />
+          {indexedItems.length === 0 ? (
+            <p className="mt-3 rounded-lg border border-dashed border-border py-6 text-center text-[11px] text-muted-foreground">
+              没有匹配“{keyword.trim()}”的标签。
+            </p>
+          ) : (
+            <ul className="mt-2 max-h-72 space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">
+              {indexedItems.map(({ item, index }) => (
+                <li
+                  key={item.id}
                   className={cn(
-                    "min-w-0 flex-1 truncate text-xs",
-                    item.visible ? "font-medium" : "text-muted-foreground",
+                    "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors",
+                    item.visible
+                      ? "border-border/70 bg-muted/20"
+                      : "border-dashed border-border/70 bg-transparent",
                   )}
                 >
-                  {item.name}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`上移 ${item.name}`}
-                  disabled={index === 0}
-                  onClick={() => onMove(index, -1)}
-                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  <ChevronUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`下移 ${item.name}`}
-                  disabled={index === items.length - 1}
-                  onClick={() => onMove(index, 1)}
-                  className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </button>
-                <Switch
-                  checked={item.visible}
-                  onCheckedChange={(checked) => onToggle(item.id, checked)}
-                  label={`首页展示 ${item.name}`}
-                />
-              </li>
-            ))}
-          </ul>
+                  <span className="w-4 shrink-0 text-center text-[10px] tabular-nums text-muted-foreground">
+                    {index + 1}
+                  </span>
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-xs",
+                      item.visible ? "font-medium" : "text-muted-foreground",
+                    )}
+                  >
+                    {item.name}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`上移 ${item.name}`}
+                    disabled={index === 0}
+                    onClick={() => onMove(index, -1)}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`下移 ${item.name}`}
+                    disabled={index === items.length - 1}
+                    onClick={() => onMove(index, 1)}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                  <Switch
+                    checked={item.visible}
+                    onCheckedChange={(checked) => onToggle(item.id, checked)}
+                    label={`首页展示 ${item.name}`}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
           <Button
             type="button"
             variant="outline"

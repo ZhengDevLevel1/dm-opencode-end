@@ -17,6 +17,7 @@ import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { toast } from "@/stores/toast";
 import type {
   RecommendationLogQuery,
@@ -922,6 +923,7 @@ function LogsSection() {
   });
   const [filters, setFilters] = useState(draft);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(LOG_PAGE_SIZE);
   const [detail, setDetail] = useState<RecommendationLogVO | null>(null);
 
   const syncKeywordParam = (keyword: string) => {
@@ -951,12 +953,12 @@ function LogsSection() {
   }, [keywordParam]);
 
   const params = useMemo<RecommendationLogQuery>(() => {
-    const query: RecommendationLogQuery = { page, size: LOG_PAGE_SIZE };
+    const query: RecommendationLogQuery = { page, size: pageSize };
     if (filters.keyword.trim()) query.keyword = filters.keyword.trim();
     if (filters.start) query.start = `${filters.start}T00:00:00`;
     if (filters.end) query.end = `${filters.end}T23:59:59`;
     return query;
-  }, [page, filters]);
+  }, [page, pageSize, filters]);
 
   const query = useQuery({
     queryKey: queryKeys.adminRecommendationLogs(params),
@@ -1177,8 +1179,13 @@ function LogsSection() {
               page={page}
               pages={query.data?.pages ?? 1}
               total={query.data?.total ?? 0}
-              pageSize={LOG_PAGE_SIZE}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.standard}
               onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
             />
           </div>
         ) : null}

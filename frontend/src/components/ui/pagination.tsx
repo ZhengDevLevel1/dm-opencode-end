@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./button";
+import { PageSizeSelect } from "./page-size-select";
 import { cn } from "@/lib/cn";
 
 interface PaginationProps {
@@ -9,6 +10,8 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
   className?: string;
   pageSize?: number;
+  pageSizeOptions?: readonly number[];
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 function buildPages(current: number, total: number): Array<number | "ellipsis"> {
@@ -32,6 +35,8 @@ export function Pagination({
   onPageChange,
   className,
   pageSize,
+  pageSizeOptions,
+  onPageSizeChange,
 }: PaginationProps) {
   if (total === 0) return null;
   const list = buildPages(page, Math.max(pages, 1));
@@ -45,44 +50,53 @@ export function Pagination({
       <p className="text-xs text-muted-foreground tabular">
         共 {total} 条{pageSize ? ` · 每页 ${pageSize} 条` : ""} · 第 {page} / {Math.max(pages, 1)} 页
       </p>
-      <div className="flex items-center gap-1">
-        <Button
-          variant="outline"
-          size="icon-sm"
-          aria-label="上一页"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        {list.map((item, index) =>
-          item === "ellipsis" ? (
-            <span key={`e-${index}`} className="px-1 text-xs text-muted-foreground">
-              …
-            </span>
-          ) : (
-            <Button
-              key={item}
-              variant={item === page ? "default" : "ghost"}
-              size="icon-sm"
-              className="tabular text-xs"
-              aria-label={`第 ${item} 页`}
-              aria-current={item === page ? "page" : undefined}
-              onClick={() => onPageChange(item)}
-            >
-              {item}
-            </Button>
-          ),
-        )}
-        <Button
-          variant="outline"
-          size="icon-sm"
-          aria-label="下一页"
-          disabled={page >= pages}
-          onClick={() => onPageChange(page + 1)}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+      <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-end">
+        {onPageSizeChange && pageSize ? (
+          <PageSizeSelect
+            value={pageSize}
+            onChange={onPageSizeChange}
+            options={pageSizeOptions}
+          />
+        ) : null}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="上一页"
+            disabled={page <= 1}
+            onClick={() => onPageChange(page - 1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          {list.map((item, index) =>
+            item === "ellipsis" ? (
+              <span key={`e-${index}`} className="px-1 text-xs text-muted-foreground">
+                …
+              </span>
+            ) : (
+              <Button
+                key={item}
+                variant={item === page ? "default" : "ghost"}
+                size="icon-sm"
+                className="tabular text-xs"
+                aria-label={`第 ${item} 页`}
+                aria-current={item === page ? "page" : undefined}
+                onClick={() => onPageChange(item)}
+              >
+                {item}
+              </Button>
+            ),
+          )}
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="下一页"
+            disabled={page >= pages}
+            onClick={() => onPageChange(page + 1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

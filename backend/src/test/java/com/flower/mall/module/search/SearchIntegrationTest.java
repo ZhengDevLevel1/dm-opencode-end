@@ -137,6 +137,92 @@ class SearchIntegrationTest {
     }
 
     @Test
+    void customerOrderSearchMatchesOwnOrdersOnly() throws Exception {
+        String token = login("customer", "customer123");
+
+        mockMvc.perform(get("/api/orders")
+                        .header("Authorization", bearer(token))
+                        .param("keyword", "FL202605010001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].id").value(1));
+
+        mockMvc.perform(get("/api/orders")
+                        .header("Authorization", bearer(token))
+                        .param("keyword", "白百合"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].id").value(1));
+
+        mockMvc.perform(get("/api/orders")
+                        .header("Authorization", bearer(token))
+                        .param("keyword", "小玫"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2));
+
+        mockMvc.perform(get("/api/orders")
+                        .header("Authorization", bearer(token))
+                        .param("keyword", "13900000004"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+
+        mockMvc.perform(get("/api/orders")
+                        .header("Authorization", bearer(token))
+                        .param("status", "CANCELLED")
+                        .param("keyword", "小玫"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].id").value(4));
+    }
+
+    @Test
+    void customerReviewSearchMatchesProductContentAndReply() throws Exception {
+        String alice = login("alice", "alice123");
+
+        mockMvc.perform(get("/api/reviews/my")
+                        .header("Authorization", bearer(alice))
+                        .param("keyword", "康乃馨"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].productId").value(3));
+
+        mockMvc.perform(get("/api/reviews/my")
+                        .header("Authorization", bearer(alice))
+                        .param("keyword", "妈妈"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].orderId").value(2));
+
+        mockMvc.perform(get("/api/reviews/my")
+                        .header("Authorization", bearer(alice))
+                        .param("keyword", "感谢"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+
+        String customer = login("customer", "customer123");
+
+        mockMvc.perform(get("/api/reviews/my")
+                        .header("Authorization", bearer(customer))
+                        .param("keyword", "红玫瑰"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].productId").value(1));
+
+        mockMvc.perform(get("/api/reviews/my")
+                        .header("Authorization", bearer(customer))
+                        .param("keyword", "感谢"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].orderId").value(1));
+
+        mockMvc.perform(get("/api/reviews/my")
+                        .header("Authorization", bearer(customer))
+                        .param("keyword", "花很新鲜"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1));
+    }
+
+    @Test
     void recommendationLogSearchMatchesNicknameAndChineseLabels() throws Exception {
         String token = login("admin", "admin123");
 

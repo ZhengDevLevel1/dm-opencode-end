@@ -159,11 +159,21 @@ public class OrderService {
         return vo;
     }
 
-    public PageResult<OrderVO> pageForUser(Long userId, long page, long size, String status) {
+    public PageResult<OrderVO> pageForUser(Long userId, long page, long size, String status, String keyword) {
+        String search = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String pattern = search == null ? null : "%" + search + "%";
         IPage<Order> orderPage = orderMapper.selectPage(new Page<>(Math.max(page, 1), clampSize(size)),
                 Wrappers.<Order>lambdaQuery()
                         .eq(Order::getUserId, userId)
                         .eq(StringUtils.hasText(status), Order::getStatus, status)
+                        .and(pattern != null, wrapper -> wrapper
+                                .like(Order::getOrderNo, search)
+                                .or().like(Order::getReceiverName, search)
+                                .or().like(Order::getReceiverPhone, search)
+                                .or().apply("EXISTS (SELECT 1 FROM order_item oi "
+                                                + "WHERE oi.order_id = shop_order.id "
+                                                + "AND oi.product_name LIKE {0})",
+                                        pattern))
                         .orderByDesc(Order::getId));
         return toPageResult(orderPage, false);
     }

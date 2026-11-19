@@ -23,6 +23,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useResolvedDark } from "@/app/providers/theme-provider";
 import { useCartQuery, useFavoritesQuery } from "@/hooks/queries";
 import { queryKeys } from "@/lib/query-keys";
+import { roleLabelOf } from "@/lib/permissions";
 import { staffService } from "@/lib/services";
 import { runWithThemeTransition, nextThemeMode } from "@/lib/theme-transition";
 import { toast } from "@/stores/toast";
@@ -210,7 +211,7 @@ export function Topbar() {
             <div className="px-2.5 pb-2">
               <p className="truncate text-sm font-medium">{user.nickname || user.username}</p>
               <p className="truncate text-[11px] text-muted-foreground">
-                @{user.username} · {user.roleLabel}
+                @{user.username} · {roleLabelOf(user.role, user.roleLabel)}
               </p>
             </div>
             <DropdownSeparator />

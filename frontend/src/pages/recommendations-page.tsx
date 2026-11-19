@@ -23,7 +23,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Progress } from "@/components/ui/progress";
 
 const SEASON_VALUES: SeasonSuitability[] = ["SPRING", "SUMMER", "AUTUMN", "WINTER", "ALL"];
-const LIMIT_OPTIONS = [6, 10, 20];
+const LIMIT_OPTIONS = [8, 12, 16, 20];
 const LIMIT_SELECT_OPTIONS = LIMIT_OPTIONS.map((item) => ({
   value: String(item),
   label: `${item} 件`,
@@ -50,8 +50,8 @@ export function RecommendationsPage() {
     ? (seasonParam as SeasonSuitability)
     : undefined;
   const festival = params.get("festival") ?? undefined;
-  const limitParam = Number(params.get("limit") ?? "10");
-  const limit = LIMIT_OPTIONS.includes(limitParam) ? limitParam : 10;
+  const limitParam = Number(params.get("limit") ?? "8");
+  const limit = LIMIT_OPTIONS.includes(limitParam) ? limitParam : 8;
 
   const seasonOptions = useMemo(
     () => (dict.data?.seasons ?? []).map((item) => ({ value: item.value, label: item.label })),

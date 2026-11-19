@@ -98,11 +98,20 @@ public class ReviewService {
                 reviewPage.getTotal(), reviewPage.getCurrent(), reviewPage.getSize());
     }
 
-    public PageResult<ReviewVO> pageMine(long page, long size) {
+    public PageResult<ReviewVO> pageMine(long page, long size, String keyword) {
         Long userId = SecurityUtils.currentUserId();
+        String search = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        String pattern = search == null ? null : "%" + search + "%";
         IPage<Review> reviewPage = reviewMapper.selectPage(new Page<>(Math.max(page, 1), clampSize(size)),
                 Wrappers.<Review>lambdaQuery()
                         .eq(Review::getUserId, userId)
+                        .and(pattern != null, wrapper -> wrapper
+                                .apply("EXISTS (SELECT 1 FROM product p "
+                                                + "WHERE p.id = review.product_id "
+                                                + "AND (p.name LIKE {0} OR p.flower_meaning LIKE {0}))",
+                                        pattern)
+                                .or().like(Review::getContent, search)
+                                .or().like(Review::getReply, search))
                         .orderByDesc(Review::getId));
         return PageResult.of(toVOList(reviewPage.getRecords(), true),
                 reviewPage.getTotal(), reviewPage.getCurrent(), reviewPage.getSize());
@@ -193,7 +202,7 @@ public class ReviewService {
             ReviewVO vo = ReviewVO.from(review);
             User user = users.get(review.getUserId());
             if (user != null) {
-                vo.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : "会员用户");
+                vo.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : "花友");
             }
             if (includeProductName) {
                 Product product = products.get(review.getProductId());

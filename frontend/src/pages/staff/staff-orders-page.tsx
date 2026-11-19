@@ -5,6 +5,7 @@ import { ClipboardList, Loader2, Search, SlidersHorizontal, X } from "lucide-rea
 import { staffService } from "@/lib/services";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import type { OrderStatus } from "@/types/api";
@@ -56,6 +57,7 @@ export function StaffOrdersPage() {
   const [keywordDraft, setKeywordDraft] = useState(keyword);
   const [startDraft, setStartDraft] = useState(start);
   const [endDraft, setEndDraft] = useState(end);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   useEffect(() => {
     setKeywordDraft(keyword);
@@ -66,13 +68,13 @@ export function StaffOrdersPage() {
   const query = useMemo(
     () => ({
       page,
-      size: PAGE_SIZE,
+      size: pageSize,
       status: status || undefined,
       keyword: keyword || undefined,
       start: start ? `${start}T00:00:00` : undefined,
       end: end ? `${end}T23:59:59` : undefined,
     }),
-    [page, status, keyword, start, end],
+    [page, pageSize, status, keyword, start, end],
   );
 
   const orders = useQuery({
@@ -357,8 +359,13 @@ export function StaffOrdersPage() {
           page={orders.data.page}
           pages={orders.data.pages}
           total={orders.data.total}
-          pageSize={orders.data.size}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS.standard}
           onPageChange={(next) => updateParams({ page: String(next) })}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            updateParams({ page: undefined });
+          }}
         />
       ) : null}
 

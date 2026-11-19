@@ -577,7 +577,7 @@ export function AdminDashboardPage() {
           display: widgetHidden("breakdown") ? "none" : undefined,
         }}
       >
-        <div className="ui-card p-4 md:p-5">
+        <div className="ui-card flex h-full flex-col p-4 md:p-5">
           <div className="flex items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold tracking-tight">品类销售</h2>
@@ -599,7 +599,7 @@ export function AdminDashboardPage() {
           ) : !categories.data || categories.data.length === 0 ? (
             <EmptyState className="mt-4" title="暂无品类销售" bare />
           ) : (
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 max-h-64 min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1 lg:max-h-none">
               {categories.data.map((entry, index) => (
                 <div key={entry.category}>
                   <div className="mb-1.5 flex items-center justify-between gap-2">

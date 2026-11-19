@@ -13,6 +13,7 @@ import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatDateTimeFull, formatNumber } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import type { OperationLog, OperationLogQuery } from "@/types/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,16 +42,17 @@ export function AdminLogsPage() {
   const [draft, setDraft] = useState<LogFilters>(emptyFilters);
   const [filters, setFilters] = useState<LogFilters>(emptyFilters);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [detail, setDetail] = useState<OperationLog | null>(null);
 
   const params = useMemo<OperationLogQuery>(() => {
-    const query: OperationLogQuery = { page, size: PAGE_SIZE };
+    const query: OperationLogQuery = { page, size: pageSize };
     if (filters.module.trim()) query.module = filters.module.trim();
     if (filters.username.trim()) query.username = filters.username.trim();
     if (filters.start) query.start = `${filters.start}T00:00:00`;
     if (filters.end) query.end = `${filters.end}T23:59:59`;
     return query;
-  }, [page, filters]);
+  }, [page, pageSize, filters]);
 
   const query = useQuery({
     queryKey: queryKeys.adminLogs(params),
@@ -293,8 +295,13 @@ export function AdminLogsPage() {
               page={page}
               pages={query.data?.pages ?? 1}
               total={query.data?.total ?? 0}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.dense}
               onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
             />
           </div>
         ) : null}

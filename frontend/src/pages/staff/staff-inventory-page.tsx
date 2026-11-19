@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { LayoutGroup, motion } from "framer-motion";
 import { staffService } from "@/lib/services";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { queryKeys } from "@/lib/query-keys";
 import { invalidateCatalogQueries } from "@/lib/query-invalidation";
 import { getErrorMessage } from "@/lib/api-client";
@@ -100,8 +101,8 @@ const emptyAdjust: AdjustState = {
   loadingProduct: false,
 };
 
-function buildQuery(filters: Filters, page: number): InventoryQuery {
-  const query: InventoryQuery = { page, size: PAGE_SIZE };
+function buildQuery(filters: Filters, page: number, pageSize: number): InventoryQuery {
+  const query: InventoryQuery = { page, size: pageSize };
   if (filters.keyword.trim()) query.keyword = filters.keyword.trim();
   if (filters.changeType) query.changeType = filters.changeType as InventoryChangeType;
   if (filters.orderNo.trim()) query.orderNo = filters.orderNo.trim();
@@ -128,17 +129,19 @@ export function StaffInventoryPage() {
   const [draft, setDraft] = useState<Filters>(emptyFilters);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [cardKeywordDraft, setCardKeywordDraft] = useState("");
   const [cardKeyword, setCardKeyword] = useState("");
   const [cardPage, setCardPage] = useState(1);
+  const [cardPageSize, setCardPageSize] = useState(CARD_PAGE_SIZE);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [adjust, setAdjust] = useState<AdjustState>(emptyAdjust);
   const [productKeyword, setProductKeyword] = useState("");
   const [adjustError, setAdjustError] = useState("");
 
   const query = useQuery({
-    queryKey: queryKeys.staffInventory({ ...filters, page, size: PAGE_SIZE }),
-    queryFn: () => staffService.inventory(buildQuery(filters, page)),
+    queryKey: queryKeys.staffInventory({ ...filters, page, size: pageSize }),
+    queryFn: () => staffService.inventory(buildQuery(filters, page, pageSize)),
     enabled: view === "list",
     placeholderData: keepPreviousData,
   });
@@ -146,7 +149,7 @@ export function StaffInventoryPage() {
   const cardQuery = useQuery({
     queryKey: queryKeys.staffProducts({
       page: cardPage,
-      size: CARD_PAGE_SIZE,
+      size: cardPageSize,
       keyword: cardKeyword || undefined,
       stockLevel: stockLevel === "ALL" ? undefined : stockLevel,
       sort: cardSort,
@@ -154,7 +157,7 @@ export function StaffInventoryPage() {
     queryFn: () =>
       staffService.products({
         page: cardPage,
-        size: CARD_PAGE_SIZE,
+        size: cardPageSize,
         keyword: cardKeyword || undefined,
         stockLevel: stockLevel === "ALL" ? undefined : stockLevel,
         sort: cardSort,
@@ -349,7 +352,12 @@ export function StaffInventoryPage() {
           }}
           onClear={clearCardFilters}
           page={cardPage}
+          pageSize={cardPageSize}
           onPageChange={setCardPage}
+          onPageSizeChange={(next) => {
+            setCardPageSize(next);
+            setCardPage(1);
+          }}
           query={cardQuery}
           onAdjust={openAdjust}
         />
@@ -622,8 +630,13 @@ export function StaffInventoryPage() {
               page={page}
               pages={query.data?.pages ?? 1}
               total={query.data?.total ?? 0}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.dense}
               onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
             />
           </div>
         ) : null}
@@ -946,7 +959,9 @@ function InventoryCardsSection({
   onSearch,
   onClear,
   page,
+  pageSize,
   onPageChange,
+  onPageSizeChange,
   query,
   onAdjust,
 }: {
@@ -962,7 +977,9 @@ function InventoryCardsSection({
   onSearch: () => void;
   onClear: () => void;
   page: number;
+  pageSize: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   query: UseQueryResult<PageResult<ProductVO>, Error>;
   onAdjust: (product: ProductVO) => void;
 }) {
@@ -1136,8 +1153,10 @@ function InventoryCardsSection({
               page={page}
               pages={query.data?.pages ?? 1}
               total={query.data?.total ?? 0}
-              pageSize={CARD_PAGE_SIZE}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.cardGrid}
               onPageChange={onPageChange}
+              onPageSizeChange={onPageSizeChange}
             />
           </div>
         ) : null}

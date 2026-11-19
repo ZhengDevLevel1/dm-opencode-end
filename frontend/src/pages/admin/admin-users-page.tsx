@@ -17,6 +17,8 @@ import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatDate, formatNumber, maskPhone } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
+import { roleLabelOf } from "@/lib/permissions";
 import { toast } from "@/stores/toast";
 import { useAuthStore } from "@/stores/auth";
 import type {
@@ -54,12 +56,6 @@ const userStatusOptions: Array<{ value: UserStatus; label: string }> = [
   { value: "ENABLED", label: "启用" },
   { value: "DISABLED", label: "禁用" },
 ];
-
-const roleLabels: Record<UserRole, string> = {
-  CUSTOMER: "消费者",
-  STAFF: "店员",
-  ADMIN: "管理员",
-};
 
 const phoneField = z
   .string()
@@ -118,6 +114,7 @@ export function AdminUsersPage() {
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<UserVO | null>(null);
   const [resetting, setResetting] = useState<UserVO | null>(null);
@@ -131,12 +128,12 @@ export function AdminUsersPage() {
   const params = useMemo<AdminUserQuery>(
     () => ({
       page,
-      size: PAGE_SIZE,
+      size: pageSize,
       keyword: keyword.trim() || undefined,
       role: role ? (role as UserRole) : undefined,
       status: status ? (status as UserStatus) : undefined,
     }),
-    [page, keyword, role, status],
+    [page, pageSize, keyword, role, status],
   );
 
   const query = useQuery({
@@ -321,7 +318,7 @@ export function AdminUsersPage() {
                     </TD>
                     <TD>
                       <Badge variant={user.role === "ADMIN" ? "default" : "secondary"}>
-                        {user.roleLabel || roleLabels[user.role]}
+                        {roleLabelOf(user.role, user.roleLabel)}
                       </Badge>
                     </TD>
                     <TD>
@@ -368,8 +365,13 @@ export function AdminUsersPage() {
               page={page}
               pages={query.data?.pages ?? 1}
               total={query.data?.total ?? 0}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.standard}
               onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
             />
           </div>
         ) : null}

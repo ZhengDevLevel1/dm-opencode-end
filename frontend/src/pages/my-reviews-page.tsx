@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageSquareQuote, PenLine, Star, Store } from "lucide-react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquareQuote, PenLine, Search, Star, Store } from "lucide-react";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import { orderService, reviewService } from "@/lib/services";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import type { OrderItemVO, OrderVO, PageResult, ReviewVO } from "@/types/api";
@@ -17,11 +19,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Pagination } from "@/components/ui/pagination";
+import { ListSearch } from "@/components/ui/list-search";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 
 const HISTORY_PAGE_SIZE = 6;
+const PENDING_PAGE_SIZE = 8;
 
 interface PendingItem {
   order: OrderVO;
@@ -44,8 +48,12 @@ export function MyReviewsPage() {
   const queryClient = useQueryClient();
   const orderIdParam = Number(searchParams.get("orderId"));
   const orderItemIdParam = Number(searchParams.get("orderItemId"));
+  const keywordParam = searchParams.get("keyword") ?? "";
   const [tab, setTab] = useState("pending");
   const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState(HISTORY_PAGE_SIZE);
+  const [pendingKeyword, setPendingKeyword] = useState("");
+  const [historyKeywordInput, setHistoryKeywordInput] = useState(keywordParam);
   const [target, setTarget] = useState<PendingItem | null>(null);
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState("");
@@ -64,10 +72,43 @@ export function MyReviewsPage() {
     staleTime: 30_000,
   });
 
+  const historyKeyword = keywordParam.trim();
   const history = useQuery({
-    queryKey: queryKeys.reviewsMy({ page: historyPage, size: HISTORY_PAGE_SIZE }),
-    queryFn: () => reviewService.myReviews({ page: historyPage, size: HISTORY_PAGE_SIZE }),
+    queryKey: queryKeys.reviewsMy({
+      page: historyPage,
+      size: historyPageSize,
+      keyword: historyKeyword || undefined,
+    }),
+    queryFn: () =>
+      reviewService.myReviews({
+        page: historyPage,
+        size: historyPageSize,
+        keyword: historyKeyword || undefined,
+      }),
+    placeholderData: keepPreviousData,
   });
+
+  useEffect(() => {
+    setHistoryKeywordInput(keywordParam);
+    setHistoryPage(1);
+  }, [keywordParam]);
+
+  const submitHistorySearch = () => {
+    const next = new URLSearchParams(searchParams);
+    const value = historyKeywordInput.trim();
+    if (value) next.set("keyword", value);
+    else next.delete("keyword");
+    setSearchParams(next, { replace: true });
+    setHistoryPage(1);
+  };
+
+  const clearHistorySearch = () => {
+    setHistoryKeywordInput("");
+    const next = new URLSearchParams(searchParams);
+    next.delete("keyword");
+    setSearchParams(next, { replace: true });
+    setHistoryPage(1);
+  };
 
   const sourceOrders = useMemo(() => {
     const list = completedOrders.data?.records ?? [];
@@ -88,6 +129,31 @@ export function MyReviewsPage() {
     });
     return items;
   }, [sourceOrders]);
+
+  const pendingSearch = pendingKeyword.trim().toLowerCase();
+  const filteredPendingItems = useMemo(() => {
+    if (!pendingSearch) return pendingItems;
+    return pendingItems.filter(({ order, item }) =>
+      [item.productName, order.orderNo, order.receiverName, order.receiverPhone]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(pendingSearch)),
+    );
+  }, [pendingItems, pendingSearch]);
+
+  const {
+    page: pendingPage,
+    pages: pendingPages,
+    total: pendingTotal,
+    pageSize: pendingPageSize,
+    records: pendingRecords,
+    setPage: setPendingPage,
+    setPageSize: setPendingPageSize,
+    resetPage: resetPendingPage,
+  } = useClientPagination(filteredPendingItems, PENDING_PAGE_SIZE);
+
+  useEffect(() => {
+    resetPendingPage();
+  }, [pendingSearch, resetPendingPage]);
 
   const openReview = (pending: PendingItem) => {
     setTarget(pending);
@@ -213,6 +279,27 @@ export function MyReviewsPage() {
         </TabsList>
 
         <TabsContent value="pending" className="mt-4">
+          {!completedOrders.isLoading &&
+          !linkedOrder.isLoading &&
+          !completedOrders.isError &&
+          pendingItems.length > 0 ? (
+            <form
+              className="mb-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                resetPendingPage();
+              }}
+            >
+              <ListSearch
+                value={pendingKeyword}
+                onChange={setPendingKeyword}
+                onSubmit={resetPendingPage}
+                onClear={() => setPendingKeyword("")}
+                placeholder="搜索花礼名、订单号或收货人"
+                aria-label="搜索待评价花礼"
+              />
+            </form>
+          ) : null}
           {completedOrders.isLoading || linkedOrder.isLoading ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {Array.from({ length: 4 }).map((_, index) => (
@@ -238,52 +325,96 @@ export function MyReviewsPage() {
                 </Button>
               }
             />
+          ) : filteredPendingItems.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="没有找到待评价的花礼"
+              description={`没有匹配“${pendingKeyword.trim()}”的花礼，换个花礼名、订单号或收货人试试。`}
+              action={
+                <Button variant="outline" onClick={() => setPendingKeyword("")}>
+                  清空搜索
+                </Button>
+              }
+            />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {pendingItems.slice(0, 8).map(({ order, item }) => (
-                <article key={item.id} className="ui-card flex gap-3 p-4">
-                  <Link to={`/products/${item.productId}`} className="shrink-0">
-                    <ProductImage
-                      src={item.productImage}
-                      alt={item.productName}
-                      seed={item.productName}
-                      className="h-20 w-16 rounded-lg"
-                      iconClassName="h-6 w-6"
-                    />
-                  </Link>
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <Link
-                      to={`/products/${item.productId}`}
-                      className="line-clamp-1 text-sm font-medium hover:text-primary"
-                    >
-                      {item.productName}
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {pendingRecords.map(({ order, item }) => (
+                  <article key={item.id} className="ui-card flex gap-3 p-4">
+                    <Link to={`/products/${item.productId}`} className="shrink-0">
+                      <ProductImage
+                        src={item.productImage}
+                        alt={item.productName}
+                        seed={item.productName}
+                        className="h-20 w-16 rounded-lg"
+                        iconClassName="h-6 w-6"
+                      />
                     </Link>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {order.orderNo} · {formatDateTime(order.completedAt ?? order.createdAt)}
-                    </p>
-                    <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
-                      {item.quantity} 件 · {order.receiverName}
-                    </p>
-                    <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-                      <Badge variant="secondary">已完成</Badge>
-                      <Button size="sm" onClick={() => openReview({ order, item })}>
-                        <PenLine className="h-3.5 w-3.5" />
-                        去评价
-                      </Button>
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <Link
+                        to={`/products/${item.productId}`}
+                        className="line-clamp-1 text-sm font-medium hover:text-primary"
+                      >
+                        {item.productName}
+                      </Link>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        {order.orderNo} · {formatDateTime(order.completedAt ?? order.createdAt)}
+                      </p>
+                      <p className="mt-1 line-clamp-1 text-[11px] text-muted-foreground">
+                        {item.quantity} 件 · {order.receiverName}
+                      </p>
+                      <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                        <Badge variant="secondary">已完成</Badge>
+                        <Button size="sm" onClick={() => openReview({ order, item })}>
+                          <PenLine className="h-3.5 w-3.5" />
+                          去评价
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))}
-              {pendingItems.length > 8 ? (
-                <p className="text-xs text-muted-foreground sm:col-span-2">
-                  还有 {pendingItems.length - 8} 件待评价花礼，进入对应订单详情即可继续评价。
-                </p>
-              ) : null}
+                  </article>
+                ))}
+              </div>
+              <Pagination
+                page={pendingPage}
+                pages={pendingPages}
+                total={pendingTotal}
+                pageSize={pendingPageSize}
+                pageSizeOptions={PAGE_SIZE_OPTIONS.pendingReview}
+                onPageChange={setPendingPage}
+                onPageSizeChange={setPendingPageSize}
+              />
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
+          <form
+            className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitHistorySearch();
+            }}
+          >
+            <ListSearch
+              value={historyKeywordInput}
+              onChange={setHistoryKeywordInput}
+              onSubmit={submitHistorySearch}
+              onClear={clearHistorySearch}
+              placeholder="搜索商品名或评价内容"
+              aria-label="搜索我的评价"
+              containerClassName="flex-1"
+            />
+            <div className="flex shrink-0 items-center gap-2">
+              <Button type="submit" variant="outline" className="flex-1 sm:flex-none">
+                搜索
+              </Button>
+              {keywordParam ? (
+                <Button type="button" variant="ghost" onClick={clearHistorySearch}>
+                  重置
+                </Button>
+              ) : null}
+            </div>
+          </form>
           {history.isLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, index) => (
@@ -302,9 +433,20 @@ export function MyReviewsPage() {
             />
           ) : historyRecords.length === 0 ? (
             <EmptyState
-              icon={MessageSquareQuote}
-              title="还没有发表过评价"
-              description="完成订单后，为喜欢的花礼留下真实感受吧。"
+              icon={keywordParam ? Search : MessageSquareQuote}
+              title={keywordParam ? "没有找到相关评价" : "还没有发表过评价"}
+              description={
+                keywordParam
+                  ? `没有匹配“${keywordParam}”的评价，换个商品名或关键词试试。`
+                  : "完成订单后，为喜欢的花礼留下真实感受吧。"
+              }
+              action={
+                keywordParam ? (
+                  <Button variant="outline" onClick={clearHistorySearch}>
+                    清空搜索
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <div className="space-y-3">
@@ -320,7 +462,12 @@ export function MyReviewsPage() {
               pages={history.data.pages}
               total={history.data.total}
               pageSize={history.data.size}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.reviewHistory}
               onPageChange={setHistoryPage}
+              onPageSizeChange={(next) => {
+                setHistoryPageSize(next);
+                setHistoryPage(1);
+              }}
             />
           ) : null}
         </TabsContent>

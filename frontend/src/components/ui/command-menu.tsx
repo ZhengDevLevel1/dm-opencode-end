@@ -16,6 +16,7 @@ import { canSeeRole, navGroups } from "@/app/shell/nav";
 import { queryKeys } from "@/lib/query-keys";
 import { adminService, productService, staffService } from "@/lib/services";
 import { formatCurrency } from "@/lib/format";
+import { roleLabelOf } from "@/lib/permissions";
 
 interface CommandEntry {
   id: string;
@@ -181,7 +182,7 @@ export function CommandMenu() {
           id: `user-${item.id}`,
           group: "用户搜索",
           label: item.nickname || item.username,
-          description: `@${item.username} · ${item.roleLabel} · ${item.statusLabel}`,
+          description: `@${item.username} · ${roleLabelOf(item.role, item.roleLabel)} · ${item.statusLabel}`,
           icon: UsersRound,
           onSelect: () => {
             saveRecent(trimmed);

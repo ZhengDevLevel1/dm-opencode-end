@@ -20,6 +20,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { invalidateCatalogQueries } from "@/lib/query-invalidation";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { useDict } from "@/hooks/queries";
 import { toast } from "@/stores/toast";
 import { cn } from "@/lib/cn";
@@ -152,6 +153,7 @@ export function AdminProductsPage() {
   const [maxPrice, setMaxPrice] = useState("");
   const [sort, setSort] = useState<ProductSort>("newest");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [editor, setEditor] = useState<{ open: boolean; product: ProductVO | null }>({
     open: false,
     product: null,
@@ -183,7 +185,7 @@ export function AdminProductsPage() {
   const params = useMemo<ProductQuery>(
     () => ({
       page,
-      size: PAGE_SIZE,
+      size: pageSize,
       keyword: keyword.trim() || undefined,
       status: status ? (status as ProductStatus) : undefined,
       stockLevel: stockLevel === "ALL" ? undefined : stockLevel,
@@ -197,6 +199,7 @@ export function AdminProductsPage() {
     }),
     [
       page,
+      pageSize,
       keyword,
       status,
       stockLevel,
@@ -667,8 +670,13 @@ export function AdminProductsPage() {
               page={page}
               pages={query.data?.pages ?? 1}
               total={query.data?.total ?? 0}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.standard}
               onPageChange={setPage}
+              onPageSizeChange={(next) => {
+                setPageSize(next);
+                setPage(1);
+              }}
             />
           </div>
         ) : null}

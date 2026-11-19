@@ -196,7 +196,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 
 | 枚举 | 值 | 标签 |
 | --- | --- | --- |
-| 用户角色 `UserRole` | `CUSTOMER` | 消费者/会员 |
+| 用户角色 `UserRole` | `CUSTOMER` | 消费者 |
 |  | `STAFF` | 店员 |
 |  | `ADMIN` | 运营管理员 |
 | 用户状态 `UserStatus` | `ENABLED` | 正常 |
@@ -265,7 +265,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
     },
     "priceBands": ["平价", "中端", "高端"],
     "seasons": [{ "value": "SPRING", "label": "春季" }, { "value": "ALL", "label": "四季" }],
-    "roles": [{ "value": "CUSTOMER", "label": "消费者/会员" }],
+    "roles": [{ "value": "CUSTOMER", "label": "消费者" }],
     "orderStatuses": [{ "value": "PENDING_PAYMENT", "label": "待支付" }],
     "paymentStatuses": [{ "value": "PENDING", "label": "待支付" }],
     "reviewStatuses": [{ "value": "VISIBLE", "label": "显示" }],
@@ -481,7 +481,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
       "phone": "13900000003",
       "email": "customer@flower.local",
       "role": "CUSTOMER",
-      "roleLabel": "消费者/会员",
+      "roleLabel": "消费者",
       "status": "ENABLED",
       "statusLabel": "正常",
       "createdAt": "2026-06-30T10:00:00"
@@ -823,7 +823,7 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | 方法 | 路径 | 权限 | 请求 | 响应 |
 | --- | --- | --- | --- | --- |
 | POST | `/api/orders` | 登录 | `CreateOrderRequest` | `ApiResponse<OrderVO>` |
-| GET | `/api/orders` | 登录 | `page`、`size`、`status` | `ApiResponse<PageResult<OrderVO>>` |
+| GET | `/api/orders` | 登录 | `page`、`size`、`status`、`keyword` | `ApiResponse<PageResult<OrderVO>>` |
 | GET | `/api/orders/{id}` | 登录 | 无 | `ApiResponse<OrderVO>` |
 | POST | `/api/orders/{id}/cancel` | 登录 | `CancelOrderRequest` 可选 | `ApiResponse<OrderVO>` |
 | POST | `/api/orders/{id}/after-sale` | 登录 | `AfterSaleRequest` | `ApiResponse<OrderVO>` |
@@ -899,6 +899,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 用户申请售后仅允许 `COMPLETED`，申请后订单变为 `AFTER_SALE`，此时尚未退款。
 - `GET /api/orders/{id}/fulfillments` 只允许订单所属用户访问；未接单时返回空数组。
 - 订单列表支持 `status` 精确筛选，使用枚举值。
+- 订单列表支持 `keyword` 模糊搜索订单号、收货人、收货电话或订单商品名称，搜索范围仅限当前用户自己的订单。
 - `OrderVO.buyerUsername`、`buyerNickname` 主要出现在店员端和创建订单响应中，普通用户列表/详情中通常省略。
 
 ## 9. 支付（模拟支付）
@@ -952,7 +953,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | --- | --- | --- | --- | --- |
 | POST | `/api/reviews` | 登录 | `ReviewCreateRequest` | `ApiResponse<ReviewVO>` |
 | GET | `/api/reviews/products/{productId}` | 公开 | `page`、`size` | `ApiResponse<PageResult<ReviewVO>>` |
-| GET | `/api/reviews/my` | 登录 | `page`、`size` | `ApiResponse<PageResult<ReviewVO>>` |
+| GET | `/api/reviews/my` | 登录 | `page`、`size`、`keyword` | `ApiResponse<PageResult<ReviewVO>>` |
 
 ### 10.2 请求体
 
@@ -971,6 +972,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 评价创建后订单明细 `reviewed` 变为 `true`，商品评分会按可见评价重新计算。
 - 商品评价列表只返回 `VISIBLE` 评价，按评价 ID 降序；该接口不返回 `productName`。
 - “我的评价”和管理员评价列表会返回 `productName`。
+- “我的评价”支持 `keyword` 模糊搜索商品名称/花语、评价内容或门店回复，范围仅限当前用户自己的评价。
 - 隐藏评价不会出现在商品评价列表，也不会进入商品评分统计。
 - `ReviewVO` 中 `content`、`reply`、`productName` 可能因为空值被省略。
 

@@ -5,7 +5,7 @@ import lombok.Getter;
 @Getter
 public enum UserRole {
 
-    CUSTOMER("消费者/会员"),
+    CUSTOMER("消费者"),
     STAFF("店员"),
     ADMIN("运营管理员");
 

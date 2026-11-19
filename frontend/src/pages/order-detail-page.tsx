@@ -371,7 +371,7 @@ export function OrderDetailPage() {
                 共 {orderData.items.length} 种
               </span>
             </div>
-            <ul className="divide-y divide-border/60">
+            <ul className="max-h-96 divide-y divide-border/60 overflow-y-auto overscroll-contain">
               {orderData.items.map((item) => (
                 <li key={item.id} className="flex items-start gap-3 px-5 py-4">
                   <Link to={`/products/${item.productId}`} className="shrink-0">

@@ -465,7 +465,7 @@ export function CheckoutPage() {
                 <h2 className="text-base font-semibold tracking-tight">花礼清单</h2>
                 <span className="text-xs text-muted-foreground">共 {items.length} 种花礼</span>
               </div>
-              <ul className="divide-y divide-border/60">
+              <ul className="max-h-[22rem] divide-y divide-border/60 overflow-y-auto overscroll-contain">
                 {items.map((item) => (
                   <li key={item.id} className="flex items-center gap-3 px-5 py-3.5">
                     <ProductImage

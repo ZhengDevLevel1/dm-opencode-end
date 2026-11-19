@@ -46,7 +46,8 @@ public class ReviewController {
     @GetMapping("/my")
     public ApiResponse<PageResult<ReviewVO>> mine(
             @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "10") long size) {
-        return ApiResponse.ok(reviewService.pageMine(page, size));
+            @RequestParam(defaultValue = "10") long size,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok(reviewService.pageMine(page, size, keyword));
     }
 }

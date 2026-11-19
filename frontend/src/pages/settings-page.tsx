@@ -42,6 +42,7 @@ import {
 import { useAuthStore } from "@/stores/auth";
 import { appearanceService, authService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
+import { roleLabelOf } from "@/lib/permissions";
 import { useAuthBackgroundQuery } from "@/hooks/queries";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { resolveImageUrl } from "@/lib/image";
@@ -857,7 +858,7 @@ function AccountSettings() {
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-muted-foreground">角色</dt>
-              <dd>{user?.roleLabel ?? "—"}</dd>
+              <dd>{roleLabelOf(user?.role, user?.roleLabel) || "—"}</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-muted-foreground">状态</dt>

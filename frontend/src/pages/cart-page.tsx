@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, Minus, Plus, ReceiptText, ShoppingBag, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Loader2,
+  Minus,
+  Plus,
+  ReceiptText,
+  Search,
+  ShoppingBag,
+  Trash2,
+} from "lucide-react";
 import { useCartQuery } from "@/hooks/queries";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import { cartService } from "@/lib/services";
 import { getErrorMessage, isAbortError } from "@/lib/api-client";
 import { formatCurrency } from "@/lib/format";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import type { CartItemVO } from "@/types/api";
@@ -14,10 +25,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { ListSearch } from "@/components/ui/list-search";
+import { Pagination } from "@/components/ui/pagination";
 import { Skeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
+
+const CART_PAGE_SIZE = 5;
 
 export function CartPage() {
   const navigate = useNavigate();
@@ -35,10 +50,33 @@ export function CartPage() {
   const [pendingIds, setPendingIds] = useState<ReadonlySet<number>>(() => new Set());
   const [clearOpen, setClearOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<CartItemVO | null>(null);
+  const [keyword, setKeyword] = useState("");
 
   const items = useMemo(() => cart.data ?? [], [cart.data]);
+  const search = keyword.trim().toLowerCase();
+  const visibleItems = useMemo(() => {
+    if (!search) return items;
+    return items.filter((item) =>
+      [item.productName, item.statusLabel].some((value) =>
+        value?.toLowerCase().includes(search),
+      ),
+    );
+  }, [items, search]);
+  const { page, pages, total, pageSize, records, setPage, setPageSize, resetPage } =
+    useClientPagination(visibleItems, CART_PAGE_SIZE);
+  useEffect(() => {
+    resetPage();
+  }, [search, resetPage]);
   const availableItems = useMemo(() => items.filter((item) => item.available), [items]);
   const availableIds = useMemo(() => availableItems.map((item) => item.id), [availableItems]);
+  const visibleAvailableItems = useMemo(
+    () => visibleItems.filter((item) => item.available),
+    [visibleItems],
+  );
+  const visibleAvailableIds = useMemo(
+    () => visibleAvailableItems.map((item) => item.id),
+    [visibleAvailableItems],
+  );
   const effectiveSelected = useMemo(() => {
     if (selected === null) return availableIds;
     return selected.filter((id) => availableIds.includes(id));
@@ -108,7 +146,9 @@ export function CartPage() {
   const selectedItems = availableItems.filter((item) => effectiveSelected.includes(item.id));
   const selectedCount = selectedItems.reduce((total, item) => total + item.quantity, 0);
   const subtotal = selectedItems.reduce((total, item) => total + item.subtotal, 0);
-  const allSelected = availableItems.length > 0 && effectiveSelected.length === availableItems.length;
+  const allVisibleSelected =
+    visibleAvailableItems.length > 0 &&
+    visibleAvailableItems.every((item) => effectiveSelected.includes(item.id));
 
   const toggleItem = (id: number) => {
     const base = selected === null ? availableIds : selected;
@@ -116,7 +156,13 @@ export function CartPage() {
   };
 
   const toggleAll = () => {
-    setSelected(allSelected ? [] : availableIds);
+    const base = selected === null ? availableIds : selected;
+    if (allVisibleSelected) {
+      const visible = new Set(visibleAvailableIds);
+      setSelected(base.filter((id) => !visible.has(id)));
+      return;
+    }
+    setSelected(Array.from(new Set([...base, ...visibleAvailableIds])));
   };
 
   const changeQuantity = (item: CartItemVO, next: number) => {
@@ -172,11 +218,30 @@ export function CartPage() {
   return (
     <div className="grid items-start gap-5 lg:grid-cols-[1fr_340px]">
       <section className="ui-card overflow-hidden">
+        <div className="border-b border-border/60 px-4 py-3">
+          <ListSearch
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="搜索购物车商品"
+            aria-label="搜索购物车商品"
+          />
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-            <Checkbox checked={allSelected} indeterminate={effectiveSelected.length > 0 && !allSelected} onChange={toggleAll} />
-            全选
-            <span className="text-muted-foreground">（{availableItems.length} 件可结算）</span>
+            <Checkbox
+              checked={allVisibleSelected}
+              indeterminate={
+                visibleAvailableItems.some((item) => effectiveSelected.includes(item.id)) &&
+                !allVisibleSelected
+              }
+              disabled={visibleAvailableItems.length === 0}
+              onChange={toggleAll}
+            />
+            {search ? "全选筛选结果" : "全选"}
+            <span className="text-muted-foreground">
+              （当前 {visibleAvailableItems.length} 件可结算
+              {search ? ` / 共 ${availableItems.length} 件` : ""}）
+            </span>
           </label>
           <Button
             variant="ghost"
@@ -189,8 +254,28 @@ export function CartPage() {
           </Button>
         </div>
 
-        <ul className="divide-y divide-border/60">
-          {items.map((item) => {
+        {search || pages > 1 ? (
+          <p className="border-b border-border/60 bg-muted/30 px-4 py-2 text-[11px] text-muted-foreground">
+            搜索和分页只影响当前展示，已勾选的商品会保留。
+          </p>
+        ) : null}
+
+        <ul className="max-h-[28rem] divide-y divide-border/60 overflow-y-auto overscroll-contain">
+          {visibleItems.length === 0 ? (
+            <li className="px-4 py-12">
+              <EmptyState
+                icon={Search}
+                title="没有找到购物车商品"
+                description={`没有匹配“${keyword.trim()}”的花礼。`}
+                action={
+                  <Button variant="outline" size="sm" onClick={() => setKeyword("")}>
+                    清空搜索
+                  </Button>
+                }
+              />
+            </li>
+          ) : null}
+          {records.map((item) => {
             const checked = effectiveSelected.includes(item.id);
             const max = Math.min(99, item.stock);
             return (
@@ -294,6 +379,19 @@ export function CartPage() {
             );
           })}
         </ul>
+        {total > 0 ? (
+          <div className="border-t border-border/60 px-4 py-3">
+            <Pagination
+              page={page}
+              pages={pages}
+              total={total}
+              pageSize={pageSize}
+              pageSizeOptions={PAGE_SIZE_OPTIONS.cart}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </div>
+        ) : null}
       </section>
 
       <aside className="ui-card sticky top-20 p-5">

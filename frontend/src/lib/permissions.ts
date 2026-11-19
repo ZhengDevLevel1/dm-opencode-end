@@ -21,6 +21,14 @@ export function hasRole(user: UserVO | null, roles: UserRole[]): boolean {
   return roles.includes(user.role);
 }
 
+export function roleLabelOf(
+  role: UserRole | undefined | null,
+  fallbackLabel?: string | null,
+): string {
+  if (role === "CUSTOMER") return "消费者";
+  return fallbackLabel ?? "";
+}
+
 export function can(user: UserVO | null, action: AppAction): boolean {
   if (!user) return false;
   switch (action) {

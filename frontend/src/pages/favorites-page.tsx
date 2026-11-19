@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Flower2 } from "lucide-react";
+import { Flower2, Search } from "lucide-react";
 import { useFavoritesQuery } from "@/hooks/queries";
+import { useClientPagination } from "@/hooks/use-client-pagination";
 import { cartService, favoriteService } from "@/lib/services";
 import { getErrorMessage } from "@/lib/api-client";
+import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import type { ProductVO } from "@/types/api";
@@ -12,7 +14,11 @@ import { ProductCard } from "@/components/domain/product-card";
 import { ProductGridSkeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ListSearch } from "@/components/ui/list-search";
+import { Pagination } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
+
+const FAVORITES_PAGE_SIZE = 12;
 
 export function FavoritesPage() {
   const navigate = useNavigate();
@@ -20,6 +26,7 @@ export function FavoritesPage() {
   const favorites = useFavoritesQuery();
   const [favoritePendingId, setFavoritePendingId] = useState<number | null>(null);
   const [addingId, setAddingId] = useState<number | null>(null);
+  const [keyword, setKeyword] = useState("");
 
   const removeFavorite = useMutation({
     mutationFn: (productId: number) => favoriteService.remove(productId),
@@ -52,7 +59,28 @@ export function FavoritesPage() {
     }
   };
 
-  const products = favorites.data ?? [];
+  const products = useMemo(() => favorites.data ?? [], [favorites.data]);
+  const search = keyword.trim().toLowerCase();
+  const filteredProducts = useMemo(() => {
+    if (!search) return products;
+    return products.filter((product) =>
+      [
+        product.name,
+        product.category,
+        product.flowerMeaning,
+        product.occasionTags,
+        product.festivalTags,
+        product.description,
+      ].some((value) => value?.toLowerCase().includes(search)),
+    );
+  }, [products, search]);
+
+  const { page, pages, total, pageSize, records, setPage, setPageSize, resetPage } =
+    useClientPagination(filteredProducts, FAVORITES_PAGE_SIZE);
+
+  useEffect(() => {
+    resetPage();
+  }, [search, resetPage]);
 
   return (
     <div className="space-y-5">
@@ -61,7 +89,11 @@ export function FavoritesPage() {
           <h1 className="text-xl font-semibold tracking-tight">我的收藏</h1>
           <p className="mt-1 text-xs text-muted-foreground">
             收好每一份心动，随时回来看看。
-            {products.length > 0 ? ` 当前收藏 ${products.length} 件花礼。` : ""}
+            {products.length > 0
+              ? search
+                ? ` 当前收藏 ${products.length} 件，筛选出 ${filteredProducts.length} 件。`
+                : ` 当前收藏 ${products.length} 件花礼。`
+              : ""}
           </p>
         </div>
         <Button variant="outline" size="sm" asChild>
@@ -71,6 +103,17 @@ export function FavoritesPage() {
           </Link>
         </Button>
       </div>
+
+      {!favorites.isLoading && !favorites.isError && products.length > 0 ? (
+        <div className="ui-card p-3">
+          <ListSearch
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="搜索商品名、品类、花语或标签"
+            aria-label="搜索收藏"
+          />
+        </div>
+      ) : null}
 
       {favorites.isLoading ? (
         <ProductGridSkeleton count={8} />
@@ -90,19 +133,38 @@ export function FavoritesPage() {
           }
           className="py-24"
         />
+      ) : filteredProducts.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title="没有找到相关收藏"
+          description={`没有匹配“${keyword.trim()}”的花礼，换个商品名、品类或标签试试。`}
+          action={<Button variant="outline" onClick={() => setKeyword("")}>清空搜索</Button>}
+          className="py-24"
+        />
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
-          {products.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              isFavorite
-              favoritePending={favoritePendingId === product.id}
-              addPending={addingId === product.id}
-              onFavorite={handleFavorite}
-              onAddToCart={handleAddToCart}
-            />
-          ))}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4">
+            {records.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                isFavorite
+                favoritePending={favoritePendingId === product.id}
+                addPending={addingId === product.id}
+                onFavorite={handleFavorite}
+                onAddToCart={handleAddToCart}
+              />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            pages={pages}
+            total={total}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS.cardGrid}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       )}
     </div>
