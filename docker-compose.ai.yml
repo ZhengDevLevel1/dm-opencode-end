@@ -9,9 +9,9 @@ services:
       JVM_XMX: 512m
       JVM_XMN: 128m
     ports:
-      - "8848:8848"
-      - "9848:9848"
-      - "9849:9849"
+      - "127.0.0.1:8848:8848"
+      - "127.0.0.1:9848:9848"
+      - "127.0.0.1:9849:9849"
     volumes:
       # 修改这里：使用本地目录挂载
       - ./nacos_data:/home/nacos/data
@@ -27,8 +27,8 @@ services:
     image: qdrant/qdrant:v1.12.4
     container_name: flower-qdrant
     ports:
-      - "6333:6333"
-      - "6334:6334"
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
     volumes:
       # 修改这里：使用本地目录挂载
       - ./qdrant_data:/qdrant/storage

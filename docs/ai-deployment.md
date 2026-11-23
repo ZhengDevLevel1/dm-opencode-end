@@ -9,10 +9,12 @@ docker compose -f docker-compose.ai.yml up -d
 docker compose -f docker-compose.ai.yml ps
 ```
 
-访问：
+访问（仅限本机）：
 
 - Nacos 控制台：http://localhost:8848/nacos （本地关闭鉴权，默认无账号密码）
 - Qdrant 控制台：http://localhost:6333/dashboard
+
+`docker-compose.ai.yml` 只把 Nacos/Qdrant 端口绑定到 `127.0.0.1`，不要改成 `0.0.0.0` 暴露到局域网或公网。
 
 停止：
 
@@ -45,6 +47,7 @@ FLUSH PRIVILEGES;
 ```powershell
 $env:NACOS_ADDR="127.0.0.1:8848"
 $env:NACOS_ENABLED="true"
+$env:AI_SERVICE_BIND_ADDRESS="127.0.0.1"
 $env:AI_INTERNAL_TOKEN="flower-ai-internal-dev-token"
 $env:QDRANT_URL="http://127.0.0.1:6333"
 $env:SILICONFLOW_API_KEY="你的硅基流动 Key"
@@ -53,6 +56,8 @@ $env:AI_DB_URL="jdbc:mysql://localhost:3306/flower_shop?useUnicode=true&characte
 $env:AI_DB_USERNAME="flower_ai_ro"
 $env:AI_DB_PASSWORD="你的只读账号密码"
 ```
+
+`AI_INTERNAL_TOKEN` 示例值仅用于本机开发；服务离开 loopback 前必须替换为强随机值。
 
 主后端同样需要：
 
@@ -80,7 +85,7 @@ cd ai-service
 mvn spring-boot:run
 ```
 
-AI 服务默认端口 `8081`，注册到 Nacos 的服务名为 `flower-ai-service`。主后端优先通过 Nacos 发现 AI 服务；Nacos 不可用时回退到 `AI_BASE_URL`。
+AI 服务默认只绑定 `127.0.0.1:8081`，注册到 Nacos 的服务名为 `flower-ai-service`；不要把它直接暴露到公网。主后端优先通过 Nacos 发现 AI 服务；Nacos 不可用时回退到 `AI_BASE_URL`。
 
 ## 5. 验证
 

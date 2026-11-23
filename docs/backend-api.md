@@ -1185,19 +1185,20 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `scene` | string | 否 | 默认 `chat` |
 | `conversationId` | number | 否 | 已有对话 ID；省略时自动创建新对话 |
 | `sessionId` | string | 否 | 匿名会话 ID，也可放在 `X-Session-Id` 请求头 |
-| `history` | array | 否 | 兼容字段；仅当对话尚无数据库历史时作为回退上下文 |
 
+- 对话历史只从服务端数据库加载，不接受客户端传入的历史；客户端只需传当前问题和 `conversationId`。
 - 登录用户历史按 `user_id` 隔离，匿名用户按 `session_key`（`X-Session-Id`，缺省为远端地址哈希）隔离；越权访问返回 `403`。
 - 服务端在调用 AI 前保存用户消息；流结束后保存助手消息，状态记录为 `COMPLETE`、`ABORTED` 或 `FAILED`，空回复不落库。
 - 新对话标题默认为「新的对话」，首轮成功回复后异步生成标题；生成失败时回退为首条问题前 20 字。
+- AI 会先做问题准入：花店相关正常回答；无关但一两句话能回答的简短回答；无关且工作量大时只生成一句礼貌拒答并引导回花店话题，此时不返回商品/引用卡片。
 
 SSE 事件：
 
 | 事件 | 数据 | 说明 |
 | --- | --- | --- |
 | `meta` | `{ requestId, model, degraded }` | 开始事件；`degraded=true` 表示降级为本地模板，`model` 仅管理员可见 |
-| `products` | `{ items: [{ productId, name, category, price, ratingAvg, salesCount, reason }] }` | 检索到的在售商品 |
-| `citations` | `{ items: [{ documentId, title, category, source, snippet }] }` | 知识库引用；仅管理员可见 |
+| `products` | `{ items: [{ productId, name, category, price, ratingAvg, salesCount, reason }] }` | 花店相关问题时检索到的在售商品 |
+| `citations` | `{ items: [{ documentId, title, category, source, snippet }] }` | 花店相关问题的知识库引用；仅管理员可见 |
 | `delta` | `{ content }` | 增量文本 |
 | `usage` | `{ promptTokens, completionTokens, totalTokens, estimatedCost, model }` | 用量与估算成本；仅管理员可见 |
 | `done` | `{ requestId, degraded? }` | 流结束 |
@@ -1751,7 +1752,7 @@ SSE 事件：
 | `source` | string | 否 | 最长 200 |
 | `enabled` | boolean | 否 | 默认 `true` |
 
-知识库新增、更新、删除后会尽力触发向量索引重建；AI 服务不可用时 CRUD 仍成功，但向量索引可能滞后。`POST /api/admin/ai/reindex` 可手动重建商品与知识库索引。
+知识库是公开内容库：启用的文档会进入所有用户的 AI 问答上下文，并可能被用户复述。只允许存放可公开的花语、养护、配送、售后等内容，不要写入成本、供应商、毛利、内部 SOP、客户信息或密钥。知识库新增、更新、删除后会尽力触发向量索引重建；AI 服务不可用时 CRUD 仍成功，但向量索引可能滞后。`POST /api/admin/ai/reindex` 可手动重建商品与知识库索引。
 
 ## 14. 前端对接流程
 

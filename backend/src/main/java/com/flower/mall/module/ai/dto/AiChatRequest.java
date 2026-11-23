@@ -4,9 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Data
 public class AiChatRequest {
 
@@ -19,6 +16,4 @@ public class AiChatRequest {
     private String sessionId;
 
     private Long conversationId;
-
-    private List<AiChatMessage> history = new ArrayList<>();
 }

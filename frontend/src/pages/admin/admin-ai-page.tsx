@@ -826,6 +826,13 @@ function KnowledgeSection() {
 
   return (
     <div className="space-y-4">
+      <p className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2 text-[11px] leading-relaxed text-warning">
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>
+          知识库是公开内容库：启用的文档会进入所有用户的 AI 问答上下文，并可能被用户复述。请勿填写成本、进价、供应商、毛利、
+          内部 SOP、客户信息或密钥等内部资料。
+        </span>
+      </p>
       <section className="ui-card p-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <form
@@ -977,7 +984,7 @@ function KnowledgeSection() {
           }
         }}
         title={editing ? "编辑知识库文档" : "新增知识库文档"}
-        description="保存后会自动触发知识库增量索引；若 AI 服务不可用，文档仍会保存在数据库中。"
+        description="知识库内容会进入公开 AI 问答上下文，请只填写可对匿名用户公开的内容。保存后会自动触发增量索引；AI 服务不可用时文档仍会保存在数据库中。"
         size="lg"
         footer={
           <>
@@ -1038,7 +1045,7 @@ function KnowledgeSection() {
                 setForm((prev) => ({ ...prev, content: event.target.value }))
               }
               rows={8}
-              placeholder="写清楚适用场景、操作步骤和注意事项。"
+              placeholder="仅填写可公开的花语、养护、配送、售后说明，写清适用场景和注意事项。"
               className="text-xs"
             />
           </div>

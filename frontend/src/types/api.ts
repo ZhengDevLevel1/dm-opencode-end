@@ -1090,17 +1090,11 @@ export interface AiWeightAdviceApplyRequest {
   weights: Record<string, number>;
 }
 
-export interface AiChatHistoryMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
 export interface AiChatRequest {
   message: string;
   scene?: string;
   sessionId?: string;
   conversationId?: number;
-  history?: AiChatHistoryMessage[];
 }
 
 export interface AiChatProduct {

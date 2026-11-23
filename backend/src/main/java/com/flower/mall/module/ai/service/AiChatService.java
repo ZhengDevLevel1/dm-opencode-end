@@ -119,9 +119,6 @@ public class AiChatService {
 
         try {
             java.util.List<AiChatMessage> history = conversationService.history(conversationId);
-            if (history.isEmpty() && request.getHistory() != null && !request.getHistory().isEmpty()) {
-                history = request.getHistory();
-            }
             conversationService.saveUserMessage(conversationId, request.getMessage());
 
             Map<String, Object> body = new LinkedHashMap<>();

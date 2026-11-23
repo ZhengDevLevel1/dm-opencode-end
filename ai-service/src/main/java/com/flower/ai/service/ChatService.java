@@ -61,40 +61,25 @@ public class ChatService {
                     "requestId", requestId,
                     "model", available ? properties.getDeepseek().getChatModel() : "fallback",
                     "degraded", !available));
-            send(emitter, "products", Map.of("items", products.stream().map(hit -> {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("productId", hit.productId());
-                item.put("name", hit.name());
-                item.put("category", hit.category());
-                item.put("price", hit.price());
-                item.put("ratingAvg", hit.ratingAvg());
-                item.put("salesCount", hit.salesCount());
-                item.put("reason", hit.reason());
-                return item;
-            }).toList()));
-            send(emitter, "citations", Map.of("items", knowledge.stream().map(hit -> {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("documentId", hit.documentId());
-                item.put("title", hit.title());
-                item.put("category", hit.category());
-                item.put("source", hit.source());
-                item.put("snippet", snippet(hit.content()));
-                return item;
-            }).toList()));
 
             List<Map<String, String>> messages = buildMessages(request, products, knowledge);
             if (available) {
                 boolean[] delivered = {false};
+                AdmissionStream admissionStream = new AdmissionStream(
+                        emitter, products, knowledge, request.message());
                 DeepSeekClient.Completion completion = null;
                 try {
                     completion = deepSeekClient.stream(
                             messages, 0.5, 900,
                             delta -> {
                                 delivered[0] = true;
-                                send(emitter, "delta", Map.of("content", delta));
+                                admissionStream.onDelta(delta);
                             });
                 } catch (AiServiceException ex) {
                     log.warn("DeepSeek chat failed, switching to local answer: {}", ex.getMessage());
+                }
+                if (delivered[0]) {
+                    admissionStream.finish();
                 }
                 if (completion != null) {
                     sendUsage(emitter, completion.promptTokens(), completion.completionTokens(), completion.model());
@@ -106,11 +91,13 @@ public class ChatService {
                     if (delivered[0]) {
                         send(emitter, "delta", Map.of("content", "\n\n（AI 服务暂时不可用，以上内容可能不完整。）"));
                     } else {
+                        sendCards(emitter, products, knowledge);
                         streamFallback(emitter, products, knowledge);
                     }
                     sendUsage(emitter, 0, 0, "fallback");
                 }
             } else {
+                sendCards(emitter, products, knowledge);
                 streamFallback(emitter, products, knowledge);
                 sendUsage(emitter, 0, 0, "fallback");
             }
@@ -128,15 +115,47 @@ public class ChatService {
         }
     }
 
+    private void sendCards(SseEmitter emitter,
+                           List<RetrievalService.ProductHit> products,
+                           List<RetrievalService.KnowledgeHit> knowledge) {
+        send(emitter, "products", Map.of("items", products.stream().map(hit -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("productId", hit.productId());
+            item.put("name", hit.name());
+            item.put("category", hit.category());
+            item.put("price", hit.price());
+            item.put("ratingAvg", hit.ratingAvg());
+            item.put("salesCount", hit.salesCount());
+            item.put("reason", hit.reason());
+            return item;
+        }).toList()));
+        send(emitter, "citations", Map.of("items", knowledge.stream().map(hit -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("documentId", hit.documentId());
+            item.put("title", hit.title());
+            item.put("category", hit.category());
+            item.put("source", hit.source());
+            item.put("snippet", snippet(hit.content()));
+            return item;
+        }).toList()));
+    }
+
     private List<Map<String, String>> buildMessages(ChatRequest request,
                                                     List<RetrievalService.ProductHit> products,
                                                     List<RetrievalService.KnowledgeHit> knowledge) {
         List<Map<String, String>> messages = new ArrayList<>();
         StringBuilder system = new StringBuilder();
         system.append("你是花屿花店的 AI 挑花顾问，回答要温暖、具体、可执行。")
-                .append("优先推荐店内真实在售商品，不要编造不存在的花材或价格。")
-                .append("如果用户问养护、配送、售后，先参考知识库，再用简洁中文回答。")
-                .append("回答控制在 200 字以内，可以分点，但不要输出 JSON。");
+                .append("服务范围包括选花、花束搭配、花语、花材养护、绿植、送花场景、配送、订单和售后。")
+                .append("回答前先做问题准入判断，第一行只输出一个标签，标签不会展示给用户，正文从第二行开始：")
+                .append("\n[[FLOWER]]：与花店相关，正常回答。")
+                .append("\n[[OFF_TOPIC_SMALL]]：与花店无关，但一两句话就能回答；只简短回答，不展开，不推荐商品。")
+                .append("\n[[OFF_TOPIC_LARGE]]：与花店无关且需要较多检索、推理或生成；不要处理原问题，也不要给出答案、步骤、代码、资料或长篇解释。只写一句自然、礼貌、口语化的边界说明，再用一句顺势引导回选花、花材养护、花束搭配、花语、订单等花店话题。")
+                .append("\n拒答要求：不要使用“无法回答”“不能回答”等生硬说法；结合用户原话、语气和场景生成，不要千篇一律；可以带一点亲和语气；参考最近对话，避免连续使用相同句式；不要解释判断规则，不要提及标签。")
+                .append("\n[[FLOWER]] 回答要求：优先推荐店内真实在售商品，不要编造花材或价格；养护、配送、售后先参考知识库；控制在 200 字以内，可以分点，但不要输出 JSON。")
+                .append("\n判断示例：用户说“帮我写一个快速排序算法” -> [[OFF_TOPIC_LARGE]]；用户说“1+1 等于几” -> [[OFF_TOPIC_SMALL]]；用户说“送女朋友生日花” -> [[FLOWER]]。")
+                .append("\n标签必须是输出的第一个字符，前面不要加“好的”“当然”等任何内容；如果问题需要写代码、写论文、做复杂分析、长文翻译、专业咨询、复杂计算或多步骤推理，即使你能回答，也必须标为 [[OFF_TOPIC_LARGE]]。")
+                .append("\n下面的商品和知识库只用于 [[FLOWER]] 问题；无关问题不要引用。");
         if (!products.isEmpty()) {
             system.append("\n可推荐商品：");
             for (RetrievalService.ProductHit product : products) {
@@ -230,6 +249,83 @@ public class ChatService {
         }
         String normalized = content.replace('\n', ' ').trim();
         return normalized.length() <= 160 ? normalized : normalized.substring(0, 160) + "…";
+    }
+
+    private final class AdmissionStream {
+
+        private final SseEmitter emitter;
+        private final List<RetrievalService.ProductHit> products;
+        private final List<RetrievalService.KnowledgeHit> knowledge;
+        private final String question;
+        private final StringBuilder pending = new StringBuilder();
+        private QuestionAdmission.Category category;
+
+        private AdmissionStream(SseEmitter emitter,
+                                List<RetrievalService.ProductHit> products,
+                                List<RetrievalService.KnowledgeHit> knowledge,
+                                String question) {
+            this.emitter = emitter;
+            this.products = products;
+            this.knowledge = knowledge;
+            this.question = question;
+        }
+
+        private void onDelta(String delta) {
+            if (delta == null || delta.isEmpty()) {
+                return;
+            }
+            if (category != null) {
+                sendDelta(delta);
+                return;
+            }
+            pending.append(delta);
+            QuestionAdmission.Parsed parsed = QuestionAdmission.parseLeading(pending.toString());
+            if (parsed == null) {
+                return;
+            }
+            QuestionAdmission.Category fallback = QuestionAdmission.fallbackCategory(question);
+            category = parsed.category() == QuestionAdmission.Category.FLOWER
+                    && fallback != QuestionAdmission.Category.FLOWER
+                    ? fallback : parsed.category();
+            if (category == QuestionAdmission.Category.FLOWER) {
+                sendCards(emitter, products, knowledge);
+            }
+            if (!parsed.content().isEmpty()) {
+                sendDelta(parsed.content());
+            }
+        }
+
+        private void finish() {
+            if (category != null) {
+                return;
+            }
+            String text = pending.toString();
+            if (text.isBlank()) {
+                return;
+            }
+            String trimmed = text.stripLeading();
+            if (trimmed.startsWith("[[")) {
+                int lineEnd = trimmed.indexOf('\n');
+                if (lineEnd < 0) {
+                    return;
+                }
+                text = trimmed.substring(lineEnd + 1);
+                if (text.isBlank()) {
+                    return;
+                }
+            }
+            category = QuestionAdmission.fallbackCategory(question);
+            if (category == QuestionAdmission.Category.FLOWER) {
+                sendCards(emitter, products, knowledge);
+            }
+            sendDelta(text);
+        }
+
+        private void sendDelta(String content) {
+            if (content != null && !content.isEmpty()) {
+                ChatService.this.send(emitter, "delta", Map.of("content", content));
+            }
+        }
     }
 
     public record ChatRequest(String message, String scene, String sessionId,
