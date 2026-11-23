@@ -327,6 +327,16 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | GET | `/api/reviews/products/{productId}` | 公开 | `ApiResponse<PageResult<ReviewVO>>` |
 | GET | `/api/reviews/my` | 登录 | `ApiResponse<PageResult<ReviewVO>>` |
 | GET | `/api/recommendations` | 公开（可选登录） | `ApiResponse<RecommendationResponse>` |
+| POST | `/api/recommendation-events` | 公开（可选登录） | `ApiResponse<{ accepted: number }>` |
+| POST | `/api/ai/chat` | 公开（可选登录） | `text/event-stream` |
+| GET | `/api/ai/conversations` | 公开（可选登录） | `ApiResponse<AiConversationVO[]>` |
+| POST | `/api/ai/conversations` | 公开（可选登录） | `ApiResponse<AiConversationVO>` |
+| GET | `/api/ai/conversations/{id}` | 公开（可选登录） | `ApiResponse<AiConversationDetailVO>` |
+| PUT | `/api/ai/conversations/{id}` | 公开（可选登录） | `ApiResponse<AiConversationVO>` |
+| DELETE | `/api/ai/conversations/{id}` | 公开（可选登录） | `ApiResponse<Void>` |
+| POST | `/api/ai/conversations/batch-delete` | 公开（可选登录） | `ApiResponse<{ count }>` |
+| POST | `/api/ai/conversations/batch-pin` | 公开（可选登录） | `ApiResponse<{ count }>` |
+| GET | `/api/ai/status` | 公开 | `ApiResponse<AiStatusVO>` |
 | GET | `/api/staff/orders` | 店员 | `ApiResponse<PageResult<OrderVO>>` |
 | GET | `/api/staff/orders/{id}` | 店员 | `ApiResponse<OrderVO>` |
 | POST | `/api/staff/orders/{id}/accept` | 店员 | `ApiResponse<FulfillmentVO[]>` |
@@ -369,6 +379,22 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | GET | `/api/admin/recommendations/logs` | 管理员 | `ApiResponse<PageResult<RecommendationLogVO>>` |
 | GET | `/api/admin/recommendations/evaluation` | 管理员 | `ApiResponse<RecommendationEvaluationVO>` |
 | GET | `/api/admin/recommendations/stats` | 管理员 | `ApiResponse<RecommendationStatsVO>` |
+| GET | `/api/admin/recommendations/effects` | 管理员 | `ApiResponse<RecommendationEffectVO>` |
+| GET | `/api/admin/recommendations/experiments` | 管理员 | `ApiResponse<RecommendationExperimentVO[]>` |
+| POST | `/api/admin/recommendations/experiments` | 管理员 | `ApiResponse<RecommendationExperimentVO>` |
+| PUT | `/api/admin/recommendations/experiments/{id}/status` | 管理员 | `ApiResponse<RecommendationExperimentVO>` |
+| POST | `/api/admin/ai/product-copy` | 管理员 | `ApiResponse<AiProductCopyVO>` |
+| POST | `/api/admin/ai/product-copy/apply` | 管理员 | `ApiResponse<ProductVO>` |
+| POST | `/api/admin/ai/recommendation-advice` | 管理员 | `ApiResponse<AiWeightAdviceVO>` |
+| POST | `/api/admin/ai/recommendation-advice/apply` | 管理员 | `ApiResponse<RecommendationSceneWeightVO[]>` |
+| GET | `/api/admin/ai/metrics` | 管理员 | `ApiResponse<AiMetricsVO>` |
+| GET | `/api/admin/ai/calls` | 管理员 | `ApiResponse<PageResult<AiCallLogVO>>` |
+| GET | `/api/admin/ai/health` | 管理员 | `ApiResponse<AiHealthVO>` |
+| POST | `/api/admin/ai/reindex` | 管理员 | `ApiResponse<AiReindexVO>` |
+| GET | `/api/admin/ai/knowledge` | 管理员 | `ApiResponse<AiKnowledgeDocument[]>` |
+| POST | `/api/admin/ai/knowledge` | 管理员 | `ApiResponse<AiKnowledgeDocument>` |
+| PUT | `/api/admin/ai/knowledge/{id}` | 管理员 | `ApiResponse<AiKnowledgeDocument>` |
+| DELETE | `/api/admin/ai/knowledge/{id}` | 管理员 | `ApiResponse<Void>` |
 | GET | `/api/admin/stats/overview` | 管理员 | `ApiResponse<OverviewStatsVO>` |
 | GET | `/api/admin/stats/sales-trend` | 管理员 | `ApiResponse<SalesTrendVO[]>` |
 | GET | `/api/admin/stats/category-sales` | 管理员 | `ApiResponse<CategorySalesVO[]>` |
@@ -1016,13 +1042,18 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 只推荐 `ON_SALE` 商品。
 - 推荐结果会写入推荐日志；匿名请求也会记录，但 `userId` 为空。
 - 当前没有单独的“推荐结果为空”错误，商品为空时仍返回 200，`items` 为 `[]`。
-- `strategy` 当前固定为 `CONTENT_TFIDF_MULTI_FACTOR`。
+- `requestId` 是本次推荐请求 ID，前端上报曝光/点击/加购事件时必须原样带回。
+- `strategy` 为本次实际召回策略：`CONTENT_TFIDF_MULTI_FACTOR` 或实验命中的 `VECTOR_HYBRID`；`experimentId`、`variant` 仅在命中实验时返回。
+- 每个 `items[]` 同时带 `position`（从 1 开始）、`strategy`、`experimentId`、`variant`，可直接用于推荐事件归因。
 
 响应示例：
 
 ```json
 {
+  "requestId": "rec-9f6c1d2e",
   "strategy": "CONTENT_TFIDF_MULTI_FACTOR",
+  "experimentId": "exp_home_vector",
+  "variant": "TREATMENT",
   "coldStart": true,
   "season": "AUTUMN",
   "seasonLabel": "秋季",
@@ -1040,6 +1071,10 @@ AFTER_SALE --店员拒绝--> COMPLETED
   "items": [
     {
       "productId": 1,
+      "position": 1,
+      "strategy": "CONTENT_TFIDF_MULTI_FACTOR",
+      "experimentId": "exp_home_vector",
+      "variant": "TREATMENT",
       "name": "红玫瑰花束·11枝",
       "imageUrl": "/images/products/rose-11.svg",
       "category": "玫瑰",
@@ -1066,6 +1101,8 @@ AFTER_SALE --店员拒绝--> COMPLETED
 
 `items` 字段：
 
+- `position`：结果位置，从 1 开始。
+- `strategy`、`experimentId`、`variant`：该商品对应的策略与实验信息。
 - `score`：综合得分。
 - `contentSimilarity`：内容相似度。
 - `popularityScore`：销量热度。
@@ -1073,6 +1110,126 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - `ratingScore`：评分分。
 - `reason`：面向用户展示的推荐理由。
 - `matchedTags`：命中的标签。
+
+### 11.2 推荐行为事件
+
+`POST /api/recommendation-events` · 公开（可选登录） · `ApiResponse<{ accepted: number }>`
+
+用于上报推荐曝光、商品浏览、点击、加购事件。后端按 `eventId` 幂等去重，效果统计再按“主体（登录用户或匿名会话）+ 商品”去重计算 CTR/CVR。订单事件由下单流程自动写入，不需要前端重复上报。
+
+请求体：
+
+```json
+{
+  "events": [
+    {
+      "eventId": "evt-8f2c1d",
+      "requestId": "rec-9f6c1d2e",
+      "eventType": "IMPRESSION",
+      "productId": 1,
+      "position": 1,
+      "scene": "home",
+      "strategy": "CONTENT_TFIDF_MULTI_FACTOR",
+      "experimentId": "exp_home_vector",
+      "variant": "TREATMENT",
+      "sessionId": "s-3a7b9c",
+      "occurredAt": "2026-11-21T10:00:00",
+      "metadata": {}
+    }
+  ]
+}
+```
+
+字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `events` | array | 是 | 至少 1 条事件；建议客户端每批不超过 50 条 |
+| `eventId` | string | 是 | 客户端生成的幂等 ID，重复上报会被忽略 |
+| `requestId` | string | 条件 | 推荐响应中的 `requestId`；除 `VIEW` 外必填 |
+| `eventType` | string | 是 | `IMPRESSION`、`VIEW`、`CLICK`、`ADD_TO_CART`、`ORDER` |
+| `productId` | number | 是 | 商品 ID |
+| `position` | number | 否 | 推荐位置 |
+| `scene` | string | 否 | 推荐场景 |
+| `strategy` | string | 否 | 推荐策略 |
+| `experimentId` | string | 否 | 实验 ID |
+| `variant` | string | 否 | `CONTROL` 或 `TREATMENT` |
+| `sessionId` | string | 否 | 匿名会话 ID；登录用户可省略 |
+| `occurredAt` | datetime | 否 | 事件发生时间，省略时使用服务端当前时间 |
+| `metadata` | object | 否 | 扩展字段，例如 `dwellMs`、`quantity` |
+
+说明：
+
+- 匿名用户必须提供 `sessionId`；登录用户优先使用 JWT 用户 ID。
+- `VIEW` 和 `CLICK` 会同步更新 `user_product_interaction`，用于后续行为画像与向量召回。
+- 事件上报失败不应阻塞购物流程，前端可静默忽略。
+
+### 11.3 AI 挑花顾问
+
+`POST /api/ai/chat` · 公开（可选登录） · `text/event-stream`
+
+请求体：
+
+```json
+{
+  "message": "送女朋友生日，预算 200 左右",
+  "scene": "chat",
+  "conversationId": 12,
+  "sessionId": "s-3a7b9c"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `message` | string | 是 | 最多 500 字 |
+| `scene` | string | 否 | 默认 `chat` |
+| `conversationId` | number | 否 | 已有对话 ID；省略时自动创建新对话 |
+| `sessionId` | string | 否 | 匿名会话 ID，也可放在 `X-Session-Id` 请求头 |
+| `history` | array | 否 | 兼容字段；仅当对话尚无数据库历史时作为回退上下文 |
+
+- 登录用户历史按 `user_id` 隔离，匿名用户按 `session_key`（`X-Session-Id`，缺省为远端地址哈希）隔离；越权访问返回 `403`。
+- 服务端在调用 AI 前保存用户消息；流结束后保存助手消息，状态记录为 `COMPLETE`、`ABORTED` 或 `FAILED`，空回复不落库。
+- 新对话标题默认为「新的对话」，首轮成功回复后异步生成标题；生成失败时回退为首条问题前 20 字。
+
+SSE 事件：
+
+| 事件 | 数据 | 说明 |
+| --- | --- | --- |
+| `meta` | `{ requestId, model, degraded }` | 开始事件；`degraded=true` 表示降级为本地模板，`model` 仅管理员可见 |
+| `products` | `{ items: [{ productId, name, category, price, ratingAvg, salesCount, reason }] }` | 检索到的在售商品 |
+| `citations` | `{ items: [{ documentId, title, category, source, snippet }] }` | 知识库引用；仅管理员可见 |
+| `delta` | `{ content }` | 增量文本 |
+| `usage` | `{ promptTokens, completionTokens, totalTokens, estimatedCost, model }` | 用量与估算成本；仅管理员可见 |
+| `done` | `{ requestId, degraded? }` | 流结束 |
+| `error` | `{ message }` | 错误提示，前端应展示可重试状态 |
+
+- `meta`、`products`、`delta`、`done` 对所有用户返回；非管理员的 `meta` 会移除 `model`，也不接收 `citations`/`usage` 事件。
+- 匿名访问受 IP 限流、每日次数和全局预算限制，超限返回 `429` 或 `AI_RATE_LIMITED`。
+- `GET /api/ai/status` 返回 `{ enabled, available, chatEnabled, merchantEnabled, anonymousAllowed, mode, message }`，前端可据此显示入口或维护提示。
+
+### 11.4 AI 对话会话
+
+所有会话接口均为公开（可选登录），归属校验与聊天一致：登录用户按 JWT 用户 ID，匿名用户按 `X-Session-Id`（缺省使用远端地址哈希）。
+
+| 方法 | 路径 | 请求 | 响应 |
+| --- | --- | --- | --- |
+| GET | `/api/ai/conversations` | 无 | `ApiResponse<AiConversationVO[]>` |
+| POST | `/api/ai/conversations` | 无 | `ApiResponse<AiConversationVO>` |
+| GET | `/api/ai/conversations/{id}` | 无 | `ApiResponse<AiConversationDetailVO>` |
+| PUT | `/api/ai/conversations/{id}` | `{ "title": "..." }` | `ApiResponse<AiConversationVO>` |
+| DELETE | `/api/ai/conversations/{id}` | 无 | `ApiResponse<Void>` |
+| POST | `/api/ai/conversations/batch-delete` | `{ "ids": [1, 2] }` | `ApiResponse<{ "count": 2 }>` |
+| POST | `/api/ai/conversations/batch-pin` | `{ "ids": [1, 2], "pinned": true }` | `ApiResponse<{ "count": 2 }>` |
+
+`AiConversationVO`：`{ id, title, pinned, createdAt, updatedAt, lastMessageAt }`。
+
+`AiConversationDetailVO`：`{ conversation, messages }`，`messages` 按时间升序，元素字段为 `{ id, role, content, products, citations, usage, model, degraded, status, createdAt }`。非管理员读取详情时 `citations`、`usage`、`model` 返回 `null`。
+
+说明：
+
+- 列表仅返回 `ACTIVE` 会话，按置顶优先、最近更新倒序排列；删除为软删除（`DELETED`），不再出现在列表。
+- 标题最长 120 字；`batch-pin` 的 `ids` 不能为空，`pinned` 省略时按 `true` 处理。
+- 会话不存在返回 `404`，访问他人会话返回 `403`。
 
 ## 12. 店员端
 
@@ -1342,6 +1499,10 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | GET | `/api/admin/recommendations/logs` | 管理员 | 分页/筛选 | `ApiResponse<PageResult<RecommendationLogVO>>` |
 | GET | `/api/admin/recommendations/evaluation` | 管理员 | 无 | `ApiResponse<RecommendationEvaluationVO>` |
 | GET | `/api/admin/recommendations/stats` | 管理员 | 无 | `ApiResponse<RecommendationStatsVO>` |
+| GET | `/api/admin/recommendations/effects` | 管理员 | `days` 默认 30 | `ApiResponse<RecommendationEffectVO>` |
+| GET | `/api/admin/recommendations/experiments` | 管理员 | 无 | `ApiResponse<RecommendationExperimentVO[]>` |
+| POST | `/api/admin/recommendations/experiments` | 管理员 | `RecommendationExperimentRequest` | `ApiResponse<RecommendationExperimentVO>` |
+| PUT | `/api/admin/recommendations/experiments/{id}/status` | 管理员 | `{ status }` | `ApiResponse<RecommendationExperimentVO>` |
 
 `RecommendationWeightRequest`
 
@@ -1396,6 +1557,26 @@ AFTER_SALE --店员拒绝--> COMPLETED
 | `end` | datetime | 创建时间止 |
 
 推荐日志中的 `weightsJson`、`detailJson` 是 JSON 字符串，前端如果需要结构化展示需要先 `JSON.parse`。`productIds` 是逗号分隔的字符串，例如 `"1,6,8,13"`。
+
+推荐效果 `GET /api/admin/recommendations/effects?days=30` 返回窗口内的曝光、点击、加购、下单与 CTR/CVR，并按场景、实验变体、日期分组。统计口径按“主体（登录用户或匿名会话）+ `productId`”去重，同一主体对同一商品的多次同类事件只计一次；`days` 限制在 1-90。
+
+推荐实验：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `id` | string | 是 | 实验 ID，保存时存在则更新，不存在则创建 |
+| `name` | string | 是 | 实验名称 |
+| `scene` | string | 否 | 生效场景，默认 `home` |
+| `mode` | string | 否 | `AB` 或 `SHADOW`，默认 `AB` |
+| `trafficPercent` | number | 否 | 实验流量百分比 0-100，默认 10 |
+| `status` | string | 否 | `PAUSED`、`RUNNING`、`STOPPED`，默认 `PAUSED` |
+| `primaryMetric` | string | 否 | 主指标，默认 `CTR` |
+| `configJson` | string | 否 | 扩展配置 JSON 字符串 |
+
+- `AB` 模式按 `trafficPercent` 将流量分到 `CONTROL`（TF-IDF）或 `TREATMENT`（向量混合召回）。
+- `SHADOW` 模式始终返回 `CONTROL`，只记录实验信息，不影响线上排序。
+- 启动实验会把 `startAt` 设为当前时间；停止实验会写入 `endAt`。
+- 实验命中后，推荐响应会带 `experimentId` 和 `variant`，推荐事件应一并上报，才能按变体统计效果。
 
 推荐评估固定包含 5 类画像：
 
@@ -1500,6 +1681,78 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 场景标签默认只展示前 6 个，品类标签默认全部展示；关闭首页展示不影响商品筛选、编辑与推荐匹配。
 - 删除标签不会清空商品中已保存的旧值。
 
+### 13.9 AI 运营
+
+| 方法 | 路径 | 权限 | 请求 | 响应 |
+| --- | --- | --- | --- | --- |
+| POST | `/api/admin/ai/product-copy` | 管理员 | `AiProductCopyRequest` | `ApiResponse<AiProductCopyVO>` |
+| POST | `/api/admin/ai/product-copy/apply` | 管理员 | `AiProductCopyApplyRequest` | `ApiResponse<ProductVO>` |
+| POST | `/api/admin/ai/recommendation-advice` | 管理员 | `AiWeightAdviceRequest` | `ApiResponse<AiWeightAdviceVO>` |
+| POST | `/api/admin/ai/recommendation-advice/apply` | 管理员 | `AiWeightAdviceApplyRequest` | `ApiResponse<RecommendationSceneWeightVO[]>` |
+| GET | `/api/admin/ai/metrics` | 管理员 | `days` 默认 30 | `ApiResponse<AiMetricsVO>` |
+| GET | `/api/admin/ai/calls` | 管理员 | 分页 + `scene`/`status` | `ApiResponse<PageResult<AiCallLogVO>>` |
+| GET | `/api/admin/ai/health` | 管理员 | 无 | `ApiResponse<AiHealthVO>` |
+| POST | `/api/admin/ai/reindex` | 管理员 | 无 | `ApiResponse<AiReindexVO>` |
+| GET | `/api/admin/ai/knowledge` | 管理员 | `keyword`/`category`/`enabled` | `ApiResponse<AiKnowledgeDocument[]>` |
+| POST | `/api/admin/ai/knowledge` | 管理员 | `KnowledgeDocumentRequest` | `ApiResponse<AiKnowledgeDocument>` |
+| PUT | `/api/admin/ai/knowledge/{id}` | 管理员 | `KnowledgeDocumentRequest` | `ApiResponse<AiKnowledgeDocument>` |
+| DELETE | `/api/admin/ai/knowledge/{id}` | 管理员 | 无 | `ApiResponse<Void>` |
+
+`AiProductCopyRequest`：`{ productId?, name?, category?, grade?, origin?, flowerMeaning?, occasionTags?, festivalTags?, description?, price?, tone?, length? }`。`productId` 与 `name` 至少提供一个：传 `productId` 时读取已有商品字段并允许用请求字段覆盖；不传 `productId` 时仅按请求字段生成新品文案。`tone` 默认 `温暖`，`length` 取 `short`/`medium`/`long`，默认 `medium`。
+
+`AiProductCopyApplyRequest`：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `productId` | number | 是 | 要回写的商品 |
+| `title` | string | 否 | 最长 100，应用后覆盖商品名称 |
+| `description` | string | 否 | 最长 2000 |
+| `tags` | string[] | 否 | 写入 `product.ai_tags`，逗号分隔 |
+| `sellingPoints` | string[] | 否 | 写入 `product.ai_selling_points`，逗号分隔 |
+| `applyTitle` | boolean | 否 | 默认 `true` |
+| `applyDescription` | boolean | 否 | 默认 `true` |
+| `applyTags` | boolean | 否 | 默认 `true` |
+| `applySellingPoints` | boolean | 否 | 默认 `true` |
+
+应用接口按开关与内容是否为空选择性回写，未勾选或内容为空时不修改对应字段；全部字段未变更时直接返回现有商品。成功回写会清理商品详情/热销缓存并记录操作日志。
+
+`AiProductCopyVO`：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `title` | string | 商品标题 |
+| `description` | string | 商品描述 |
+| `tags` | string[] | 推荐标签 |
+| `sellingPoints` | string[] | 卖点 |
+| `degraded` | boolean | 是否使用本地模板降级 |
+| `fallbackReason` | string | 降级原因，成功时省略 |
+
+`AiWeightAdviceRequest`：`{ scene: string, days?: number }`。
+
+`AiWeightAdviceVO`：`{ scene, currentWeights, suggestedWeights, reason, confidence, guardrails, degraded, fallbackReason }`。`currentWeights` 与 `suggestedWeights` 均包含 `content`、`popularity`、`festival`、`rating` 四项，且 `suggestedWeights` 之和严格为 1。生成接口只返回草稿，不会自动保存；管理员确认后调用 `POST /api/admin/ai/recommendation-advice/apply` 或 `PUT /api/admin/recommendations/scene-weights` 生效。
+
+`AiWeightAdviceApplyRequest`：`{ scene: string, weights: { content, popularity, festival, rating } }`。后端会把四项权重 clamp 到 `0..1` 并归一化为总和 `1.000`，仅更新指定场景，其他场景保持原值，成功后返回全部场景权重并记录操作日志。
+
+`AiMetricsVO`：包含 `startDate`、`endDate`、`totalCalls`、`successCalls`、`fallbackCalls`、`failedCalls`、`successRate`、`fallbackRate`、`totalTokens`、`promptTokens`、`completionTokens`、`estimatedCost`、`todayCost`、`monthCost`、`avgLatencyMs`、`p95LatencyMs`、`firstTokenP95Ms`、`qps`、`avgLatencyMs5m`、`p95LatencyMs5m`、`callsByScene`、`costByScene`、`degradedStages`、`daily`、`hourly`、`endpoints`。`qps`/`avgLatencyMs5m`/`p95LatencyMs5m` 来自 5 分钟实时窗口；`daily` 含 `calls/fallback/failed/tokens/promptTokens/completionTokens/cost`，`hourly` 含 `calls/fallback/failed/tokens/cost/avgLatencyMs/p95LatencyMs`，`endpoints` 含 `path/calls/failures/qps/avgLatencyMs/p95LatencyMs/lastStatus/lastCalledAt`。
+
+`AiCallLogVO`：包含 `requestId`、`userId`、`userRole`、`scene`、`model`、`status`、`degraded`、`fallbackReason`、`latencyMs`、`firstTokenMs`、`promptTokens`、`completionTokens`、`totalTokens`、`estimatedCost`、`createdAt` 等字段。
+
+`AiHealthVO`：`{ enabled, reachable, endpoint, service, status, qdrantReady, llmReady, embeddingReady, degraded, message }`。
+
+`AiReindexVO`：`{ accepted, productCount, knowledgeCount, message }`。
+
+`KnowledgeDocumentRequest`：
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `title` | string | 是 | 最长 120 |
+| `category` | string | 是 | 最长 30 |
+| `content` | string | 是 | 知识库正文 |
+| `source` | string | 否 | 最长 200 |
+| `enabled` | boolean | 否 | 默认 `true` |
+
+知识库新增、更新、删除后会尽力触发向量索引重建；AI 服务不可用时 CRUD 仍成功，但向量索引可能滞后。`POST /api/admin/ai/reindex` 可手动重建商品与知识库索引。
+
 ## 14. 前端对接流程
 
 ### 14.1 访客浏览
@@ -1508,7 +1761,9 @@ AFTER_SALE --店员拒绝--> COMPLETED
 2. `GET /api/products` 查询商品，或 `GET /api/products/hot` 获取热销。
 3. `GET /api/products/{id}` 查看详情。
 4. `GET /api/recommendations?scene=home` 获取首页推荐，商品详情用 `scene=product&productId={id}` 获取相似商品；不登录时 `coldStart=true`。
-5. `GET /api/reviews/products/{productId}` 查看公开评价。
+5. 保存推荐响应中的 `requestId` 与每个商品的 `position`/`strategy`/`experimentId`/`variant`，在曝光、点击、加购时调用 `POST /api/recommendation-events` 上报。
+6. 可选：调用 `POST /api/ai/chat` 使用 AI 挑花顾问；前端按 SSE 事件增量渲染 `delta`，并展示 `products`/`citations`。
+7. `GET /api/reviews/products/{productId}` 查看公开评价。
 
 ### 14.2 登录与个人中心
 
@@ -2043,6 +2298,10 @@ export interface RecommendationSceneWeightVO extends RecommendationWeightRequest
 
 export interface RecommendationItemVO {
   productId: number;
+  position: number;
+  strategy: string;
+  experimentId?: string;
+  variant?: string;
   name: string;
   imageUrl?: string;
   category: string;
@@ -2065,7 +2324,10 @@ export interface RecommendationItemVO {
 }
 
 export interface RecommendationResponse {
+  requestId: string;
   strategy: string;
+  experimentId?: string;
+  variant?: string;
   coldStart: boolean;
   season: SeasonSuitability;
   seasonLabel: string;
@@ -2081,10 +2343,15 @@ export interface RecommendationResponse {
 
 export interface RecommendationLogVO {
   id: number;
+  requestId?: string;
   userId?: number;
   userNickname?: string;
   scene: string;
   sceneLabel: string;
+  strategy?: string;
+  experimentId?: string;
+  variant?: string;
+  mode?: RecommendationMode;
   festival?: string;
   season: SeasonSuitability;
   seasonLabel: string;
@@ -2167,10 +2434,213 @@ export interface TopProductVO {
 }
 ```
 
+### 15.8 AI 与推荐实验
+
+```ts
+export type RecommendationEventType = 'IMPRESSION' | 'VIEW' | 'CLICK' | 'ADD_TO_CART' | 'ORDER';
+
+export interface RecommendationEvent {
+  eventId: string;
+  requestId?: string;
+  eventType: RecommendationEventType;
+  productId?: number;
+  position?: number;
+  scene?: RecommendationScene;
+  strategy?: string;
+  experimentId?: string;
+  variant?: 'CONTROL' | 'TREATMENT';
+  sessionId?: string;
+  occurredAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RecommendationEventBatchRequest {
+  events: RecommendationEvent[];
+}
+
+export interface RecommendationExperimentRequest {
+  id: string;
+  name: string;
+  scene?: RecommendationScene;
+  mode?: 'AB' | 'SHADOW';
+  trafficPercent?: number;
+  status?: 'PAUSED' | 'RUNNING' | 'STOPPED';
+  primaryMetric?: string;
+  configJson?: string;
+}
+
+export interface RecommendationExperimentVO extends RecommendationExperimentRequest {
+  startAt?: string;
+  endAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecommendationEffectVO {
+  startDate: string;
+  endDate: string;
+  impressions: number;
+  clicks: number;
+  addToCarts: number;
+  orders: number;
+  ctr: number;
+  cvr: number;
+  addToCartRate: number;
+  orderRate: number;
+  byScene: Record<string, {
+    impressions: number;
+    clicks: number;
+    addToCarts: number;
+    orders: number;
+    ctr: number;
+    cvr: number;
+  }>;
+  byVariant: Array<{
+    experimentId?: string;
+    variant: string;
+    impressions: number;
+    clicks: number;
+    orders: number;
+    ctr: number;
+    cvr: number;
+  }>;
+  daily: Array<{
+    date: string;
+    impressions: number;
+    clicks: number;
+    orders: number;
+    ctr: number;
+    cvr: number;
+  }>;
+}
+
+export interface AiStatusVO {
+  enabled: boolean;
+  available: boolean;
+  chatEnabled: boolean;
+  merchantEnabled: boolean;
+  anonymousAllowed: boolean;
+  mode: string;
+  message?: string;
+}
+
+export interface AiProductCopyRequest {
+  productId: number;
+  tone?: string;
+  length?: 'short' | 'medium' | 'long';
+}
+
+export interface AiProductCopyVO {
+  title: string;
+  description: string;
+  tags: string[];
+  sellingPoints: string[];
+  degraded: boolean;
+  fallbackReason?: string;
+}
+
+export interface AiWeightAdviceRequest {
+  scene: RecommendationScene;
+  days?: number;
+}
+
+export interface AiWeightAdviceVO {
+  scene: string;
+  currentWeights: Record<'content' | 'popularity' | 'festival' | 'rating', number>;
+  suggestedWeights: Record<'content' | 'popularity' | 'festival' | 'rating', number>;
+  reason: string;
+  confidence: number;
+  guardrails: string[];
+  degraded: boolean;
+  fallbackReason?: string;
+}
+
+export interface KnowledgeDocumentRequest {
+  title: string;
+  category: string;
+  content: string;
+  source?: string;
+  enabled?: boolean;
+}
+
+export interface AiKnowledgeDocument extends KnowledgeDocumentRequest {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AiMetricsVO {
+  startDate: string;
+  endDate: string;
+  totalCalls: number;
+  successCalls: number;
+  fallbackCalls: number;
+  failedCalls: number;
+  successRate: number;
+  fallbackRate: number;
+  totalTokens: number;
+  estimatedCost: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  firstTokenP95Ms: number;
+  callsByScene: Record<string, number>;
+  daily: Array<{
+    date: string;
+    calls: number;
+    fallback: number;
+    failed: number;
+    tokens: number;
+    cost: number;
+  }>;
+}
+
+export interface AiCallLogVO {
+  id: number;
+  requestId: string;
+  userId?: number;
+  userRole?: string;
+  scene: string;
+  model?: string;
+  status: string;
+  degraded: boolean;
+  degradedStage?: string;
+  fallbackReason?: string;
+  latencyMs?: number;
+  firstTokenMs?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  estimatedCost?: number;
+  requestChars?: number;
+  responseChars?: number;
+  sessionId?: string;
+  errorCode?: number;
+  createdAt: string;
+}
+
+export interface AiHealthVO {
+  enabled: boolean;
+  reachable: boolean;
+  endpoint?: string;
+  service?: string;
+  status?: string;
+  qdrantReady: boolean;
+  llmReady: boolean;
+  message?: string;
+}
+
+export interface AiReindexVO {
+  accepted: boolean;
+  productCount: number;
+  knowledgeCount: number;
+  message?: string;
+}
+```
+
 ## 16. 已知边界与前端注意事项
 
 - 图片上传依赖 MinIO；未配置时上传接口返回 `503/8001`。商品历史相对地址仍可使用占位图或独立静态资源服务兜底。
-- 没有地址簿、优惠券、积分、真实物流、真实支付；地址随订单提交，支付只有模拟回调。
+- 地址簿已支持，但订单仍会保存收货信息快照；没有优惠券、积分、真实物流、真实支付，支付只有模拟回调。
 - 没有订单预览接口：前端可从购物车列表计算预计金额，但最终金额以下单响应为准。
 - `RecommendationQuery.scene` 已参与场景权重、冷启动置信度、品类多样性和推荐理由；`scene=product` 还需传 `productId`，缺少时返回 `400/7003`。地点维度仍未建模。
 - 公开商品列表的 `sort=recommend` 最多扫描 `app.recommendation.catalog-scan-limit`（默认 500）条候选；带 `keyword` 时回退为普通销量排序。

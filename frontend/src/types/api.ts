@@ -121,7 +121,7 @@ export interface UpdateProfileRequest {
   nickname?: string;
   phone?: string;
   email?: string;
-  /** 修改为新邮箱时必填，验证码发送到新邮箱。 */
+  /** 修改为新邮箱时必填，验证码发送到新邮箱�?*/
   emailCode?: string;
   avatarUrl?: string;
 }
@@ -144,15 +144,15 @@ export interface AuthBackgroundVO {
   backgroundOpacity?: number;
   backgroundBlur?: number;
   componentOpacity?: number;
-  /** 登录页表面配色 */
+  /** 登录页表面配�?*/
   palette?: PaletteId;
   /** 登录页强调色 */
   accent?: AccentId;
   /** 自定义强调色 #RRGGBB */
   customAccent?: string;
-  /** 登录页字体风格 */
+  /** 登录页字体风�?*/
   fontFamily?: FontFamilyId;
-  /** 登录页字体大小（px） */
+  /** 登录页字体大小（px�?*/
   fontSize?: number;
   updatedAt?: string;
 }
@@ -171,9 +171,9 @@ export interface AuthBackgroundRequest {
 }
 
 export interface ChangePasswordRequest {
-  /** 原密码；与邮箱验证码二选一。 */
+  /** 原密码；与邮箱验证码二选一�?*/
   oldPassword?: string;
-  /** 发送到当前账号绑定邮箱的验证码；与原密码二选一。 */
+  /** 发送到当前账号绑定邮箱的验证码；与原密码二选一�?*/
   emailCode?: string;
   newPassword: string;
 }
@@ -348,6 +348,7 @@ export interface CartItemVO {
 export interface CartAddRequest {
   productId: number;
   quantity: number;
+  attribution?: CartAttribution;
 }
 
 export interface CartUpdateRequest {
@@ -603,6 +604,10 @@ export interface RecommendationSceneWeightsRequest {
 
 export interface RecommendationItemVO {
   productId: number;
+  position?: number;
+  strategy?: string;
+  experimentId?: string;
+  variant?: string;
   name: string;
   imageUrl?: string;
   category: string;
@@ -625,7 +630,10 @@ export interface RecommendationItemVO {
 }
 
 export interface RecommendationResponse {
+  requestId?: string;
   strategy: string;
+  experimentId?: string;
+  variant?: string;
   coldStart: boolean;
   season: SeasonSuitability;
   seasonLabel: string;
@@ -641,10 +649,15 @@ export interface RecommendationResponse {
 
 export interface RecommendationLogVO {
   id: number;
+  requestId?: string;
   userId?: number;
   userNickname?: string;
   scene: string;
   sceneLabel: string;
+  strategy?: string;
+  experimentId?: string;
+  variant?: string;
+  mode?: RecommendationMode;
   festival?: string;
   season: SeasonSuitability;
   seasonLabel: string;
@@ -767,4 +780,394 @@ export interface ReviewPageQuery {
   page?: number;
   size?: number;
   keyword?: string;
+}
+
+
+export interface CartAttribution {
+  requestId?: string;
+  eventId?: string;
+  scene?: string;
+  position?: number;
+  strategy?: string;
+  experimentId?: string;
+  variant?: string;
+}
+
+export interface RecommendationEvent {
+  eventId: string;
+  requestId?: string;
+  eventType: "IMPRESSION" | "VIEW" | "CLICK" | "ADD_TO_CART" | "ORDER";
+  productId: number;
+  position?: number;
+  scene?: string;
+  strategy?: string;
+  experimentId?: string;
+  variant?: string;
+  sessionId?: string;
+  occurredAt?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RecommendationEventBatchRequest {
+  events: RecommendationEvent[];
+}
+
+export interface RecommendationEffectScene {
+  impressions: number;
+  clicks: number;
+  addToCarts: number;
+  orders: number;
+  ctr: number;
+  cvr: number;
+}
+
+export interface RecommendationEffectVariant {
+  experimentId: string;
+  variant: string;
+  impressions: number;
+  clicks: number;
+  orders: number;
+  ctr: number;
+  cvr: number;
+}
+
+export interface RecommendationEffectDaily {
+  date: string;
+  impressions: number;
+  clicks: number;
+  orders: number;
+  ctr: number;
+  cvr: number;
+}
+
+export interface RecommendationEffectVO {
+  startDate: string;
+  endDate: string;
+  impressions: number;
+  clicks: number;
+  addToCarts: number;
+  orders: number;
+  ctr: number;
+  cvr: number;
+  addToCartRate: number;
+  orderRate: number;
+  byScene: Record<string, RecommendationEffectScene>;
+  byVariant: RecommendationEffectVariant[];
+  daily: RecommendationEffectDaily[];
+}
+
+export interface RecommendationExperimentVO {
+  id: string;
+  name: string;
+  scene: string;
+  mode: string;
+  trafficPercent: number;
+  status: string;
+  primaryMetric: string;
+  configJson?: string;
+  startAt?: string;
+  endAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface RecommendationExperimentRequest {
+  id: string;
+  name: string;
+  scene: string;
+  mode: string;
+  trafficPercent: number;
+  status: string;
+  primaryMetric: string;
+  configJson?: string;
+}
+
+export interface AiStatusVO {
+  enabled: boolean;
+  available: boolean;
+  chatEnabled: boolean;
+  merchantEnabled: boolean;
+  anonymousAllowed: boolean;
+  mode: string;
+  message: string;
+}
+
+export interface AiHealthVO {
+  enabled: boolean;
+  reachable: boolean;
+  endpoint: string;
+  service: string;
+  status: string;
+  qdrantReady: boolean;
+  llmReady: boolean;
+  embeddingReady: boolean;
+  degraded: boolean;
+  message: string;
+}
+
+export interface AiMetricsDailyPoint {
+  date: string;
+  calls: number;
+  fallback: number;
+  failed: number;
+  tokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  cost: number;
+}
+
+export interface AiMetricsHourlyPoint {
+  hour: string;
+  calls: number;
+  fallback: number;
+  failed: number;
+  tokens: number;
+  cost: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+}
+
+export interface AiMetricsSceneCost {
+  scene: string;
+  calls: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cost: number;
+}
+
+export interface AiMetricsEndpointPoint {
+  path: string;
+  calls: number;
+  failures: number;
+  qps: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  lastStatus: string;
+  lastCalledAt: string;
+}
+
+export interface AiMetricsVO {
+  startDate: string;
+  endDate: string;
+  totalCalls: number;
+  successCalls: number;
+  fallbackCalls: number;
+  failedCalls: number;
+  successRate: number;
+  fallbackRate: number;
+  totalTokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  estimatedCost: number;
+  todayCost: number;
+  monthCost: number;
+  avgLatencyMs: number;
+  p95LatencyMs: number;
+  firstTokenP95Ms: number;
+  qps: number;
+  avgLatencyMs5m: number;
+  p95LatencyMs5m: number;
+  callsByScene: Record<string, number>;
+  costByScene: Record<string, AiMetricsSceneCost>;
+  degradedStages: Record<string, number>;
+  daily: AiMetricsDailyPoint[];
+  hourly: AiMetricsHourlyPoint[];
+  endpoints: AiMetricsEndpointPoint[];
+}
+
+export interface AiCallLogVO {
+  id: number;
+  requestId: string;
+  userId?: number;
+  userRole?: string;
+  scene: string;
+  model: string;
+  status: string;
+  degraded: boolean;
+  degradedStage?: string;
+  fallbackReason?: string;
+  latencyMs?: number;
+  firstTokenMs?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  estimatedCost?: number;
+  requestChars?: number;
+  responseChars?: number;
+  sessionId?: string;
+  errorCode?: number;
+  createdAt: string;
+}
+
+export interface AiCallLogQuery {
+  page?: number;
+  size?: number;
+  scene?: string;
+  status?: string;
+}
+
+export interface AiKnowledgeDocument {
+  id: number;
+  title: string;
+  category: string;
+  content: string;
+  source?: string;
+  enabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface KnowledgeDocumentRequest {
+  title: string;
+  category: string;
+  content: string;
+  source?: string;
+  enabled?: boolean;
+}
+
+export interface AiReindexVO {
+  accepted: boolean;
+  productCount: number;
+  knowledgeCount: number;
+  message: string;
+}
+
+export interface AiProductCopyRequest {
+  productId?: number;
+  name?: string;
+  category?: string;
+  grade?: string;
+  origin?: string;
+  flowerMeaning?: string;
+  occasionTags?: string;
+  festivalTags?: string;
+  description?: string;
+  price?: number;
+  tone?: string;
+  length?: string;
+}
+
+export interface AiProductCopyVO {
+  title: string;
+  description: string;
+  tags: string[];
+  sellingPoints: string[];
+  degraded: boolean;
+  fallbackReason?: string;
+}
+
+export interface AiProductCopyApplyRequest {
+  productId: number;
+  title: string;
+  description: string;
+  tags: string[];
+  sellingPoints: string[];
+  applyTitle?: boolean;
+  applyDescription?: boolean;
+  applyTags?: boolean;
+  applySellingPoints?: boolean;
+}
+
+export interface AiWeightAdviceRequest {
+  scene: string;
+  days?: number;
+}
+
+export interface AiWeightAdviceVO {
+  scene: string;
+  currentWeights: Record<string, number>;
+  suggestedWeights: Record<string, number>;
+  reason: string;
+  confidence: number;
+  guardrails: string[];
+  degraded: boolean;
+  fallbackReason?: string;
+}
+
+export interface AiWeightAdviceApplyRequest {
+  scene: string;
+  weights: Record<string, number>;
+}
+
+export interface AiChatHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface AiChatRequest {
+  message: string;
+  scene?: string;
+  sessionId?: string;
+  conversationId?: number;
+  history?: AiChatHistoryMessage[];
+}
+
+export interface AiChatProduct {
+  productId: number;
+  name: string;
+  category: string;
+  price: number;
+  ratingAvg?: number;
+  salesCount?: number;
+  reason?: string;
+}
+
+export interface AiChatCitation {
+  documentId: number;
+  title: string;
+  category: string;
+  source?: string;
+  snippet: string;
+}
+
+export interface AiChatUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  estimatedCost: number;
+  model?: string;
+}
+
+export interface AiChatMeta {
+  requestId?: string;
+  model?: string;
+  degraded?: boolean;
+}
+
+export interface AiChatHandlers {
+  onMeta?: (meta: AiChatMeta) => void;
+  onDelta?: (content: string) => void;
+  onProducts?: (products: AiChatProduct[]) => void;
+  onCitations?: (citations: AiChatCitation[]) => void;
+  onUsage?: (usage: AiChatUsage) => void;
+  onError?: (message: string) => void;
+  onDone?: () => void;
+}
+
+export interface AiConversation {
+  id: number;
+  title: string;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt?: string;
+}
+
+export interface AiConversationMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  products?: AiChatProduct[];
+  citations?: AiChatCitation[];
+  usage?: AiChatUsage;
+  model?: string;
+  degraded?: boolean;
+  status?: string;
+  createdAt: string;
+}
+
+export interface AiConversationDetail {
+  conversation: AiConversation;
+  messages: AiConversationMessage[];
 }

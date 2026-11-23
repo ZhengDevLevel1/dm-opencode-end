@@ -11,6 +11,7 @@ export const routeLoaders = {
     import("@/pages/recommendations-page").then((module) => ({
       default: module.RecommendationsPage,
     })),
+  ai: () => import("@/pages/ai-chat-page").then((module) => ({ default: module.AiChatPage })),
   cart: () => import("@/pages/cart-page").then((module) => ({ default: module.CartPage })),
   checkout: () =>
     import("@/pages/checkout-page").then((module) => ({ default: module.CheckoutPage })),
@@ -74,6 +75,11 @@ export const routeLoaders = {
     import("@/pages/admin/admin-recommendations-page").then((module) => ({
       default: module.AdminRecommendationsPage,
     })),
+  adminAi: () => import("@/pages/admin/admin-ai-page").then((module) => ({ default: module.AdminAiPage })),
+  adminMerchantAi: () =>
+    import("@/pages/admin/admin-merchant-ai-page").then((module) => ({
+      default: module.AdminMerchantAiPage,
+    })),
   adminLogs: () =>
     import("@/pages/admin/admin-logs-page").then((module) => ({
       default: module.AdminLogsPage,
@@ -88,6 +94,7 @@ const exactRoutes: Record<string, () => Promise<unknown>> = {
   "/": routeLoaders.home,
   "/products": routeLoaders.products,
   "/recommendations": routeLoaders.recommendations,
+  "/ai": routeLoaders.ai,
   "/cart": routeLoaders.cart,
   "/checkout": routeLoaders.checkout,
   "/orders": routeLoaders.orders,
@@ -105,6 +112,8 @@ const exactRoutes: Record<string, () => Promise<unknown>> = {
   "/admin/users": routeLoaders.adminUsers,
   "/admin/reviews": routeLoaders.adminReviews,
   "/admin/recommendations": routeLoaders.adminRecommendations,
+  "/admin/ai": routeLoaders.adminAi,
+  "/admin/merchant-ai": routeLoaders.adminMerchantAi,
   "/admin/logs": routeLoaders.adminLogs,
   "/board": routeLoaders.storeBoard,
   "/login": routeLoaders.login,

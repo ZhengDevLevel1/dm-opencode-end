@@ -22,6 +22,22 @@ public class CartItem {
 
     private Integer quantity;
 
+    private String sourceRequestId;
+
+    private String sourceEventId;
+
+    private String sourceScene;
+
+    private Integer sourcePosition;
+
+    private String sourceStrategy;
+
+    private String sourceExperimentId;
+
+    private String sourceVariant;
+
+    private LocalDateTime attributedAt;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

@@ -12,6 +12,7 @@ import com.flower.mall.common.exception.BusinessException;
 import com.flower.mall.common.exception.ErrorCode;
 import com.flower.mall.config.AppProperties;
 import com.flower.mall.module.inventory.service.InventoryService;
+import com.flower.mall.module.product.dto.ProductAiCopyUpdate;
 import com.flower.mall.module.product.dto.ProductQuery;
 import com.flower.mall.module.product.dto.ProductSaveRequest;
 import com.flower.mall.module.product.dto.ProductVO;
@@ -233,6 +234,75 @@ public class ProductService {
         }
         evictCaches(productId);
         return toVO(productMapper.selectById(productId));
+    }
+
+    @Transactional
+    public ProductVO applyAiCopy(Long productId, ProductAiCopyUpdate update) {
+        Product existing = getRequired(productId);
+        Product product = new Product();
+        product.setId(productId);
+        product.setVersion(existing.getVersion());
+        boolean changed = false;
+        if (update.applyTitle() && StringUtils.hasText(update.title())) {
+            product.setName(truncate(update.title().trim(), 100));
+            changed = true;
+        }
+        if (update.applyDescription() && StringUtils.hasText(update.description())) {
+            product.setDescription(truncate(update.description().trim(), 2000));
+            changed = true;
+        }
+        if (update.applyTags()) {
+            String tags = joinLimited(update.tags(), 255);
+            if (StringUtils.hasText(tags)) {
+                product.setAiTags(tags);
+                changed = true;
+            }
+        }
+        if (update.applySellingPoints()) {
+            String sellingPoints = joinLimited(update.sellingPoints(), 500);
+            if (StringUtils.hasText(sellingPoints)) {
+                product.setAiSellingPoints(sellingPoints);
+                changed = true;
+            }
+        }
+        if (!changed) {
+            return toVO(existing);
+        }
+        if (productMapper.updateById(product) == 0) {
+            throw BusinessException.of(ErrorCode.CONFLICT, "商品已被其他操作修改，请刷新后重试");
+        }
+        evictCaches(productId);
+        return toVO(productMapper.selectById(productId));
+    }
+
+    private String truncate(String value, int maxLength) {
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
+    }
+
+    private String joinLimited(List<String> values, int maxLength) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        Set<String> seen = new HashSet<>();
+        for (String value : values) {
+            if (!StringUtils.hasText(value)) {
+                continue;
+            }
+            String normalized = value.trim();
+            if (!seen.add(normalized)) {
+                continue;
+            }
+            int extra = builder.length() == 0 ? normalized.length() : normalized.length() + 1;
+            if (builder.length() + extra > maxLength) {
+                break;
+            }
+            if (builder.length() > 0) {
+                builder.append(',');
+            }
+            builder.append(normalized);
+        }
+        return builder.toString();
     }
 
     @Transactional

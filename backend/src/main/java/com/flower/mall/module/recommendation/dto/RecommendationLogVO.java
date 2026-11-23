@@ -16,10 +16,15 @@ import java.time.LocalDateTime;
 public class RecommendationLogVO {
 
     private Long id;
+    private String requestId;
     private Long userId;
     private String userNickname;
     private String scene;
     private String sceneLabel;
+    private String strategy;
+    private String experimentId;
+    private String variant;
+    private String mode;
     private String festival;
     private String season;
     private String seasonLabel;
@@ -32,8 +37,13 @@ public class RecommendationLogVO {
     public static RecommendationLogVO from(RecommendationLog log) {
         return RecommendationLogVO.builder()
                 .id(log.getId())
+                .requestId(log.getRequestId())
                 .userId(log.getUserId())
                 .scene(log.getScene())
+                .strategy(log.getStrategy())
+                .experimentId(log.getExperimentId())
+                .variant(log.getVariant())
+                .mode(log.getMode())
                 .sceneLabel(RecommendationLogLabels.sceneLabel(log.getScene()))
                 .festival(log.getFestival())
                 .season(log.getSeason())

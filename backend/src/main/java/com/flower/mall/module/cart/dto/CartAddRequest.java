@@ -15,4 +15,6 @@ public class CartAddRequest {
     @Min(value = 1, message = "数量必须大于0")
     @Max(value = 99, message = "单次最多购买99件")
     private Integer quantity;
+
+    private CartAttribution attribution;
 }

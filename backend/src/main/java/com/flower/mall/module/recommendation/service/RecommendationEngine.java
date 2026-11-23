@@ -60,6 +60,14 @@ public class RecommendationEngine {
                 behavior.getReviews().forEach(review ->
                         documentCandidates.putIfAbsent(review.product().getId(), review.product()));
             }
+            if (behavior.getViewed() != null) {
+                behavior.getViewed().forEach(product ->
+                        documentCandidates.putIfAbsent(product.getId(), product));
+            }
+            if (behavior.getClicked() != null) {
+                behavior.getClicked().forEach(product ->
+                        documentCandidates.putIfAbsent(product.getId(), product));
+            }
         }
         if (documentCandidates.isEmpty()) {
             return PreparedDocuments.empty();
@@ -289,6 +297,16 @@ public class RecommendationEngine {
             for (UserBehaviorData.ReviewedProduct review : behavior.getReviews()) {
                 double weight = 1.2 * (Math.max(Math.min(review.rating(), 5), 1) / 5.0);
                 mergeVector(profile, vectors.get(review.product().getId()), weight);
+            }
+        }
+        if (behavior.getViewed() != null) {
+            for (RecommendationCandidate viewed : behavior.getViewed()) {
+                mergeVector(profile, vectors.get(viewed.getId()), 0.3);
+            }
+        }
+        if (behavior.getClicked() != null) {
+            for (RecommendationCandidate clicked : behavior.getClicked()) {
+                mergeVector(profile, vectors.get(clicked.getId()), 0.8);
             }
         }
         if (behavior.getCategoryDistribution() != null) {

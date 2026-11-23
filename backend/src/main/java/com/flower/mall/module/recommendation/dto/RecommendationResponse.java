@@ -14,7 +14,10 @@ import java.util.List;
 @AllArgsConstructor
 public class RecommendationResponse {
 
+    private String requestId;
     private String strategy;
+    private String experimentId;
+    private String variant;
     private boolean coldStart;
     private String season;
     private String seasonLabel;

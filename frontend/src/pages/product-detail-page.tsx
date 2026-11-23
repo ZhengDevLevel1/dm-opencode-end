@@ -26,6 +26,7 @@ import { useDict, useFavoritesQuery } from "@/hooks/queries";
 import { useLoginGuard } from "@/hooks/use-login-guard";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatNumber, splitTags } from "@/lib/format";
+import { trackRecommendationView } from "@/lib/recommendation-tracking";
 import { toast } from "@/stores/toast";
 import type { CartItemVO } from "@/types/api";
 import { ProductImage } from "@/components/domain/product-image";
@@ -91,6 +92,30 @@ export function ProductDetailPage() {
   useEffect(() => {
     setQuantity((value) => Math.min(value, Math.max(1, maxQuantity)));
   }, [maxQuantity]);
+
+  useEffect(() => {
+    if (!validId || !product.isSuccess) return;
+    const startedAt = Date.now();
+    let tracked = false;
+    const track = () => {
+      if (tracked) return;
+      tracked = true;
+      const dwellMs = Date.now() - startedAt;
+      if (dwellMs >= 1000) {
+        trackRecommendationView(id, dwellMs);
+      }
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        track();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      track();
+    };
+  }, [id, product.isSuccess, validId]);
 
   const addMutation = useMutation({
     mutationFn: (input: { productId: number; quantity: number }) =>

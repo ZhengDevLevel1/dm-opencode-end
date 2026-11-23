@@ -16,9 +16,19 @@ public class RecommendationLog {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String requestId;
+
     private Long userId;
 
     private String scene;
+
+    private String strategy;
+
+    private String experimentId;
+
+    private String variant;
+
+    private String mode;
 
     private String festival;
 

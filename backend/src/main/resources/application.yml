@@ -104,6 +104,30 @@ app:
     catalog-scan-limit: 500
     product-cache-seconds: 30
     behavior-cache-seconds: 30
+  ai:
+    enabled: ${APP_AI_ENABLED:true}
+    chat-enabled: ${APP_AI_CHAT_ENABLED:true}
+    merchant-enabled: ${APP_AI_MERCHANT_ENABLED:true}
+    chat-allow-anonymous: ${APP_AI_CHAT_ALLOW_ANONYMOUS:true}
+    base-url: ${AI_BASE_URL:http://127.0.0.1:8081}
+    nacos-enabled: ${NACOS_ENABLED:false}
+    nacos-server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+    service-name: ${AI_SERVICE_NAME:flower-ai-service}
+    internal-token: ${AI_INTERNAL_TOKEN:flower-ai-internal-dev-token}
+    timeout-ms: ${APP_AI_TIMEOUT_MS:15000}
+    chat-timeout-ms: ${APP_AI_CHAT_TIMEOUT_MS:60000}
+    chat-rate-limit-per-minute: ${APP_AI_CHAT_RATE_LIMIT:10}
+    chat-daily-limit: ${APP_AI_CHAT_DAILY_LIMIT:100}
+    chat-max-question-chars: ${APP_AI_CHAT_MAX_QUESTION_CHARS:500}
+    chat-context-max-chars: ${APP_AI_CHAT_CONTEXT_MAX_CHARS:12000}
+    chat-context-max-messages: ${APP_AI_CHAT_CONTEXT_MAX_MESSAGES:40}
+    daily-budget: ${APP_AI_DAILY_BUDGET:20.0}
+    chat-model: ${DEEPSEEK_CHAT_MODEL:deepseek-chat}
+    recommendation-mode: ${APP_AI_RECOMMENDATION_MODE:TF_IDF}
+    vector-traffic-percent: ${APP_AI_VECTOR_TRAFFIC_PERCENT:0}
+    pricing:
+      input-per-1k: ${APP_AI_PRICE_INPUT_PER_1K:0.001}
+      output-per-1k: ${APP_AI_PRICE_OUTPUT_PER_1K:0.002}
   # MinIO 图片上传；本地未启动 MinIO 时保持 enabled=false
   minio:
     enabled: ${MINIO_ENABLED:true}

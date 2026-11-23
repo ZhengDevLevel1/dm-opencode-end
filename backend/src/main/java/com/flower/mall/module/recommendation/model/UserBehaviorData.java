@@ -14,6 +14,10 @@ public class UserBehaviorData {
     private List<RecommendationCandidate> favorites;
     private List<ReviewedProduct> reviews;
     @Builder.Default
+    private List<RecommendationCandidate> viewed = List.of();
+    @Builder.Default
+    private List<RecommendationCandidate> clicked = List.of();
+    @Builder.Default
     private Map<String, Double> categoryDistribution = Map.of();
     @Builder.Default
     private List<String> favoriteTags = List.of();
@@ -25,6 +29,8 @@ public class UserBehaviorData {
                 .purchases(List.of())
                 .favorites(List.of())
                 .reviews(List.of())
+                .viewed(List.of())
+                .clicked(List.of())
                 .categoryDistribution(Map.of())
                 .favoriteTags(List.of())
                 .purchaseFrequency(0)
@@ -36,6 +42,8 @@ public class UserBehaviorData {
         return (purchases == null || purchases.isEmpty())
                 && (favorites == null || favorites.isEmpty())
                 && (reviews == null || reviews.isEmpty())
+                && (viewed == null || viewed.isEmpty())
+                && (clicked == null || clicked.isEmpty())
                 && (categoryDistribution == null || categoryDistribution.isEmpty())
                 && (favoriteTags == null || favoriteTags.isEmpty());
     }

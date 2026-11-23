@@ -23,4 +23,7 @@ public class RecommendationQuery {
 
     @Positive(message = "种子商品ID必须大于0")
     private Long productId;
+
+    @Size(max = 64, message = "会话ID不能超过64个字符")
+    private String sessionId;
 }

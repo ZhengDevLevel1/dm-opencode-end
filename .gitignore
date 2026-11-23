@@ -25,6 +25,10 @@ pnpm-debug.log*
 # Maven 编译产物 / 打包结果
 target/
 backend/target/
+ai-service/target/
+
+# 本地 AI 服务密钥（通过 spring.config.import 加载）
+ai-service/config/
 
 # 运行日志
 logs/

@@ -13,6 +13,8 @@ import com.flower.mall.module.order.mapper.OrderItemMapper;
 import com.flower.mall.module.order.mapper.OrderMapper;
 import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.recommendation.entity.UserProductInteraction;
+import com.flower.mall.module.recommendation.mapper.UserProductInteractionMapper;
 import com.flower.mall.module.recommendation.model.RecommendationCandidate;
 import com.flower.mall.module.recommendation.model.UserBehaviorData;
 import com.flower.mall.module.review.entity.Review;
@@ -44,6 +46,7 @@ public class UserBehaviorService {
     private final ProductMapper productMapper;
     private final UserFavoriteMapper favoriteMapper;
     private final ReviewMapper reviewMapper;
+    private final UserProductInteractionMapper interactionMapper;
     private final MetricConfigService metricConfigService;
     private final AppProperties properties;
     private final Map<Long, CachedBehavior> cache = new ConcurrentHashMap<>();
@@ -99,11 +102,17 @@ public class UserBehaviorService {
         List<Review> reviews = reviewMapper.selectList(Wrappers.<Review>lambdaQuery()
                 .eq(Review::getUserId, userId)
                 .eq(Review::getStatus, ReviewStatus.VISIBLE.name()));
+        List<UserProductInteraction> interactions = interactionMapper.selectList(
+                Wrappers.<UserProductInteraction>lambdaQuery()
+                        .eq(UserProductInteraction::getUserId, userId)
+                        .orderByDesc(UserProductInteraction::getUpdatedAt)
+                        .last("LIMIT 50"));
 
         List<Long> productIds = new ArrayList<>();
         productIds.addAll(purchasedQuantities.keySet());
         productIds.addAll(favorites.stream().map(UserFavorite::getProductId).toList());
         productIds.addAll(reviews.stream().map(Review::getProductId).toList());
+        productIds.addAll(interactions.stream().map(UserProductInteraction::getProductId).toList());
         List<Long> distinctIds = productIds.stream().distinct().toList();
         Map<Long, Product> products = distinctIds.isEmpty()
                 ? Map.of()
@@ -129,6 +138,18 @@ public class UserBehaviorService {
                             toCandidate(product), review.getRating());
                 })
                 .filter(value -> value != null)
+                .toList();
+        List<RecommendationCandidate> viewedProducts = interactions.stream()
+                .filter(interaction -> interaction.getViewCount() != null && interaction.getViewCount() > 0)
+                .map(interaction -> products.get(interaction.getProductId()))
+                .filter(product -> product != null)
+                .map(this::toCandidate)
+                .toList();
+        List<RecommendationCandidate> clickedProducts = interactions.stream()
+                .filter(interaction -> interaction.getClickCount() != null && interaction.getClickCount() > 0)
+                .map(interaction -> products.get(interaction.getProductId()))
+                .filter(product -> product != null)
+                .map(this::toCandidate)
                 .toList();
 
         Map<String, Double> categoryDistribution = new LinkedHashMap<>();
@@ -161,6 +182,8 @@ public class UserBehaviorService {
                 .purchases(purchases)
                 .favorites(favoriteProducts)
                 .reviews(reviewedProducts)
+                .viewed(viewedProducts)
+                .clicked(clickedProducts)
                 .categoryDistribution(categoryDistribution)
                 .favoriteTags(new ArrayList<>(favoriteTags))
                 .purchaseFrequency(recentOrders.size())

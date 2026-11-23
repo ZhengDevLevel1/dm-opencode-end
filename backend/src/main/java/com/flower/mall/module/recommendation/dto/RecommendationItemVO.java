@@ -15,6 +15,10 @@ import java.util.List;
 public class RecommendationItemVO {
 
     private Long productId;
+    private int position;
+    private String strategy;
+    private String experimentId;
+    private String variant;
     private String name;
     private String imageUrl;
     private String category;

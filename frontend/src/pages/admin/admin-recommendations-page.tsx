@@ -4,22 +4,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   BarChart3,
+  FlaskConical,
   Layers,
+  MousePointerClick,
+  Pause,
+  Play,
+  Plus,
   RefreshCw,
   RotateCcw,
   Save,
   Sparkles,
+  Square,
   Target,
+  TrendingUp,
   UserRound,
   WandSparkles,
 } from "lucide-react";
-import { adminService } from "@/lib/services";
+import { adminService, recommendationOpsService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { toast } from "@/stores/toast";
 import type {
+  RecommendationExperimentRequest,
+  RecommendationExperimentVO,
   RecommendationLogQuery,
   RecommendationLogVO,
   RecommendationScene,
@@ -30,6 +39,7 @@ import type {
 } from "@/types/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -43,6 +53,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 const LOG_PAGE_SIZE = 10;
 
@@ -91,6 +102,71 @@ const sceneDescriptions: Record<RecommendationScene, string> = {
   product: "商品详情相似推荐，以当前商品为种子并排除自身。",
   garden: "旧版花园入口，沿用首页权重。",
 };
+
+const sceneLabels: Record<string, string> = {
+  home: "首页",
+  catalog: "全部花礼",
+  recommendations: "智能推荐",
+  product: "商品详情",
+  garden: "花园",
+  UNKNOWN: "未知场景",
+};
+
+const effectDayOptions = [
+  { value: "7", label: "近 7 天" },
+  { value: "30", label: "近 30 天" },
+  { value: "90", label: "近 90 天" },
+];
+
+const experimentSceneOptions = [
+  { value: "home", label: "首页推荐" },
+  { value: "catalog", label: "全部花礼" },
+  { value: "recommendations", label: "智能推荐" },
+  { value: "product", label: "商品详情" },
+];
+
+const experimentModeOptions = [
+  { value: "AB", label: "A/B 分流" },
+  { value: "SHADOW", label: "影子模式" },
+];
+
+const experimentStatusOptions = [
+  { value: "PAUSED", label: "已暂停" },
+  { value: "RUNNING", label: "运行中" },
+  { value: "STOPPED", label: "已停止" },
+];
+
+const experimentMetricOptions = [
+  { value: "CTR", label: "点击率 CTR" },
+  { value: "CVR", label: "转化率 CVR" },
+];
+
+const emptyExperiment: RecommendationExperimentRequest = {
+  id: "",
+  name: "",
+  scene: "home",
+  mode: "AB",
+  trafficPercent: 10,
+  status: "PAUSED",
+  primaryMetric: "CTR",
+  configJson: "",
+};
+
+function experimentStatusVariant(status: string) {
+  if (status === "RUNNING") return "success" as const;
+  if (status === "PAUSED") return "warning" as const;
+  return "secondary" as const;
+}
+
+function experimentStatusLabel(status: string) {
+  return experimentStatusOptions.find((option) => option.value === status)?.label ?? status;
+}
+
+function variantLabel(variant: string) {
+  if (variant === "TREATMENT") return "实验组";
+  if (variant === "CONTROL") return "对照组";
+  return variant || "默认";
+}
 
 function weightsSum(weights: RecommendationWeightRequest): number {
   return round3(
@@ -160,7 +236,7 @@ export function AdminRecommendationsPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">推荐运营</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          按场景调整推荐权重、查看离线评估与最近推荐日志。每个场景的四项权重之和必须严格等于 1。
+          按场景调整推荐权重、查看曝光点击效果与实验分流，并追踪最近推荐日志。每个场景的四项权重之和必须严格等于 1。
         </p>
       </div>
 
@@ -182,6 +258,18 @@ export function AdminRecommendationsPage() {
             <span className="inline-flex items-center gap-1.5">
               <Target className="h-3.5 w-3.5" />
               效果评估
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="effects">
+            <span className="inline-flex items-center gap-1.5">
+              <MousePointerClick className="h-3.5 w-3.5" />
+              曝光效果
+            </span>
+          </TabsTrigger>
+          <TabsTrigger value="experiments">
+            <span className="inline-flex items-center gap-1.5">
+              <FlaskConical className="h-3.5 w-3.5" />
+              实验管理
             </span>
           </TabsTrigger>
           <TabsTrigger value="stats">
@@ -206,6 +294,12 @@ export function AdminRecommendationsPage() {
         </TabsContent>
         <TabsContent value="evaluation" className="mt-4">
           <EvaluationSection />
+        </TabsContent>
+        <TabsContent value="effects" className="mt-4">
+          <EffectsSection />
+        </TabsContent>
+        <TabsContent value="experiments" className="mt-4">
+          <ExperimentsSection />
         </TabsContent>
         <TabsContent value="stats" className="mt-4">
           <StatsSection />
@@ -788,6 +882,556 @@ function EvaluationSection() {
           评估生成于 {formatDateTime(evalData?.generatedAt)}
         </p>
       </section>
+    </div>
+  );
+}
+
+function EffectsSection() {
+  const [days, setDays] = useState("30");
+  const effects = useQuery({
+    queryKey: queryKeys.adminRecommendationEffects(Number(days)),
+    queryFn: () => recommendationOpsService.effects(Number(days)),
+    staleTime: 30_000,
+  });
+
+  const data = effects.data;
+  const daily = useMemo(
+    () => [...(data?.daily ?? [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14),
+    [data?.daily],
+  );
+
+  if (effects.isLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Skeleton key={index} className="h-20 w-full rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (effects.isError) {
+    return <ErrorState onRetry={() => effects.refetch()} />;
+  }
+
+  return (
+    <div className="space-y-4">
+      <section className="ui-card p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">推荐曝光效果</h2>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              统计推荐曝光、点击、加购与下单归因，窗口 {data?.startDate ?? "-"} 至 {data?.endDate ?? "-"}。
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <CustomSelect
+              id="effect-days"
+              value={days}
+              onChange={setDays}
+              options={effectDayOptions}
+              className="w-32"
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => effects.refetch()}
+              loading={effects.isFetching}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              刷新
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+          <EvalStat icon={Activity} label="曝光" value={formatNumber(data?.impressions)} />
+          <EvalStat icon={MousePointerClick} label="点击" value={formatNumber(data?.clicks)} />
+          <EvalStat icon={Sparkles} label="加购" value={formatNumber(data?.addToCarts)} />
+          <EvalStat icon={Target} label="下单" value={formatNumber(data?.orders)} />
+          <EvalStat icon={BarChart3} label="点击率 CTR" value={formatPercent(data?.ctr)} />
+          <EvalStat icon={WandSparkles} label="转化率 CVR" value={formatPercent(data?.cvr)} />
+          <EvalStat icon={Layers} label="加购率" value={formatPercent(data?.addToCartRate)} />
+          <EvalStat icon={TrendingUp} label="下单率" value={formatPercent(data?.orderRate)} />
+        </div>
+      </section>
+
+      <section className="ui-card overflow-hidden">
+        <div className="border-b border-border/60 px-4 py-3">
+          <h2 className="text-sm font-semibold tracking-tight">按场景</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">识别不同推荐位对点击与转化的贡献。</p>
+        </div>
+        {Object.keys(data?.byScene ?? {}).length === 0 ? (
+          <p className="px-4 py-8 text-center text-xs text-muted-foreground">当前窗口暂无场景曝光数据。</p>
+        ) : (
+          <TableWrap>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>场景</TH>
+                  <TH className="text-right">曝光</TH>
+                  <TH className="text-right">点击</TH>
+                  <TH className="text-right">加购</TH>
+                  <TH className="text-right">下单</TH>
+                  <TH className="text-right">CTR</TH>
+                  <TH className="text-right">CVR</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {Object.entries(data?.byScene ?? {}).map(([scene, item]) => (
+                  <TR key={scene}>
+                    <TD className="font-medium">{sceneLabels[scene] ?? scene}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.impressions)}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.clicks)}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.addToCarts)}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.orders)}</TD>
+                    <TD className="text-right tabular">{formatPercent(item.ctr)}</TD>
+                    <TD className="text-right tabular">{formatPercent(item.cvr)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableWrap>
+        )}
+      </section>
+
+      <section className="ui-card overflow-hidden">
+        <div className="border-b border-border/60 px-4 py-3">
+          <h2 className="text-sm font-semibold tracking-tight">实验变体</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">对照组与实验组的曝光和转化对比。</p>
+        </div>
+        {(data?.byVariant ?? []).length === 0 ? (
+          <p className="px-4 py-8 text-center text-xs text-muted-foreground">当前窗口暂无实验分流数据。</p>
+        ) : (
+          <TableWrap>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>实验</TH>
+                  <TH>变体</TH>
+                  <TH className="text-right">曝光</TH>
+                  <TH className="text-right">点击</TH>
+                  <TH className="text-right">下单</TH>
+                  <TH className="text-right">CTR</TH>
+                  <TH className="text-right">CVR</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {(data?.byVariant ?? []).map((item) => (
+                  <TR key={`${item.experimentId}-${item.variant}`}>
+                    <TD className="font-medium">{item.experimentId || "默认策略"}</TD>
+                    <TD>
+                      <Badge variant={item.variant === "TREATMENT" ? "default" : "secondary"}>
+                        {variantLabel(item.variant)}
+                      </Badge>
+                    </TD>
+                    <TD className="text-right tabular">{formatNumber(item.impressions)}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.clicks)}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.orders)}</TD>
+                    <TD className="text-right tabular">{formatPercent(item.ctr)}</TD>
+                    <TD className="text-right tabular">{formatPercent(item.cvr)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableWrap>
+        )}
+      </section>
+
+      <section className="ui-card overflow-hidden">
+        <div className="border-b border-border/60 px-4 py-3">
+          <h2 className="text-sm font-semibold tracking-tight">按天趋势</h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">最近 14 天的推荐效果变化。</p>
+        </div>
+        {daily.length === 0 ? (
+          <p className="px-4 py-8 text-center text-xs text-muted-foreground">当前窗口暂无按天数据。</p>
+        ) : (
+          <TableWrap>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>日期</TH>
+                  <TH className="text-right">曝光</TH>
+                  <TH className="text-right">点击</TH>
+                  <TH className="text-right">下单</TH>
+                  <TH className="text-right">CTR</TH>
+                  <TH className="text-right">CVR</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {daily.map((item) => (
+                  <TR key={item.date}>
+                    <TD className="font-medium">{item.date}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.impressions)}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.clicks)}</TD>
+                    <TD className="text-right tabular">{formatNumber(item.orders)}</TD>
+                    <TD className="text-right tabular">{formatPercent(item.ctr)}</TD>
+                    <TD className="text-right tabular">{formatPercent(item.cvr)}</TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableWrap>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ExperimentsSection() {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<RecommendationExperimentVO | null>(null);
+  const [form, setForm] = useState<RecommendationExperimentRequest>({ ...emptyExperiment });
+
+  const experiments = useQuery({
+    queryKey: queryKeys.adminRecommendationExperiments,
+    queryFn: recommendationOpsService.experiments,
+    staleTime: 30_000,
+  });
+
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.adminRecommendationExperiments });
+    void queryClient.invalidateQueries({ queryKey: ["admin", "recommendation-effects"] });
+  };
+
+  const save = useMutation({
+    mutationFn: recommendationOpsService.saveExperiment,
+    onSuccess: () => {
+      toast.success("实验已保存");
+      setOpen(false);
+      setEditing(null);
+      setForm({ ...emptyExperiment });
+      invalidate();
+    },
+    onError: (error) => toast.error("保存实验失败", getErrorMessage(error)),
+  });
+
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      recommendationOpsService.updateExperimentStatus(id, status),
+    onSuccess: () => {
+      toast.success("实验状态已更新");
+      invalidate();
+    },
+    onError: (error) => toast.error("更新实验状态失败", getErrorMessage(error)),
+  });
+
+  const openCreate = () => {
+    setEditing(null);
+    setForm({ ...emptyExperiment });
+    setOpen(true);
+  };
+
+  const openEdit = (experiment: RecommendationExperimentVO) => {
+    setEditing(experiment);
+    setForm({
+      id: experiment.id,
+      name: experiment.name,
+      scene: experiment.scene,
+      mode: experiment.mode,
+      trafficPercent: experiment.trafficPercent,
+      status: experiment.status,
+      primaryMetric: experiment.primaryMetric,
+      configJson: experiment.configJson ?? "",
+    });
+    setOpen(true);
+  };
+
+  const handleSave = () => {
+    const id = form.id.trim();
+    const name = form.name.trim();
+    const trafficPercent = Number(form.trafficPercent);
+    if (!id || !name) {
+      toast.error("请填写实验 ID 和名称");
+      return;
+    }
+    if (!Number.isFinite(trafficPercent) || trafficPercent < 0 || trafficPercent > 100) {
+      toast.error("流量比例需在 0 到 100 之间");
+      return;
+    }
+    const configJson = form.configJson?.trim();
+    if (configJson) {
+      try {
+        JSON.parse(configJson);
+      } catch {
+        toast.error("配置 JSON 格式不正确");
+        return;
+      }
+    }
+    save.mutate({
+      ...form,
+      id,
+      name,
+      trafficPercent,
+      configJson: configJson || undefined,
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <section className="ui-card p-4 md:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight">推荐实验</h2>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              管理 A/B 与影子实验，控制流量比例、主指标和运行状态；效果数据在“曝光效果”中查看。
+            </p>
+          </div>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="h-3.5 w-3.5" />
+            新建实验
+          </Button>
+        </div>
+      </section>
+
+      <section className="ui-card overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <FlaskConical className="h-3.5 w-3.5" />
+            共 {experiments.data?.length ?? 0} 个实验
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => experiments.refetch()}
+            loading={experiments.isFetching}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            刷新
+          </Button>
+        </div>
+
+        {experiments.isLoading ? (
+          <div className="space-y-2 p-4">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-12 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : experiments.isError ? (
+          <div className="p-4">
+            <ErrorState onRetry={() => experiments.refetch()} />
+          </div>
+        ) : (experiments.data?.length ?? 0) === 0 ? (
+          <EmptyState
+            bare
+            title="还没有推荐实验"
+            description="创建一个 A/B 或影子实验，观察不同推荐策略的点击与转化表现。"
+            action={
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="h-3.5 w-3.5" />
+                新建实验
+              </Button>
+            }
+          />
+        ) : (
+          <TableWrap>
+            <Table>
+              <THead>
+                <TR>
+                  <TH>实验</TH>
+                  <TH>场景</TH>
+                  <TH>模式</TH>
+                  <TH className="text-right">流量</TH>
+                  <TH>状态</TH>
+                  <TH>主指标</TH>
+                  <TH>更新时间</TH>
+                  <TH className="text-right">操作</TH>
+                </TR>
+              </THead>
+              <TBody>
+                {(experiments.data ?? []).map((experiment) => (
+                  <TR key={experiment.id}>
+                    <TD>
+                      <p className="font-medium">{experiment.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{experiment.id}</p>
+                    </TD>
+                    <TD>{sceneLabels[experiment.scene] ?? experiment.scene}</TD>
+                    <TD>{experiment.mode === "SHADOW" ? "影子" : "A/B"}</TD>
+                    <TD className="text-right tabular">{experiment.trafficPercent}%</TD>
+                    <TD>
+                      <Badge variant={experimentStatusVariant(experiment.status)}>
+                        {experimentStatusLabel(experiment.status)}
+                      </Badge>
+                    </TD>
+                    <TD>{experiment.primaryMetric}</TD>
+                    <TD className="text-[11px] text-muted-foreground">
+                      {formatDateTime(experiment.updatedAt)}
+                    </TD>
+                    <TD>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openEdit(experiment)}
+                          disabled={updateStatus.isPending}
+                        >
+                          编辑
+                        </Button>
+                        {experiment.status === "RUNNING" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateStatus.mutate({ id: experiment.id, status: "PAUSED" })}
+                            disabled={updateStatus.isPending}
+                          >
+                            <Pause className="h-3 w-3" />
+                            暂停
+                          </Button>
+                        ) : experiment.status !== "STOPPED" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateStatus.mutate({ id: experiment.id, status: "RUNNING" })}
+                            disabled={updateStatus.isPending}
+                          >
+                            <Play className="h-3 w-3" />
+                            启动
+                          </Button>
+                        ) : null}
+                        {experiment.status !== "STOPPED" ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive"
+                            onClick={() => updateStatus.mutate({ id: experiment.id, status: "STOPPED" })}
+                            disabled={updateStatus.isPending}
+                          >
+                            <Square className="h-3 w-3" />
+                            停止
+                          </Button>
+                        ) : null}
+                      </div>
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </TableWrap>
+        )}
+      </section>
+
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) {
+            setEditing(null);
+            setForm({ ...emptyExperiment });
+          }
+        }}
+        title={editing ? "编辑推荐实验" : "新建推荐实验"}
+        description="实验 ID 用于归因与事件去重；保存后可通过状态按钮启动或暂停。"
+        size="lg"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleSave} loading={save.isPending}>
+              <Save className="h-4 w-4" />
+              保存实验
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="experiment-id">实验 ID</Label>
+              <Input
+                id="experiment-id"
+                value={form.id}
+                onChange={(event) => setForm((prev) => ({ ...prev, id: event.target.value }))}
+                placeholder="home_ab_2026q4"
+                disabled={Boolean(editing)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="experiment-name">实验名称</Label>
+              <Input
+                id="experiment-name"
+                value={form.name}
+                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="首页推荐 A/B 实验"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="experiment-scene">推荐场景</Label>
+              <CustomSelect
+                id="experiment-scene"
+                value={form.scene}
+                onChange={(value) => setForm((prev) => ({ ...prev, scene: value }))}
+                options={experimentSceneOptions}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="experiment-mode">实验模式</Label>
+              <CustomSelect
+                id="experiment-mode"
+                value={form.mode}
+                onChange={(value) => setForm((prev) => ({ ...prev, mode: value }))}
+                options={experimentModeOptions}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="experiment-traffic">流量比例（%）</Label>
+              <Input
+                id="experiment-traffic"
+                type="number"
+                min={0}
+                max={100}
+                value={form.trafficPercent}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, trafficPercent: Number(event.target.value) }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="experiment-status">状态</Label>
+              <CustomSelect
+                id="experiment-status"
+                value={form.status}
+                onChange={(value) => setForm((prev) => ({ ...prev, status: value }))}
+                options={experimentStatusOptions}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="experiment-metric">主指标</Label>
+              <CustomSelect
+                id="experiment-metric"
+                value={form.primaryMetric}
+                onChange={(value) => setForm((prev) => ({ ...prev, primaryMetric: value }))}
+                options={experimentMetricOptions}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="experiment-config">配置 JSON（可选）</Label>
+            <Textarea
+              id="experiment-config"
+              value={form.configJson ?? ""}
+              onChange={(event) => setForm((prev) => ({ ...prev, configJson: event.target.value }))}
+              rows={6}
+              placeholder='{"treatmentStrategy":"VECTOR_HYBRID","controlStrategy":"CONTENT_TFIDF_MULTI_FACTOR"}'
+              className="font-mono text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              留空时后端使用默认策略；保存前会校验 JSON 格式。
+            </p>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

@@ -29,6 +29,7 @@ import com.flower.mall.module.payment.mapper.PaymentRecordMapper;
 import com.flower.mall.module.product.entity.Product;
 import com.flower.mall.module.product.mapper.ProductMapper;
 import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
+import com.flower.mall.module.recommendation.service.RecommendationEventService;
 import com.flower.mall.module.recommendation.service.UserBehaviorService;
 import com.flower.mall.module.user.entity.User;
 import com.flower.mall.module.user.mapper.UserMapper;
@@ -64,6 +65,7 @@ public class OrderService {
     private final CacheService cacheService;
     private final RecommendationCatalogCache catalogCache;
     private final UserBehaviorService userBehaviorService;
+    private final RecommendationEventService recommendationEventService;
     private final AddressService addressService;
 
     @Transactional
@@ -153,6 +155,7 @@ public class OrderService {
         cartService.removeItems(sortedItems);
         evictProductCaches(sortedItems.stream().map(CartItem::getProductId).toList());
         userBehaviorService.evict(userId);
+        recommendationEventService.recordOrder(order.getId(), userId, orderItems, sortedItems);
         Order saved = orderMapper.selectById(order.getId());
         OrderVO vo = OrderVO.from(saved, orderItems);
         fillBuyerInfo(List.of(saved), List.of(vo));

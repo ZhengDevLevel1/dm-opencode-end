@@ -101,6 +101,28 @@ INSERT INTO operation_log (id, user_id, username, module, operation, method, req
 (1, 1, 'admin', '认证', '用户登录', 'AuthController.login', '/api/auth/login', 'POST', '{"username":"admin"}', 1, NULL, '127.0.0.1', 42, DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
 (2, 2, 'staff', '履约管理', '订单接单', 'StaffOrderController.accept', '/api/staff/orders/1/accept', 'POST', NULL, 1, NULL, '127.0.0.1', 31, DATEADD('DAY', -5, CURRENT_TIMESTAMP));
 
+INSERT INTO ai_knowledge_document (id, title, category, content, source, enabled) VALUES
+(1, '玫瑰花语与送花场景', '花语', '红玫瑰代表热烈的爱情与告白，适合情人节、七夕、纪念日和表白；香槟玫瑰代表温柔与长久，适合纪念日和求婚。', '内置知识库', 1),
+(2, '鲜花养护基础', '养护', '收到花束后先拆除包装，斜剪花枝 2 至 3 厘米，去除浸水叶片，使用干净花瓶和清水，每 2 至 3 天换水。', '内置知识库', 1),
+(3, '配送、退款与售后说明', '售后', '鲜花属于易损耗商品，签收后如发现明显质量问题，请在 24 小时内联系客服并提供照片。', '内置知识库', 1);
+
+INSERT INTO ai_experiment (id, name, scene, mode, traffic_percent, status, primary_metric, config_json) VALUES
+('rec-vector-ab', 'TF-IDF vs 向量召回 A/B', 'home', 'AB', 10, 'PAUSED', 'CTR', '{"control":"TF_IDF","treatment":"VECTOR"}');
+
+INSERT INTO ai_call_log (id, request_id, user_id, user_role, scene, model, status, latency_ms, first_token_ms, prompt_tokens, completion_tokens, total_tokens, llm_calls, estimated_cost, request_chars, response_chars, created_at) VALUES
+(1, 'test-ai-1', 3, 'CUSTOMER', 'CHAT', 'deepseek-chat', 'SUCCESS', 1200, 300, 100, 200, 300, 2, 0.000600, 20, 120, DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+(2, 'test-ai-2', 1, 'ADMIN', 'PRODUCT_COPY', 'deepseek-chat', 'FALLBACK', 500, NULL, 0, 0, 0, 0, 0, 10, 0, CURRENT_TIMESTAMP);
+
+INSERT INTO recommendation_event (id, event_id, request_id, event_type, user_id, session_id, product_id, position, scene, strategy, occurred_at) VALUES
+(1, 'evt-1', 'req-1', 'IMPRESSION', 3, 's-1', 1, 1, 'home', 'CONTENT_TFIDF_MULTI_FACTOR', DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+(2, 'evt-2', 'req-1', 'CLICK', 3, 's-1', 1, 1, 'home', 'CONTENT_TFIDF_MULTI_FACTOR', DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+(3, 'evt-3', 'req-2', 'IMPRESSION', 3, 's-1', 6, 2, 'home', 'CONTENT_TFIDF_MULTI_FACTOR', DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+(4, 'evt-4', 'req-2', 'ADD_TO_CART', 3, 's-1', 6, 2, 'home', 'CONTENT_TFIDF_MULTI_FACTOR', DATEADD('DAY', -1, CURRENT_TIMESTAMP));
+
+INSERT INTO user_product_interaction (id, subject_key, user_id, session_id, product_id, view_count, click_count, total_dwell_ms, last_viewed_at, last_clicked_at) VALUES
+(1, 'u:3', 3, NULL, 1, 3, 2, 45000, DATEADD('DAY', -1, CURRENT_TIMESTAMP), DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+(2, 'u:3', 3, NULL, 6, 2, 1, 20000, DATEADD('DAY', -2, CURRENT_TIMESTAMP), DATEADD('DAY', -2, CURRENT_TIMESTAMP));
+
 ALTER TABLE sys_user ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE product ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE inventory_record ALTER COLUMN id RESTART WITH 100;

@@ -1,0 +1,42 @@
+services:
+  nacos:
+    image: nacos/nacos-server:v2.3.2
+    container_name: flower-nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+      JVM_XMS: 256m
+      JVM_XMX: 512m
+      JVM_XMN: 128m
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+      - "9849:9849"
+    volumes:
+      # 修改这里：使用本地目录挂载
+      - ./nacos_data:/home/nacos/data
+      - ./nacos_logs:/home/nacos/logs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8848/nacos/v1/console/health/readiness"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    container_name: flower-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      # 修改这里：使用本地目录挂载
+      - ./qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+# 删除了原本底部的 volumes: 声明部分，因为已经改用本地目录

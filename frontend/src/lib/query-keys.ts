@@ -42,6 +42,14 @@ export const queryKeys = {
     ["admin", "recommendation-logs", params] as const,
   adminRecommendationEvaluation: ["admin", "recommendation-evaluation"] as const,
   adminRecommendationStats: ["admin", "recommendation-stats"] as const,
+  adminRecommendationEffects: (days: number) => ["admin", "recommendation-effects", days] as const,
+  adminRecommendationExperiments: ["admin", "recommendation-experiments"] as const,
+  adminAiHealth: ["admin", "ai", "health"] as const,
+  adminAiMetrics: (days: number) => ["admin", "ai", "metrics", days] as const,
+  adminAiCalls: (params: object) => ["admin", "ai", "calls", params] as const,
+  aiConversations: ["ai", "conversations"] as const,
+  aiConversation: (id: number) => ["ai", "conversations", id] as const,
+  adminAiKnowledge: (params: object) => ["admin", "ai", "knowledge", params] as const,
 };
 
 export const queryPolicy = {

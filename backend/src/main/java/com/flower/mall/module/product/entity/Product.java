@@ -39,6 +39,10 @@ public class Product {
 
     private String description;
 
+    private String aiTags;
+
+    private String aiSellingPoints;
+
     private String seasonSuitability;
 
     private Integer salesCount;

@@ -28,6 +28,8 @@ public class ProductVO {
     private Integer stock;
     private String imageUrl;
     private String description;
+    private String aiTags;
+    private String aiSellingPoints;
     private String seasonSuitability;
     private String seasonLabel;
     private String priceBand;
@@ -54,6 +56,8 @@ public class ProductVO {
                 .stock(product.getStock())
                 .imageUrl(product.getImageUrl())
                 .description(product.getDescription())
+                .aiTags(product.getAiTags())
+                .aiSellingPoints(product.getAiSellingPoints())
                 .seasonSuitability(season.name())
                 .seasonLabel(season.getLabel())
                 .priceBand(priceBand(product.getPrice()))

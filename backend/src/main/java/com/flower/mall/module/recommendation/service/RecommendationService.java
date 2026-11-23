@@ -82,6 +82,8 @@ public class RecommendationService {
     private final RecommendationLogMapper logMapper;
     private final UserMapper userMapper;
     private final RecommendationEngine engine;
+    private final RecommendationExperimentService experimentService;
+    private final VectorRecallService vectorRecallService;
     private final ObjectMapper objectMapper;
     private final AppProperties properties;
     private final MetricConfigService metricConfigService;
@@ -106,9 +108,36 @@ public class RecommendationService {
                 weights,
                 properties.getRecommendation().getCandidateLimit(),
                 Math.min(Math.max(query.getLimit(), 1), 50));
+        String requestId = "rec-" + java.util.UUID.randomUUID();
+        String subject = authUser != null
+                ? "u:" + authUser.getId()
+                : "s:" + (query.getSessionId() == null ? "anon" : query.getSessionId());
+        RecommendationExperimentService.Assignment assignment =
+                experimentService.assign(context.sceneCode(), subject);
+        List<ScoredProduct> finalItems = result.items();
+        if (assignment.treatment()) {
+            List<Long> vectorIds = vectorRecallService.recall(
+                    authUser == null ? null : authUser.getId(),
+                    query.getSessionId(),
+                    context.sceneCode(),
+                    context.seedProductId(),
+                    Math.max(result.items().size(), 20));
+            finalItems = vectorRecallService.rerank(result.items(), vectorIds);
+        }
+        List<RecommendationItemVO> itemVOs = finalItems.stream().map(this::toItemVO).toList();
+        for (int i = 0; i < itemVOs.size(); i++) {
+            RecommendationItemVO item = itemVOs.get(i);
+            item.setPosition(i + 1);
+            item.setStrategy(assignment.strategy());
+            item.setExperimentId(assignment.experimentId());
+            item.setVariant(assignment.variant());
+        }
 
         RecommendationResponse response = RecommendationResponse.builder()
-                .strategy(STRATEGY)
+                .requestId(requestId)
+                .strategy(assignment.strategy())
+                .experimentId(assignment.experimentId())
+                .variant(assignment.variant())
                 .coldStart(result.coldStart())
                 .season(result.context().season().name())
                 .seasonLabel(result.context().season().getLabel())
@@ -119,9 +148,11 @@ public class RecommendationService {
                 .mode(result.mode().code())
                 .generatedAt(result.context().generatedAt())
                 .weights(RecommendationWeightsVO.from(result.weights()))
-                .items(result.items().stream().map(this::toItemVO).toList())
+                .items(itemVOs)
                 .build();
-        saveLog(authUser == null ? null : authUser.getId(), response, result);
+        saveLog(authUser == null ? null : authUser.getId(), response,
+                new RecommendationResult(result.context(), result.weights(), result.coldStart(),
+                        result.mode(), finalItems));
         return response;
     }
 
@@ -602,8 +633,13 @@ public class RecommendationService {
     private void saveLog(Long userId, RecommendationResponse response, RecommendationResult result) {
         try {
             RecommendationLog logEntity = new RecommendationLog();
+            logEntity.setRequestId(response.getRequestId());
             logEntity.setUserId(userId);
             logEntity.setScene(result.context().sceneCode());
+            logEntity.setStrategy(response.getStrategy());
+            logEntity.setExperimentId(response.getExperimentId());
+            logEntity.setVariant(response.getVariant());
+            logEntity.setMode(response.getMode());
             logEntity.setFestival(result.context().festival());
             logEntity.setSeason(result.context().season().name());
             logEntity.setColdStart(result.coldStart() ? 1 : 0);

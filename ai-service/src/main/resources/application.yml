@@ -1,0 +1,62 @@
+server:
+  port: ${AI_SERVICE_PORT:8081}
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+  tomcat:
+    connection-timeout: 30s
+
+spring:
+  application:
+    name: flower-ai-service
+  config:
+    import:
+      - optional:file:./config/application-local.yml
+      - optional:file:./ai-service/config/application-local.yml
+  mvc:
+    async:
+      request-timeout: 120000
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${AI_DB_URL:jdbc:mysql://localhost:3306/flower_shop?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${AI_DB_USERNAME:root}
+    password: ${AI_DB_PASSWORD:1234}
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
+      connection-timeout: 3000
+      read-only: true
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Shanghai
+
+ai:
+  internal-token: ${AI_INTERNAL_TOKEN:flower-ai-internal-dev-token}
+  chat-context-max-messages: ${AI_CHAT_CONTEXT_MAX_MESSAGES:40}
+  chat-context-max-chars: ${AI_CHAT_CONTEXT_MAX_CHARS:12000}
+  qdrant:
+    base-url: ${QDRANT_URL:http://127.0.0.1:6333}
+    product-collection: ${QDRANT_PRODUCT_COLLECTION:flower_products}
+    knowledge-collection: ${QDRANT_KNOWLEDGE_COLLECTION:flower_knowledge}
+    vector-size: 1024
+  siliconflow:
+    base-url: ${SILICONFLOW_BASE_URL:https://api.siliconflow.cn/v1}
+    api-key: ${SILICONFLOW_API_KEY:}
+    embedding-model: ${SILICONFLOW_EMBEDDING_MODEL:BAAI/bge-m3}
+    rerank-model: ${SILICONFLOW_RERANK_MODEL:BAAI/bge-reranker-v2-m3}
+  deepseek:
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    api-key: ${DEEPSEEK_API_KEY:}
+    chat-model: ${DEEPSEEK_CHAT_MODEL:deepseek-flash}
+  nacos:
+    enabled: ${NACOS_ENABLED:false}
+    server-addr: ${NACOS_ADDR:127.0.0.1:8848}
+    service-name: ${AI_SERVICE_NAME:flower-ai-service}
+    ip: ${NACOS_IP:127.0.0.1}
+    port: ${AI_SERVICE_PORT:8081}
+
+logging:
+  level:
+    root: info
+    com.flower.ai: debug

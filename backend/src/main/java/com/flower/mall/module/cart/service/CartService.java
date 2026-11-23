@@ -57,6 +57,7 @@ public class CartService {
             targetQuantity = existing.getQuantity() + request.getQuantity();
             validateStock(product, targetQuantity);
             existing.setQuantity(targetQuantity);
+            applyAttribution(existing, request.getAttribution());
             cartItemMapper.updateById(existing);
             return CartItemVO.from(existing, product);
         }
@@ -65,8 +66,23 @@ public class CartService {
         item.setUserId(userId);
         item.setProductId(request.getProductId());
         item.setQuantity(request.getQuantity());
+        applyAttribution(item, request.getAttribution());
         cartItemMapper.insert(item);
         return CartItemVO.from(item, product);
+    }
+
+    private void applyAttribution(CartItem item, com.flower.mall.module.cart.dto.CartAttribution attribution) {
+        if (attribution == null) {
+            return;
+        }
+        item.setSourceRequestId(attribution.getRequestId());
+        item.setSourceEventId(attribution.getEventId());
+        item.setSourceScene(attribution.getScene());
+        item.setSourcePosition(attribution.getPosition());
+        item.setSourceStrategy(attribution.getStrategy());
+        item.setSourceExperimentId(attribution.getExperimentId());
+        item.setSourceVariant(attribution.getVariant());
+        item.setAttributedAt(java.time.LocalDateTime.now());
     }
 
     @Transactional

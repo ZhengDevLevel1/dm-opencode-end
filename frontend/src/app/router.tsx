@@ -12,6 +12,7 @@ const HomePage = lazy(routeLoaders.home);
 const ProductsPage = lazy(routeLoaders.products);
 const ProductDetailPage = lazy(routeLoaders.productDetail);
 const RecommendationsPage = lazy(routeLoaders.recommendations);
+const AiChatPage = lazy(routeLoaders.ai);
 const CartPage = lazy(routeLoaders.cart);
 const CheckoutPage = lazy(routeLoaders.checkout);
 const OrdersPage = lazy(routeLoaders.orders);
@@ -33,6 +34,8 @@ const AdminMetricsPage = lazy(routeLoaders.adminMetrics);
 const AdminUsersPage = lazy(routeLoaders.adminUsers);
 const AdminReviewsPage = lazy(routeLoaders.adminReviews);
 const AdminRecommendationsPage = lazy(routeLoaders.adminRecommendations);
+const AdminAiPage = lazy(routeLoaders.adminAi);
+const AdminMerchantAiPage = lazy(routeLoaders.adminMerchantAi);
 const AdminLogsPage = lazy(routeLoaders.adminLogs);
 const StoreBoardPage = lazy(routeLoaders.storeBoard);
 
@@ -57,6 +60,7 @@ export function AppRoutes() {
           <Route path="products" element={<ProductsPage />} />
           <Route path="products/:id" element={<ProductDetailPage />} />
           <Route path="recommendations" element={<RecommendationsPage />} />
+          <Route path="ai" element={<AiChatPage />} />
 
           <Route
             path="cart"
@@ -209,6 +213,22 @@ export function AppRoutes() {
             element={
               <RequireRole roles={["ADMIN"]}>
                 <AdminRecommendationsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="admin/merchant-ai"
+            element={
+              <RequireRole roles={["ADMIN"]}>
+                <AdminMerchantAiPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="admin/ai"
+            element={
+              <RequireRole roles={["ADMIN"]}>
+                <AdminAiPage />
               </RequireRole>
             }
           />

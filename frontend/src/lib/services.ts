@@ -1,4 +1,35 @@
-import { api } from "./api-client";
+import { api, ApiError } from "./api-client";
+import { getToken } from "./storage";
+import {
+  getRecommendationSessionId,
+  newRecommendationRequestId,
+  recommendationAttribution,
+  rememberRecommendation,
+  trackRecommendationAddToCart,
+} from "./recommendation-tracking";
+import type {
+  AiCallLogQuery,
+  AiCallLogVO,
+  AiChatHandlers,
+  AiChatRequest,
+  AiConversation,
+  AiConversationDetail,
+  AiHealthVO,
+  AiKnowledgeDocument,
+  AiMetricsVO,
+  AiProductCopyApplyRequest,
+  AiProductCopyRequest,
+  AiProductCopyVO,
+  AiReindexVO,
+  AiStatusVO,
+  AiWeightAdviceApplyRequest,
+  AiWeightAdviceRequest,
+  AiWeightAdviceVO,
+  KnowledgeDocumentRequest,
+  RecommendationEffectVO,
+  RecommendationExperimentRequest,
+  RecommendationExperimentVO,
+} from "@/types/api";
 import type {
   AddressSaveRequest,
   AddressVO,
@@ -123,7 +154,14 @@ export const productService = {
 
 export const cartService = {
   list: () => api.get<CartItemVO[]>("/cart"),
-  add: (body: CartAddRequest) => api.post<CartItemVO>("/cart/items", body),
+  add: (body: CartAddRequest) => {
+    const attribution = body.attribution ?? recommendationAttribution(body.productId);
+    const payload = attribution ? { ...body, attribution } : body;
+    return api.post<CartItemVO>("/cart/items", payload).then((item) => {
+      trackRecommendationAddToCart(body.productId, body.quantity);
+      return item;
+    });
+  },
   update: (id: number, body: CartUpdateRequest) =>
     api.put<CartItemVO>(`/cart/items/${id}`, body),
   remove: (id: number) => api.delete<void>(`/cart/items/${id}`),
@@ -173,8 +211,14 @@ export const reviewService = {
 };
 
 export const recommendationService = {
-  get: (params: RecommendationQueryParams) =>
-    api.get<RecommendationResponse>("/recommendations", { query: { ...params } }),
+  get: async (params: RecommendationQueryParams) => {
+    const response = await api.get<RecommendationResponse>("/recommendations", {
+      query: { ...params },
+    });
+    const requestId = response.requestId ?? newRecommendationRequestId();
+    rememberRecommendation(response, requestId);
+    return { ...response, requestId };
+  },
 };
 
 export const staffService = {
@@ -266,4 +310,181 @@ export const adminService = {
   categorySales: () => api.get<CategorySalesVO[]>("/admin/stats/category-sales"),
   orderStatus: () => api.get<OrderStatusVO[]>("/admin/stats/order-status"),
   topProducts: () => api.get<TopProductVO[]>("/admin/stats/top-products"),
+};
+
+
+const aiSessionHeaders = () => ({
+  "X-Session-Id": getRecommendationSessionId(),
+});
+
+export const aiService = {
+  status: () => api.get<AiStatusVO>("/ai/status"),
+
+  conversations: () =>
+    api.get<AiConversation[]>("/ai/conversations", { headers: aiSessionHeaders() }),
+
+  createConversation: () =>
+    api.post<AiConversation>("/ai/conversations", undefined, {
+      headers: aiSessionHeaders(),
+    }),
+
+  conversation: (id: number) =>
+    api.get<AiConversationDetail>(`/ai/conversations/${id}`, {
+      headers: aiSessionHeaders(),
+    }),
+
+  renameConversation: (id: number, title: string) =>
+    api.put<AiConversation>(`/ai/conversations/${id}`, { title }, {
+      headers: aiSessionHeaders(),
+    }),
+
+  deleteConversation: (id: number) =>
+    api.delete<void>(`/ai/conversations/${id}`, { headers: aiSessionHeaders() }),
+
+  batchDeleteConversations: (ids: number[]) =>
+    api.post<{ count: number }>("/ai/conversations/batch-delete", { ids }, {
+      headers: aiSessionHeaders(),
+    }),
+
+  batchPinConversations: (ids: number[], pinned = true) =>
+    api.post<{ count: number }>("/ai/conversations/batch-pin", { ids, pinned }, {
+      headers: aiSessionHeaders(),
+    }),
+
+  chat: async (
+    body: AiChatRequest,
+    handlers: AiChatHandlers = {},
+    signal?: AbortSignal,
+  ) => {
+    const base = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/+$/, "");
+    const sessionId = body.sessionId || getRecommendationSessionId();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      "X-Session-Id": sessionId,
+    };
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const response = await fetch(`${base}/ai/chat`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ...body, sessionId }),
+      signal,
+    });
+    if (!response.ok) {
+      let message = `AI ���񷵻� ${response.status}`;
+      try {
+        const payload = (await response.json()) as { message?: string };
+        if (payload?.message) message = payload.message;
+      } catch {
+        // ignore non-JSON error body
+      }
+      throw new ApiError(message, response.status, response.status);
+    }
+    if (!response.body) {
+      throw new ApiError("��ǰ�������֧����ʽ��Ӧ", 0, 0);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let finished = false;
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      handlers.onDone?.();
+    };
+
+    const dispatch = (block: string) => {
+      let eventName = "message";
+      const dataLines: string[] = [];
+      block.split(/\r?\n/).forEach((line) => {
+        if (line.startsWith("event:")) {
+          eventName = line.slice(6).trim();
+        } else if (line.startsWith("data:")) {
+          dataLines.push(line.slice(5).trim());
+        }
+      });
+      if (dataLines.length === 0) return;
+      let payload: Record<string, unknown> = {};
+      try {
+        payload = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+      } catch {
+        return;
+      }
+      if (eventName === "meta") {
+        handlers.onMeta?.(payload as never);
+      } else if (eventName === "delta") {
+        const content = typeof payload.content === "string" ? payload.content : "";
+        if (content) handlers.onDelta?.(content);
+      } else if (eventName === "products") {
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        handlers.onProducts?.(items as never);
+      } else if (eventName === "citations") {
+        const items = Array.isArray(payload.items) ? payload.items : [];
+        handlers.onCitations?.(items as never);
+      } else if (eventName === "usage") {
+        handlers.onUsage?.(payload as never);
+      } else if (eventName === "error") {
+        const message =
+          typeof payload.message === "string" ? payload.message : "AI ������ʱ������";
+        handlers.onError?.(message);
+      } else if (eventName === "done") {
+        finish();
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary >= 0) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        if (block.trim()) dispatch(block);
+        boundary = buffer.indexOf("\n\n");
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) dispatch(buffer);
+    finish();
+  },
+
+  adminHealth: () => api.get<AiHealthVO>("/admin/ai/health"),
+  adminMetrics: (days = 30) =>
+    api.get<AiMetricsVO>("/admin/ai/metrics", { query: { days } }),
+  adminCalls: (query: AiCallLogQuery) =>
+    api.get<PageResult<AiCallLogVO>>("/admin/ai/calls", { query }),
+  adminReindex: () => api.post<AiReindexVO>("/admin/ai/reindex", undefined, { timeout: 60_000 }),
+  adminKnowledge: (query: { keyword?: string; category?: string; enabled?: boolean } = {}) =>
+    api.get<AiKnowledgeDocument[]>("/admin/ai/knowledge", { query }),
+  createKnowledge: (body: KnowledgeDocumentRequest) =>
+    api.post<AiKnowledgeDocument>("/admin/ai/knowledge", body),
+  updateKnowledge: (id: number, body: KnowledgeDocumentRequest) =>
+    api.put<AiKnowledgeDocument>(`/admin/ai/knowledge/${id}`, body),
+  deleteKnowledge: (id: number) => api.delete<void>(`/admin/ai/knowledge/${id}`),
+  productCopy: (body: AiProductCopyRequest) =>
+    api.post<AiProductCopyVO>("/admin/ai/product-copy", body, { timeout: 30_000 }),
+  applyProductCopy: (body: AiProductCopyApplyRequest) =>
+    api.post<ProductVO>("/admin/ai/product-copy/apply", body),
+  recommendationAdvice: (body: AiWeightAdviceRequest) =>
+    api.post<AiWeightAdviceVO>("/admin/ai/recommendation-advice", body, { timeout: 30_000 }),
+  applyRecommendationAdvice: (body: AiWeightAdviceApplyRequest) =>
+    api.post<RecommendationSceneWeightVO[]>("/admin/ai/recommendation-advice/apply", body),
+};
+
+export const recommendationOpsService = {
+  effects: (days = 30) =>
+    api.get<RecommendationEffectVO>("/admin/recommendations/effects", { query: { days } }),
+  experiments: () =>
+    api.get<RecommendationExperimentVO[]>("/admin/recommendations/experiments"),
+  saveExperiment: (body: RecommendationExperimentRequest) =>
+    api.post<RecommendationExperimentVO>("/admin/recommendations/experiments", body),
+  updateExperimentStatus: (id: string, status: string) =>
+    api.put<RecommendationExperimentVO>(`/admin/recommendations/experiments/${id}/status`, {
+      status,
+    }),
 };

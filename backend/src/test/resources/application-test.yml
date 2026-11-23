@@ -22,6 +22,11 @@ app:
     enabled: false
   recommendation:
     candidate-limit: 60
+  ai:
+    enabled: false
+    chat-enabled: false
+    merchant-enabled: false
+    nacos-enabled: false
   minio:
     enabled: false
 

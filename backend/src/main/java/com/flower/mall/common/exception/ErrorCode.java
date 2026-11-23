@@ -59,7 +59,15 @@ public enum ErrorCode {
     FILE_CATEGORY_INVALID(8005, 400, "图片分类不合法"),
 
     ADDRESS_NOT_FOUND(9001, 404, "地址不存在"),
-    ADDRESS_LIMIT_EXCEEDED(9002, 409, "地址簿最多保存10个地址");
+    ADDRESS_LIMIT_EXCEEDED(9002, 409, "地址簿最多保存10个地址"),
+
+    AI_UNAVAILABLE(10001, 503, "AI 服务暂不可用"),
+    AI_RATE_LIMITED(10002, 429, "AI 请求过于频繁，请稍后再试"),
+    AI_BUDGET_EXCEEDED(10003, 429, "AI 今日预算已用完"),
+    AI_INVALID_RESPONSE(10004, 502, "AI 服务返回异常"),
+    AI_DISABLED(10005, 503, "AI 服务未启用"),
+    RECOMMENDATION_EVENT_INVALID(10006, 400, "推荐事件参数不合法"),
+    EXPERIMENT_NOT_FOUND(10007, 404, "推荐实验不存在");
 
     private final int code;
     private final int status;

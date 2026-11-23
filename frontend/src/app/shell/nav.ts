@@ -1,7 +1,9 @@
 import {
+  Bot,
   Boxes,
   ClipboardList,
   Flower2,
+  Gauge,
   LayoutDashboard,
   MapPinned,
   MessageSquareText,
@@ -83,6 +85,12 @@ export const navGroups: NavGroup[] = [
         description: "按当季与偏好推荐",
         to: "/recommendations",
         icon: Sparkles,
+      },
+      {
+        label: "AI 挑花顾问",
+        description: "描述场景与预算，帮你挑花",
+        to: "/ai",
+        icon: Bot,
       },
     ],
   },
@@ -202,6 +210,18 @@ export const navGroups: NavGroup[] = [
         icon: WandSparkles,
       },
       {
+        label: "商家 AI 助手",
+        description: "文案、标签与调参建议",
+        to: "/admin/merchant-ai",
+        icon: Sparkles,
+      },
+      {
+        label: "AI 运营看板",
+        description: "健康、QPS、延迟与成本",
+        to: "/admin/ai",
+        icon: Gauge,
+      },
+      {
         label: "操作日志",
         description: "关键操作追溯",
         to: "/admin/logs",
@@ -241,6 +261,7 @@ const staticMeta: Record<string, RouteMeta> = {
   "/": { title: "花礼首页", description: "清透的花艺工作室，挑一束当季花礼", icon: Flower2 },
   "/products": { title: "全部花礼", description: "按场景、节日与价格找到合适的花", icon: ShoppingBag },
   "/recommendations": { title: "智能推荐", description: "基于当季、热度与你的偏好", icon: Sparkles },
+  "/ai": { title: "AI 挑花顾问", description: "描述场景、预算与心意，AI 帮你挑花", icon: Bot },
   "/favorites": { title: "我的收藏", description: "把喜欢的花礼留在这里", icon: Flower2 },
   "/cart": { title: "购物车", description: "核对花礼与数量后去结算", icon: ShoppingBag },
   "/checkout": { title: "结算", description: "填写收货信息并完成模拟支付", icon: ReceiptText },
@@ -258,6 +279,16 @@ const staticMeta: Record<string, RouteMeta> = {
   "/admin/users": { title: "用户管理", description: "账号、角色与启用状态", icon: UsersRound },
   "/admin/reviews": { title: "评价管理", description: "可见性、回复与评分影响", icon: MessagesSquare },
   "/admin/recommendations": { title: "推荐运营", description: "权重配置、日志与效果评估", icon: WandSparkles },
+  "/admin/merchant-ai": {
+    title: "商家 AI 助手",
+    description: "生成文案、标签与推荐权重草稿并回写",
+    icon: Sparkles,
+  },
+  "/admin/ai": {
+    title: "AI 运营看板",
+    description: "服务健康、QPS、延迟、Token 与成本",
+    icon: Gauge,
+  },
   "/admin/logs": { title: "操作日志", description: "关键操作与异常追溯", icon: ScrollText },
 };
 
@@ -298,6 +329,12 @@ export function getRouteMeta(pathname: string): RouteMeta {
   }
   if (pathname.startsWith("/admin/recommendations")) {
     return staticMeta["/admin/recommendations"];
+  }
+  if (pathname.startsWith("/admin/merchant-ai")) {
+    return staticMeta["/admin/merchant-ai"];
+  }
+  if (pathname.startsWith("/admin/ai")) {
+    return staticMeta["/admin/ai"];
   }
   if (pathname.startsWith("/admin/logs")) {
     return staticMeta["/admin/logs"];
