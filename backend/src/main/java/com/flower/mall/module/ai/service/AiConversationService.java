@@ -185,21 +185,22 @@ public class AiConversationService {
 
     @Transactional
     public void saveUserMessage(Long conversationId, String content) {
-        saveMessage(conversationId, "user", content, null, null, null, null,
+        saveMessage(conversationId, "user", content, null, null, null, null, null,
                 false, COMPLETE);
     }
 
     @Transactional
     public void saveAssistantMessage(Long conversationId, String content, String productsJson,
-                                     String citationsJson, String usageJson, String model,
+                                     String citationsJson, String suggestedQuestionsJson,
+                                     String usageJson, String model,
                                      boolean degraded, String status) {
         saveMessage(conversationId, "assistant", content, productsJson, citationsJson,
-                usageJson, model, degraded, status);
+                suggestedQuestionsJson, usageJson, model, degraded, status);
     }
 
     private void saveMessage(Long conversationId, String role, String content,
-                             String productsJson, String citationsJson, String usageJson,
-                             String model, boolean degraded, String status) {
+                             String productsJson, String citationsJson, String suggestedQuestionsJson,
+                             String usageJson, String model, boolean degraded, String status) {
         if (content == null || content.isBlank()) {
             return;
         }
@@ -209,6 +210,7 @@ public class AiConversationService {
         message.setContent(content);
         message.setProductsJson(productsJson);
         message.setCitationsJson(citationsJson);
+        message.setSuggestedQuestions(suggestedQuestionsJson);
         message.setUsageJson(usageJson);
         message.setModel(model);
         message.setDegraded(degraded);
@@ -311,6 +313,9 @@ public class AiConversationService {
                 .citations(admin ? parseList(row.getCitationsJson(),
                         new TypeReference<List<AiChatCitationVO>>() {
                         }) : null)
+                .suggestedQuestions(parseList(row.getSuggestedQuestions(),
+                        new TypeReference<List<String>>() {
+                        }))
                 .usage(admin ? parseUsage(row.getUsageJson()) : null)
                 .model(admin ? row.getModel() : null)
                 .degraded(Boolean.TRUE.equals(row.getDegraded()))

@@ -49,6 +49,8 @@ export const queryKeys = {
   adminAiCalls: (params: object) => ["admin", "ai", "calls", params] as const,
   aiConversations: ["ai", "conversations"] as const,
   aiConversation: (id: number) => ["ai", "conversations", id] as const,
+  aiPromptTags: ["ai", "prompt-tags"] as const,
+  adminAiPromptTags: ["admin", "ai", "prompt-tags"] as const,
   adminAiKnowledge: (params: object) => ["admin", "ai", "knowledge", params] as const,
 };
 

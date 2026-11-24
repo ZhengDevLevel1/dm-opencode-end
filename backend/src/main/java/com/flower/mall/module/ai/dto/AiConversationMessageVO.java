@@ -19,6 +19,7 @@ public class AiConversationMessageVO {
     private String content;
     private List<AiChatProductVO> products;
     private List<AiChatCitationVO> citations;
+    private List<String> suggestedQuestions;
     private AiChatUsageVO usage;
     private String model;
     private Boolean degraded;

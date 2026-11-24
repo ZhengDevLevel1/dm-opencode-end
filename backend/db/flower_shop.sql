@@ -23,6 +23,7 @@ DROP TABLE IF EXISTS metric_config;
 DROP TABLE IF EXISTS tag_type_setting;
 DROP TABLE IF EXISTS tag_option;
 DROP TABLE IF EXISTS operation_log;
+DROP TABLE IF EXISTS ai_prompt_tag;
 DROP TABLE IF EXISTS ai_chat_message;
 DROP TABLE IF EXISTS ai_chat_conversation;
 DROP TABLE IF EXISTS recommendation_log;
@@ -575,6 +576,7 @@ CREATE TABLE ai_chat_message (
     products_json TEXT,
     citations_json TEXT,
     usage_json TEXT,
+    suggested_questions TEXT,
     model VARCHAR(80) DEFAULT NULL,
     degraded TINYINT NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'COMPLETE',
@@ -582,6 +584,18 @@ CREATE TABLE ai_chat_message (
     PRIMARY KEY (id),
     KEY idx_ai_msg_conversation (conversation_id, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 对话消息表';
+
+CREATE TABLE ai_prompt_tag (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    category VARCHAR(20) NOT NULL COMMENT 'SCENE/AUDIENCE/NEED',
+    word VARCHAR(40) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_ai_prompt_tag_category_word (category, word),
+    KEY idx_ai_prompt_tag_category_sort (category, sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 快捷提问标签表';
 
 CREATE TABLE ai_knowledge_document (
     id BIGINT NOT NULL AUTO_INCREMENT,
@@ -673,6 +687,36 @@ CREATE TABLE user_product_interaction (
     KEY idx_upi_session (session_id),
     KEY idx_upi_product (product_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户商品点击浏览聚合表';
+
+INSERT INTO ai_prompt_tag (category, word, sort_order) VALUES
+('SCENE', '日常用花', 1),
+('SCENE', '生日惊喜', 2),
+('SCENE', '纪念日', 3),
+('SCENE', '母亲节', 4),
+('SCENE', '情人节', 5),
+('SCENE', '教师节', 6),
+('SCENE', '毕业季', 7),
+('SCENE', '约会表白', 8),
+('SCENE', '探病慰问', 9),
+('SCENE', '开业祝福', 10),
+('AUDIENCE', '女朋友', 1),
+('AUDIENCE', '男朋友', 2),
+('AUDIENCE', '妈妈', 3),
+('AUDIENCE', '爸爸', 4),
+('AUDIENCE', '长辈', 5),
+('AUDIENCE', '朋友', 6),
+('AUDIENCE', '同事', 7),
+('AUDIENCE', '客户', 8),
+('AUDIENCE', '自己', 9),
+('NEED', '预算200元以内', 1),
+('NEED', '温柔一点', 2),
+('NEED', '清新淡雅', 3),
+('NEED', '有仪式感', 4),
+('NEED', '好养活', 5),
+('NEED', '寓意好', 6),
+('NEED', '显档次', 7),
+('NEED', '养护简单', 8),
+('NEED', '香味不要太浓', 9);
 
 INSERT INTO ai_knowledge_document (id, title, category, content, source, enabled) VALUES
 (1, '玫瑰花语与送花场景', '花语', '红玫瑰代表热烈的爱情与告白，适合情人节、七夕、纪念日和表白；香槟玫瑰代表温柔与长久，适合纪念日和求婚；粉玫瑰更柔和，适合初恋、生日和日常惊喜。送玫瑰时优先确认对方是否喜欢浓香型花材，并搭配尤加利叶或满天星降低视觉压迫感。', '内置知识库', 1),

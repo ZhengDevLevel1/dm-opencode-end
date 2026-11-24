@@ -11,6 +11,7 @@ import {
   setTokenExpiry,
 } from "@/lib/storage";
 import { queryClient } from "@/lib/query-client";
+import { clearWorkbenchRoutes } from "@/lib/workbench-memory";
 import type { LoginResponse, UserVO } from "@/types/api";
 
 type AuthStatus = "idle" | "loading" | "authenticated" | "anonymous";
@@ -40,6 +41,7 @@ const hasCachedSession = Boolean(
 
 export const useAuthStore = create<AuthState>((set, get) => {
   const applyLogin = (result: LoginResponse): LoginResponse => {
+    clearWorkbenchRoutes();
     setToken(result.token);
     setStoredUser(result.user);
     setTokenExpiry(result.expiresIn);
@@ -69,6 +71,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
 
     clearAuth: () => {
       clearAuthStorage();
+      clearWorkbenchRoutes();
       set({ token: null, user: null, status: "anonymous" });
       queryClient.clear();
     },

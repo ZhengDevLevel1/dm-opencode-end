@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Database,
   Gauge,
+  MessageSquareText,
   Pencil,
   Plus,
   RefreshCw,
@@ -50,6 +51,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminPromptTagsSection } from "./admin-prompt-tags-section";
 
 const EMPTY_FORM: KnowledgeDocumentRequest = {
   title: "",
@@ -98,6 +100,12 @@ export function AdminAiPage() {
               知识库
             </span>
           </TabsTrigger>
+          <TabsTrigger value="prompts">
+            <span className="inline-flex items-center gap-1.5">
+              <MessageSquareText className="h-3.5 w-3.5" />
+              快捷提问
+            </span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="status" className="mt-4">
@@ -105,6 +113,9 @@ export function AdminAiPage() {
         </TabsContent>
         <TabsContent value="knowledge" className="mt-4">
           <KnowledgeSection />
+        </TabsContent>
+        <TabsContent value="prompts" className="mt-4">
+          <AdminPromptTagsSection />
         </TabsContent>
       </Tabs>
     </div>

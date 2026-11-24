@@ -8,6 +8,11 @@ import com.flower.mall.module.ai.dto.AiMetricsVO;
 import com.flower.mall.module.ai.dto.AiProductCopyApplyRequest;
 import com.flower.mall.module.ai.dto.AiProductCopyRequest;
 import com.flower.mall.module.ai.dto.AiProductCopyVO;
+import com.flower.mall.module.ai.dto.AiPromptTagBulkRequest;
+import com.flower.mall.module.ai.dto.AiPromptTagGenerateRequest;
+import com.flower.mall.module.ai.dto.AiPromptTagGenerateVO;
+import com.flower.mall.module.ai.dto.AiPromptTagRequest;
+import com.flower.mall.module.ai.dto.AiPromptTagVO;
 import com.flower.mall.module.ai.dto.AiReindexVO;
 import com.flower.mall.module.ai.dto.AiWeightAdviceApplyRequest;
 import com.flower.mall.module.ai.dto.AiWeightAdviceRequest;
@@ -18,6 +23,7 @@ import com.flower.mall.module.ai.service.AiCallLogService;
 import com.flower.mall.module.ai.service.AiHealthService;
 import com.flower.mall.module.ai.service.AiKnowledgeService;
 import com.flower.mall.module.ai.service.AiMerchantService;
+import com.flower.mall.module.ai.service.AiPromptTagService;
 import com.flower.mall.module.log.annotation.OperationLogRecord;
 import com.flower.mall.module.product.dto.ProductVO;
 import com.flower.mall.module.recommendation.dto.RecommendationSceneWeightVO;
@@ -47,6 +53,7 @@ public class AdminAiController {
     private final AiCallLogService callLogService;
     private final AiKnowledgeService knowledgeService;
     private final AiHealthService healthService;
+    private final AiPromptTagService promptTagService;
 
     @Operation(summary = "AI 生成商品文案")
     @PostMapping("/product-copy")
@@ -132,5 +139,50 @@ public class AdminAiController {
     public ApiResponse<Void> deleteKnowledge(@PathVariable Long id) {
         knowledgeService.delete(id);
         return ApiResponse.ok();
+    }
+
+    @Operation(summary = "快捷提问标签列表")
+    @GetMapping("/prompt-tags")
+    public ApiResponse<List<AiPromptTagVO>> promptTags() {
+        return ApiResponse.ok(promptTagService.listAll());
+    }
+
+    @Operation(summary = "新增快捷提问标签")
+    @OperationLogRecord(module = "AI 运营", operation = "新增快捷提问标签")
+    @PostMapping("/prompt-tags")
+    public ApiResponse<AiPromptTagVO> createPromptTag(@Valid @RequestBody AiPromptTagRequest request) {
+        return ApiResponse.ok(promptTagService.create(request));
+    }
+
+    @Operation(summary = "更新快捷提问标签")
+    @OperationLogRecord(module = "AI 运营", operation = "更新快捷提问标签")
+    @PutMapping("/prompt-tags/{id}")
+    public ApiResponse<AiPromptTagVO> updatePromptTag(
+            @PathVariable Long id,
+            @Valid @RequestBody AiPromptTagRequest request) {
+        return ApiResponse.ok(promptTagService.update(id, request));
+    }
+
+    @Operation(summary = "删除快捷提问标签")
+    @OperationLogRecord(module = "AI 运营", operation = "删除快捷提问标签")
+    @DeleteMapping("/prompt-tags/{id}")
+    public ApiResponse<Void> deletePromptTag(@PathVariable Long id) {
+        promptTagService.delete(id);
+        return ApiResponse.ok();
+    }
+
+    @Operation(summary = "批量保存快捷提问标签")
+    @OperationLogRecord(module = "AI 运营", operation = "批量保存快捷提问标签")
+    @PostMapping("/prompt-tags/bulk")
+    public ApiResponse<List<AiPromptTagVO>> bulkPromptTags(
+            @Valid @RequestBody AiPromptTagBulkRequest request) {
+        return ApiResponse.ok(promptTagService.bulk(request));
+    }
+
+    @Operation(summary = "AI 生成快捷提问标签")
+    @PostMapping("/prompt-tags/generate")
+    public ApiResponse<AiPromptTagGenerateVO> generatePromptTags(
+            @Valid @RequestBody AiPromptTagGenerateRequest request) {
+        return ApiResponse.ok(promptTagService.generate(request));
     }
 }

@@ -1134,9 +1134,49 @@ export interface AiChatHandlers {
   onDelta?: (content: string) => void;
   onProducts?: (products: AiChatProduct[]) => void;
   onCitations?: (citations: AiChatCitation[]) => void;
+  onSuggestions?: (questions: string[]) => void;
   onUsage?: (usage: AiChatUsage) => void;
   onError?: (message: string) => void;
   onDone?: () => void;
+}
+
+export type AiPromptTagCategory = "SCENE" | "AUDIENCE" | "NEED";
+
+export interface AiPromptTagBundle {
+  scenes: string[];
+  audiences: string[];
+  needs: string[];
+}
+
+export interface AiPromptTag {
+  id: number;
+  category: AiPromptTagCategory;
+  word: string;
+  sortOrder: number;
+}
+
+export interface AiPromptTagRequest {
+  category: AiPromptTagCategory;
+  word: string;
+  sortOrder?: number;
+}
+
+export interface AiPromptTagBulkRequest {
+  category: AiPromptTagCategory;
+  words: string[];
+  mode: "APPEND" | "REPLACE";
+}
+
+export interface AiPromptTagGenerateRequest {
+  category: AiPromptTagCategory;
+  theme?: string;
+}
+
+export interface AiPromptTagGenerateResult {
+  words: string[];
+  degraded: boolean;
+  fallbackReason?: string;
+  totalTokens?: number;
 }
 
 export interface AiConversation {
@@ -1154,6 +1194,7 @@ export interface AiConversationMessage {
   content: string;
   products?: AiChatProduct[];
   citations?: AiChatCitation[];
+  suggestedQuestions?: string[];
   usage?: AiChatUsage;
   model?: string;
   degraded?: boolean;

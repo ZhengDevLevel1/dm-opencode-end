@@ -68,6 +68,9 @@ class AiConversationIntegrationTest {
                         {"items":[{"documentId":1,"title":"康乃馨花语","category":"花语","snippet":"感恩与祝福"}]}
                         """,
                 """
+                        {"items":["需要搭配贺卡吗？","预算大概多少？","需要当天送达吗？"]}
+                        """,
+                """
                         {"promptTokens":12,"completionTokens":8,"totalTokens":20,
                          "estimatedCost":0.0012,"model":"deepseek-chat"}
                         """,
@@ -80,6 +83,7 @@ class AiConversationIntegrationTest {
                 .andExpect(jsonPath("$.data.messages[0].role").value("user"))
                 .andExpect(jsonPath("$.data.messages[1].content").value("可以看看康乃馨花束。"))
                 .andExpect(jsonPath("$.data.messages[1].products[0].productId").value(8))
+                .andExpect(jsonPath("$.data.messages[1].suggestedQuestions[0]").value("需要搭配贺卡吗？"))
                 .andExpect(jsonPath("$.data.messages[1].citations").doesNotExist())
                 .andExpect(jsonPath("$.data.messages[1].usage").doesNotExist())
                 .andExpect(jsonPath("$.data.messages[1].model").doesNotExist());
@@ -137,6 +141,9 @@ class AiConversationIntegrationTest {
                         {"items":[{"documentId":2,"title":"玫瑰养护","category":"养护","snippet":"每天换水"}]}
                         """,
                 """
+                        {"items":["需要每天换水吗？","可以加保鲜剂吗？","叶子要一起剪吗？"]}
+                        """,
+                """
                         {"promptTokens":10,"completionTokens":6,"totalTokens":16,
                          "estimatedCost":0.0009,"model":"deepseek-chat"}
                         """,
@@ -146,6 +153,7 @@ class AiConversationIntegrationTest {
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.messages[1].citations[0].title").value("玫瑰养护"))
+                .andExpect(jsonPath("$.data.messages[1].suggestedQuestions[1]").value("可以加保鲜剂吗？"))
                 .andExpect(jsonPath("$.data.messages[1].usage.totalTokens").value(16))
                 .andExpect(jsonPath("$.data.messages[1].model").value("deepseek-chat"))
                 .andExpect(jsonPath("$.data.messages[1].degraded").value(true));

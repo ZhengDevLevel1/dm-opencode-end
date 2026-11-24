@@ -18,8 +18,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ChatService {
@@ -28,14 +30,17 @@ public class ChatService {
 
     private final RetrievalService retrievalService;
     private final DeepSeekClient deepSeekClient;
+    private final SuggestionService suggestionService;
     private final AiServiceProperties properties;
     private final ExecutorService executor = Executors.newFixedThreadPool(8);
 
     public ChatService(RetrievalService retrievalService,
                        DeepSeekClient deepSeekClient,
+                       SuggestionService suggestionService,
                        AiServiceProperties properties) {
         this.retrievalService = retrievalService;
         this.deepSeekClient = deepSeekClient;
+        this.suggestionService = suggestionService;
         this.properties = properties;
     }
 
@@ -63,6 +68,21 @@ public class ChatService {
                     "degraded", !available));
 
             List<Map<String, String>> messages = buildMessages(request, products, knowledge);
+            List<String> productNames = products.stream()
+                    .map(RetrievalService.ProductHit::name)
+                    .filter(name -> name != null && !name.isBlank())
+                    .limit(4)
+                    .toList();
+            boolean maybeFlower = QuestionAdmission.fallbackCategory(request.message())
+                    == QuestionAdmission.Category.FLOWER;
+            CompletableFuture<SuggestionService.SuggestionResult> suggestionFuture = maybeFlower
+                    ? suggestionService.suggest(request.message(), dialogLines(request.history()), productNames)
+                    : null;
+            boolean flowerAnswer = maybeFlower;
+            int promptTokens = 0;
+            int completionTokens = 0;
+            String usageModel = "fallback";
+
             if (available) {
                 boolean[] delivered = {false};
                 AdmissionStream admissionStream = new AdmissionStream(
@@ -81,8 +101,11 @@ public class ChatService {
                 if (delivered[0]) {
                     admissionStream.finish();
                 }
+                flowerAnswer = !delivered[0] || admissionStream.isFlower();
                 if (completion != null) {
-                    sendUsage(emitter, completion.promptTokens(), completion.completionTokens(), completion.model());
+                    promptTokens = completion.promptTokens();
+                    completionTokens = completion.completionTokens();
+                    usageModel = completion.model();
                 } else {
                     send(emitter, "meta", Map.of(
                             "requestId", requestId,
@@ -94,13 +117,22 @@ public class ChatService {
                         sendCards(emitter, products, knowledge);
                         streamFallback(emitter, products, knowledge);
                     }
-                    sendUsage(emitter, 0, 0, "fallback");
                 }
             } else {
                 sendCards(emitter, products, knowledge);
                 streamFallback(emitter, products, knowledge);
-                sendUsage(emitter, 0, 0, "fallback");
             }
+
+            SuggestionService.SuggestionResult suggestions = resolveSuggestions(
+                    suggestionFuture, request.message(), productNames);
+            if (flowerAnswer && suggestions != null && !suggestions.questions().isEmpty()) {
+                send(emitter, "suggestions", Map.of("items", suggestions.questions()));
+            }
+            if (suggestions != null) {
+                promptTokens += suggestions.promptTokens();
+                completionTokens += suggestions.completionTokens();
+            }
+            sendUsage(emitter, promptTokens, completionTokens, usageModel);
             send(emitter, "done", Map.of("requestId", requestId));
             emitter.complete();
         } catch (Exception ex) {
@@ -113,6 +145,42 @@ public class ChatService {
             }
             emitter.complete();
         }
+    }
+
+    private SuggestionService.SuggestionResult resolveSuggestions(
+            CompletableFuture<SuggestionService.SuggestionResult> future,
+            String question,
+            List<String> productNames) {
+        if (future == null) {
+            return null;
+        }
+        try {
+            return future.get(4, TimeUnit.SECONDS);
+        } catch (Exception ex) {
+            log.debug("Follow-up suggestion timed out: {}", ex.getMessage());
+            return suggestionService.fallback(question, productNames, "追问生成超时");
+        }
+    }
+
+    private List<String> dialogLines(List<HistoryMessage> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        List<String> lines = new ArrayList<>();
+        int start = Math.max(0, history.size() - 4);
+        for (int i = start; i < history.size(); i++) {
+            HistoryMessage message = history.get(i);
+            if (message == null || message.content() == null || message.content().isBlank()) {
+                continue;
+            }
+            String role = "assistant".equalsIgnoreCase(message.role()) ? "助手" : "用户";
+            String content = message.content().replace('\n', ' ').replace('\r', ' ').trim();
+            if (content.length() > 180) {
+                content = content.substring(0, 180) + "…";
+            }
+            lines.add(role + "：" + content);
+        }
+        return lines;
     }
 
     private void sendCards(SseEmitter emitter,
@@ -325,6 +393,10 @@ public class ChatService {
             if (content != null && !content.isEmpty()) {
                 ChatService.this.send(emitter, "delta", Map.of("content", content));
             }
+        }
+
+        private boolean isFlower() {
+            return category == QuestionAdmission.Category.FLOWER;
         }
     }
 

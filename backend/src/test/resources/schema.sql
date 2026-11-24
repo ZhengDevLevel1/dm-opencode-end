@@ -2,6 +2,7 @@ DROP TABLE IF EXISTS order_item_attribution;
 DROP TABLE IF EXISTS recommendation_event;
 DROP TABLE IF EXISTS user_product_interaction;
 DROP TABLE IF EXISTS ai_experiment;
+DROP TABLE IF EXISTS ai_prompt_tag;
 DROP TABLE IF EXISTS ai_chat_message;
 DROP TABLE IF EXISTS ai_chat_conversation;
 DROP TABLE IF EXISTS ai_call_log;
@@ -402,10 +403,21 @@ CREATE TABLE ai_chat_message (
     products_json CLOB,
     citations_json CLOB,
     usage_json CLOB,
+    suggested_questions CLOB,
     model VARCHAR(80),
     degraded TINYINT NOT NULL DEFAULT 0,
     status VARCHAR(20) NOT NULL DEFAULT 'COMPLETE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ai_prompt_tag (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    category VARCHAR(20) NOT NULL,
+    word VARCHAR(40) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_ai_prompt_tag_category_word UNIQUE (category, word)
 );
 
 CREATE TABLE ai_knowledge_document (

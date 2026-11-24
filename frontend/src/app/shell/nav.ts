@@ -22,6 +22,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { UserRole } from "@/types/api";
+import type { WorkbenchKey } from "@/lib/workbench-memory";
+
+export type { WorkbenchKey } from "@/lib/workbench-memory";
 
 export interface NavItem {
   label: string;
@@ -33,8 +36,6 @@ export interface NavItem {
   match?: (pathname: string) => boolean;
   badge?: "cart" | "favorites" | "pending";
 }
-
-export type WorkbenchKey = "mall" | "staff" | "admin";
 
 export interface NavGroup {
   label: string;
@@ -87,8 +88,8 @@ export const navGroups: NavGroup[] = [
         icon: Sparkles,
       },
       {
-        label: "AI 挑花顾问",
-        description: "描述场景与预算，帮你挑花",
+        label: "AI 花艺师",
+        description: "选花、搭配、养护，一站式花艺解答",
         to: "/ai",
         icon: Bot,
       },
@@ -244,6 +245,29 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
+const navItemWorkbenches = new Map<string, WorkbenchKey>(
+  navGroups.flatMap((group) =>
+    group.items.map((item): [string, WorkbenchKey] => [item.to, group.workbench]),
+  ),
+);
+
+export function resolveWorkbenchMemoryPath(
+  pathname: string,
+): { workbench: WorkbenchKey; path: string } | null {
+  const workbench = navItemWorkbenches.get(pathname);
+  if (workbench) return { workbench, path: pathname };
+  if (/^\/products\/\d+$/.test(pathname)) {
+    return { workbench: "mall", path: "/products" };
+  }
+  if (/^\/orders\/\d+$/.test(pathname)) {
+    return { workbench: "mall", path: "/orders" };
+  }
+  if (/^\/staff\/orders\/\d+$/.test(pathname)) {
+    return { workbench: "staff", path: "/staff/orders" };
+  }
+  return null;
+}
+
 export function canSeeRole(role: UserRole | undefined, roles?: UserRole[]): boolean {
   if (!roles) return true;
   if (!role) return false;
@@ -261,7 +285,7 @@ const staticMeta: Record<string, RouteMeta> = {
   "/": { title: "花礼首页", description: "清透的花艺工作室，挑一束当季花礼", icon: Flower2 },
   "/products": { title: "全部花礼", description: "按场景、节日与价格找到合适的花", icon: ShoppingBag },
   "/recommendations": { title: "智能推荐", description: "基于当季、热度与你的偏好", icon: Sparkles },
-  "/ai": { title: "AI 挑花顾问", description: "描述场景、预算与心意，AI 帮你挑花", icon: Bot },
+  "/ai": { title: "AI 花艺师", description: "选花、搭配、养护，一站式花艺解答", icon: Bot },
   "/favorites": { title: "我的收藏", description: "把喜欢的花礼留在这里", icon: Flower2 },
   "/cart": { title: "购物车", description: "核对花礼与数量后去结算", icon: ShoppingBag },
   "/checkout": { title: "结算", description: "填写收货信息并完成模拟支付", icon: ReceiptText },

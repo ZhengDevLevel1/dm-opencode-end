@@ -20,6 +20,12 @@ import type {
   AiProductCopyApplyRequest,
   AiProductCopyRequest,
   AiProductCopyVO,
+  AiPromptTag,
+  AiPromptTagBulkRequest,
+  AiPromptTagBundle,
+  AiPromptTagGenerateRequest,
+  AiPromptTagGenerateResult,
+  AiPromptTagRequest,
   AiReindexVO,
   AiStatusVO,
   AiWeightAdviceApplyRequest,
@@ -320,6 +326,8 @@ const aiSessionHeaders = () => ({
 export const aiService = {
   status: () => api.get<AiStatusVO>("/ai/status"),
 
+  promptTags: () => api.get<AiPromptTagBundle>("/ai/prompt-tags"),
+
   conversations: () =>
     api.get<AiConversation[]>("/ai/conversations", { headers: aiSessionHeaders() }),
 
@@ -425,6 +433,11 @@ export const aiService = {
       } else if (eventName === "citations") {
         const items = Array.isArray(payload.items) ? payload.items : [];
         handlers.onCitations?.(items as never);
+      } else if (eventName === "suggestions") {
+        const items = Array.isArray(payload.items)
+          ? payload.items.filter((item): item is string => typeof item === "string")
+          : [];
+        handlers.onSuggestions?.(items);
       } else if (eventName === "usage") {
         handlers.onUsage?.(payload as never);
       } else if (eventName === "error") {
@@ -459,6 +472,19 @@ export const aiService = {
   adminCalls: (query: AiCallLogQuery) =>
     api.get<PageResult<AiCallLogVO>>("/admin/ai/calls", { query }),
   adminReindex: () => api.post<AiReindexVO>("/admin/ai/reindex", undefined, { timeout: 60_000 }),
+  adminPromptTags: () => api.get<AiPromptTag[]>("/admin/ai/prompt-tags"),
+  createPromptTag: (body: AiPromptTagRequest) =>
+    api.post<AiPromptTag>("/admin/ai/prompt-tags", body),
+  updatePromptTag: (id: number, body: AiPromptTagRequest) =>
+    api.put<AiPromptTag>(`/admin/ai/prompt-tags/${id}`, body),
+  deletePromptTag: (id: number) =>
+    api.delete<void>(`/admin/ai/prompt-tags/${id}`),
+  bulkPromptTags: (body: AiPromptTagBulkRequest) =>
+    api.post<AiPromptTag[]>("/admin/ai/prompt-tags/bulk", body),
+  generatePromptTags: (body: AiPromptTagGenerateRequest) =>
+    api.post<AiPromptTagGenerateResult>("/admin/ai/prompt-tags/generate", body, {
+      timeout: 30_000,
+    }),
   adminKnowledge: (query: { keyword?: string; category?: string; enabled?: boolean } = {}) =>
     api.get<AiKnowledgeDocument[]>("/admin/ai/knowledge", { query }),
   createKnowledge: (body: KnowledgeDocumentRequest) =>

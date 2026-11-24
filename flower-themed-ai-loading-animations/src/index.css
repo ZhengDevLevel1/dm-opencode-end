@@ -1,0 +1,274 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #fbf6f2;
+  --color-paper-deep: #f4ece6;
+  --color-card: #fffdfb;
+  --color-ink: #3a2f31;
+  --color-ink-soft: #7a6a6b;
+  --color-line: #e7ded8;
+  --color-rose: #ee9baa;
+  --color-rose-deep: #c96a7e;
+  --color-blush: #fbe7ea;
+  --color-blush-2: #f9e3e8;
+  --color-sage: #8fa68e;
+
+  --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-serif: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-display: "Instrument Serif", "Noto Serif SC", serif;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #fbf6f2;
+  color: #3a2f31;
+  font-family: var(--font-sans);
+  font-weight: 300;
+}
+
+/* ── paper grain ─────────────────────────────────────── */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E");
+}
+
+/* ── 方案一：植物呼吸 / 生长 ─────────────────────────── */
+@keyframes huabreathe {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.62;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+.a-breathe {
+  animation: huabreathe 2.8s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+@keyframes huaaura {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.6;
+  }
+}
+.a-aura {
+  animation: huaaura 2.8s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+}
+
+/* （原「三点跳动」方案已移除） */
+
+/* （原「骨架屏」方案已移除；保留下面的光标闪烁，供回复打字机使用） */
+@keyframes huablink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+.a-caret {
+  animation: huablink 1.05s step-end infinite;
+}
+
+/* （原「飘散花瓣」方案已移除） */
+
+/* ── 计时数字：静止等宽刷新（不跳动，只加毫秒） ─────── */
+.ticker {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+/* ── 上浮入场 ───────────────────────────────────────── */
+@keyframes huaRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.a-rise {
+  animation: huaRise 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@keyframes huaDot {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.a-dot {
+  animation: huaDot 1.6s ease-in-out infinite;
+}
+
+/* ── 方案五：花茎生长（SVG 描线 + 抽叶） ────────────── */
+@keyframes huaGrow {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+/* 减速描线：越长越慢、不回卷——每一茬的长度与生成时间无关 */
+.a-stem {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: huaGrow 5.2s cubic-bezier(0.16, 0.72, 0.28, 1) forwards;
+}
+
+/* 一茬的生命周期：淡入抽枝 → 生长 → 顶端呼吸 → 落下（循环重播） */
+@keyframes huaVineCycle {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  6% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  90% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(9px) rotate(-3deg);
+  }
+}
+.a-vine {
+  transform-origin: 0% 100%;
+  animation: huaVineCycle 7s cubic-bezier(0.4, 0, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+.a-arc {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: huaGrow var(--dur, 6000ms) linear forwards;
+}
+@keyframes huaLeaf {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.a-leaf {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  animation: huaLeaf 0.7s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+/* 生长点：先结苞，随后一直轻微呼吸——等待多久都不显得"长完了" */
+.a-bud-1,
+.a-bud-2,
+.a-cap {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.a-bud-1 {
+  animation:
+    huaLeaf 0.7s cubic-bezier(0.34, 1.5, 0.64, 1) 5.1s both,
+    huaBudPulse 1.9s ease-in-out 5.7s infinite;
+}
+.a-bud-2 {
+  animation:
+    huaLeaf 0.7s cubic-bezier(0.34, 1.5, 0.64, 1) 5.3s both,
+    huaBudPulse 1.9s ease-in-out 5.9s infinite;
+}
+.a-cap {
+  animation: huaBudPulse 2.2s ease-in-out infinite;
+}
+@keyframes huaBudPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+/* （原「水面涟漪」方案已移除） */
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: #fbe7ea;
+  color: #3a2f31;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a-breathe,
+  .a-aura,
+  .a-hop,
+  .a-skel,
+  .a-caret,
+  .a-dot {
+    animation: none !important;
+  }
+  .a-skel-out {
+    animation: none !important;
+    opacity: 0;
+  }
+  .a-petal {
+    display: none;
+  }
+  .a-rise {
+    animation: none !important;
+  }
+  .a-stem,
+  .a-arc {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  .a-vine {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .a-leaf,
+  .a-bud,
+  .a-bud-1,
+  .a-bud-2,
+  .a-cap {
+    animation: none !important;
+  }
+  .a-ripple {
+    animation: none !important;
+    opacity: 0.4;
+    transform: scale(1.15);
+  }
+}

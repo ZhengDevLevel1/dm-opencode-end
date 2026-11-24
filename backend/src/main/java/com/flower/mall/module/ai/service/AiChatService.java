@@ -114,6 +114,7 @@ public class AiChatService {
         boolean admin = "ADMIN".equalsIgnoreCase(userRole);
         String productsJson = null;
         String citationsJson = null;
+        String suggestionsJson = null;
         String usageJson = null;
         String messageStatus = "COMPLETE";
 
@@ -161,6 +162,8 @@ public class AiChatService {
                             } else if ("citations".equals(eventName)) {
                                 citationsJson = payload;
                                 forward = admin;
+                            } else if ("suggestions".equals(eventName)) {
+                                suggestionsJson = payload;
                             } else if ("usage".equals(eventName)) {
                                 usageJson = payload;
                                 applyUsage(callLog, safeRead(payload));
@@ -247,7 +250,7 @@ public class AiChatService {
             if (answer.length() > 0) {
                 try {
                     conversationService.saveAssistantMessage(conversationId, answer.toString(),
-                            productsJson, citationsJson, usageJson, callLog.getModel(),
+                            productsJson, citationsJson, suggestionsJson, usageJson, callLog.getModel(),
                             Boolean.TRUE.equals(callLog.getDegraded()), messageStatus);
                     if ("COMPLETE".equals(messageStatus)) {
                         conversationService.scheduleTitle(conversationId);

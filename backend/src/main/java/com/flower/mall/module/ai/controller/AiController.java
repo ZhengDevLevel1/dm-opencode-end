@@ -9,10 +9,12 @@ import com.flower.mall.module.ai.dto.AiConversationBatchRequest;
 import com.flower.mall.module.ai.dto.AiConversationDetailVO;
 import com.flower.mall.module.ai.dto.AiConversationRenameRequest;
 import com.flower.mall.module.ai.dto.AiConversationVO;
+import com.flower.mall.module.ai.dto.AiPromptTagBundleVO;
 import com.flower.mall.module.ai.dto.AiStatusVO;
 import com.flower.mall.module.ai.service.AiChatService;
 import com.flower.mall.module.ai.service.AiConversationService;
 import com.flower.mall.module.ai.service.AiHealthService;
+import com.flower.mall.module.ai.service.AiPromptTagService;
 import com.flower.mall.security.AuthUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +45,7 @@ public class AiController {
     private final AiChatService chatService;
     private final AiConversationService conversationService;
     private final AiHealthService healthService;
+    private final AiPromptTagService promptTagService;
     private final AppProperties properties;
 
     @Operation(summary = "AI 挑花顾问流式问答")
@@ -162,6 +165,12 @@ public class AiController {
     @GetMapping("/status")
     public ApiResponse<AiStatusVO> status() {
         return ApiResponse.ok(healthService.status());
+    }
+
+    @Operation(summary = "快捷提问标签")
+    @GetMapping("/prompt-tags")
+    public ApiResponse<AiPromptTagBundleVO> promptTags() {
+        return ApiResponse.ok(promptTagService.bundle());
     }
 
     private static String sessionKey(String header, HttpServletRequest request) {

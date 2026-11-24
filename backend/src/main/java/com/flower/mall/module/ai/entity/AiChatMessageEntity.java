@@ -18,6 +18,7 @@ public class AiChatMessageEntity {
     private String content;
     private String productsJson;
     private String citationsJson;
+    private String suggestedQuestions;
     private String usageJson;
     private String model;
     private Boolean degraded;

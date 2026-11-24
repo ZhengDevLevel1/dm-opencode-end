@@ -35,6 +35,7 @@ import {
   DropdownSeparator,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/domain/user-avatar";
+import { GuestThemeMenu } from "@/components/domain/guest-theme-menu";
 import { useBloomTransition } from "@/components/domain/bloom-transition";
 import { Badge } from "@/components/ui/badge";
 import { getRouteMeta } from "./nav";
@@ -184,14 +185,18 @@ export function Topbar() {
           <RefreshCw className={cn("h-[18px] w-[18px]", refreshing && "animate-spin")} />
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={resolvedDark ? "切换到亮色模式" : "切换到暗色模式"}
-          onClick={handleThemeToggle}
-        >
-          {resolvedDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
-        </Button>
+        {authenticated ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={resolvedDark ? "切换到亮色模式" : "切换到暗色模式"}
+            onClick={handleThemeToggle}
+          >
+            {resolvedDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+          </Button>
+        ) : (
+          <GuestThemeMenu />
+        )}
 
         {authenticated && user ? (
           <DropdownMenu

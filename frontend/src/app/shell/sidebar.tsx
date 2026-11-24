@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
 import { ChevronsRight, Flower2, Pin, PinOff, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { getWorkbenchRoute } from "@/lib/workbench-memory";
 import { preloadRoute } from "@/app/route-loaders";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -11,7 +12,14 @@ import { useCartQuery, useFavoritesQuery } from "@/hooks/queries";
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
 import { staffService } from "@/lib/services";
-import { canSeeRole, navGroups, resolveWorkbench, workbenches } from "./nav";
+import {
+  canSeeRole,
+  navGroups,
+  resolveWorkbench,
+  resolveWorkbenchMemoryPath,
+  workbenches,
+  type WorkbenchKey,
+} from "./nav";
 import { Button } from "@/components/ui/button";
 
 function useBadgeCounts() {
@@ -71,6 +79,14 @@ function WorkbenchSwitch({ expanded }: { expanded: boolean }) {
 
   const current = resolveWorkbench(location.pathname);
   const next = links[(links.findIndex((link) => resolveWorkbench(link.to) === current) + 1) % links.length];
+  const targetFor = (key: WorkbenchKey, fallback: string) => {
+    if (key === current) return fallback;
+    const stored = getWorkbenchRoute(key);
+    const remembered = stored ? resolveWorkbenchMemoryPath(stored) : null;
+    return remembered?.workbench === key ? remembered.path : fallback;
+  };
+  const nextKey = next ? resolveWorkbench(next.to) : null;
+  const nextTarget = next && nextKey ? targetFor(nextKey, next.to) : "/";
 
   return (
     <div className="px-2 pb-3">
@@ -80,13 +96,14 @@ function WorkbenchSwitch({ expanded }: { expanded: boolean }) {
             {links.map((link) => {
               const key = resolveWorkbench(link.to);
               const active = current === key;
+              const target = targetFor(key, link.to);
               return (
                 <button
                   key={link.to}
                   type="button"
-                  onMouseEnter={() => preloadRoute(link.to)}
-                  onFocus={() => preloadRoute(link.to)}
-                  onClick={() => navigate(link.to)}
+                  onMouseEnter={() => preloadRoute(target)}
+                  onFocus={() => preloadRoute(target)}
+                  onClick={() => navigate(target)}
                   className={cn(
                     "relative flex-1 cursor-pointer rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
                     active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
@@ -108,7 +125,7 @@ function WorkbenchSwitch({ expanded }: { expanded: boolean }) {
       ) : (
         <button
           type="button"
-          onClick={() => navigate(next?.to ?? "/")}
+          onClick={() => navigate(nextTarget)}
           className="flex h-9 w-12 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent/40"
           aria-label={next ? `切换到${next.label}` : "切换工作台"}
           title={next ? `切换到${next.label}` : "切换工作台"}

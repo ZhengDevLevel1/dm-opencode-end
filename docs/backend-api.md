@@ -337,6 +337,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | POST | `/api/ai/conversations/batch-delete` | 公开（可选登录） | `ApiResponse<{ count }>` |
 | POST | `/api/ai/conversations/batch-pin` | 公开（可选登录） | `ApiResponse<{ count }>` |
 | GET | `/api/ai/status` | 公开 | `ApiResponse<AiStatusVO>` |
+| GET | `/api/ai/prompt-tags` | 公开 | `ApiResponse<AiPromptTagBundleVO>` |
 | GET | `/api/staff/orders` | 店员 | `ApiResponse<PageResult<OrderVO>>` |
 | GET | `/api/staff/orders/{id}` | 店员 | `ApiResponse<OrderVO>` |
 | POST | `/api/staff/orders/{id}/accept` | 店员 | `ApiResponse<FulfillmentVO[]>` |
@@ -395,6 +396,12 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | POST | `/api/admin/ai/knowledge` | 管理员 | `ApiResponse<AiKnowledgeDocument>` |
 | PUT | `/api/admin/ai/knowledge/{id}` | 管理员 | `ApiResponse<AiKnowledgeDocument>` |
 | DELETE | `/api/admin/ai/knowledge/{id}` | 管理员 | `ApiResponse<Void>` |
+| GET | `/api/admin/ai/prompt-tags` | 管理员 | `ApiResponse<AiPromptTagVO[]>` |
+| POST | `/api/admin/ai/prompt-tags` | 管理员 | `ApiResponse<AiPromptTagVO>` |
+| PUT | `/api/admin/ai/prompt-tags/{id}` | 管理员 | `ApiResponse<AiPromptTagVO>` |
+| DELETE | `/api/admin/ai/prompt-tags/{id}` | 管理员 | `ApiResponse<Void>` |
+| POST | `/api/admin/ai/prompt-tags/bulk` | 管理员 | `ApiResponse<AiPromptTagVO[]>` |
+| POST | `/api/admin/ai/prompt-tags/generate` | 管理员 | `ApiResponse<AiPromptTagGenerateVO>` |
 | GET | `/api/admin/stats/overview` | 管理员 | `ApiResponse<OverviewStatsVO>` |
 | GET | `/api/admin/stats/sales-trend` | 管理员 | `ApiResponse<SalesTrendVO[]>` |
 | GET | `/api/admin/stats/category-sales` | 管理员 | `ApiResponse<CategorySalesVO[]>` |
@@ -1200,15 +1207,28 @@ SSE 事件：
 | `products` | `{ items: [{ productId, name, category, price, ratingAvg, salesCount, reason }] }` | 花店相关问题时检索到的在售商品 |
 | `citations` | `{ items: [{ documentId, title, category, source, snippet }] }` | 花店相关问题的知识库引用；仅管理员可见 |
 | `delta` | `{ content }` | 增量文本 |
+| `suggestions` | `{ items: string[] }` | 3–4 条上下文追问；仅花店相关回答返回，随助手消息持久化 |
 | `usage` | `{ promptTokens, completionTokens, totalTokens, estimatedCost, model }` | 用量与估算成本；仅管理员可见 |
 | `done` | `{ requestId, degraded? }` | 流结束 |
 | `error` | `{ message }` | 错误提示，前端应展示可重试状态 |
 
-- `meta`、`products`、`delta`、`done` 对所有用户返回；非管理员的 `meta` 会移除 `model`，也不接收 `citations`/`usage` 事件。
+- `meta`、`products`、`delta`、`suggestions`、`done` 对所有用户返回；非管理员的 `meta` 会移除 `model`，也不接收 `citations`/`usage` 事件。
+- 追问在主回答结束后生成，最多等待 4 秒；超时、AI 不可用或问题被判定为无关时使用本地兜底或直接省略。追问 token 会计入同一条 `usage`。
 - 匿名访问受 IP 限流、每日次数和全局预算限制，超限返回 `429` 或 `AI_RATE_LIMITED`。
 - `GET /api/ai/status` 返回 `{ enabled, available, chatEnabled, merchantEnabled, anonymousAllowed, mode, message }`，前端可据此显示入口或维护提示。
 
-### 11.4 AI 对话会话
+### 11.4 AI 快捷提问标签
+
+`GET /api/ai/prompt-tags` · 公开 · `ApiResponse<AiPromptTagBundleVO>`
+
+返回 `{ scenes, audiences, needs }` 三个字符串数组，按 `sortOrder` 升序，用于新对话随机组合快捷提问。前端通常取 1 个场景、1 个关系人群、1 个诉求，再补 1 条静态问题。
+
+- 词库由管理员维护；新增、更新、删除或批量保存后，公开接口立即返回最新词库。
+- 同一分类下标签词按不区分大小写去重，重复创建返回 `409`。
+- `category` 支持 `SCENE`/`AUDIENCE`/`NEED`，也兼容中文 `场景/节日`/`关系/人群`/`诉求/痛点`。
+- 该接口不需要登录，不返回管理字段；管理端增删改查见「AI 运营」。
+
+### 11.5 AI 对话会话
 
 所有会话接口均为公开（可选登录），归属校验与聊天一致：登录用户按 JWT 用户 ID，匿名用户按 `X-Session-Id`（缺省使用远端地址哈希）。
 
@@ -1224,7 +1244,7 @@ SSE 事件：
 
 `AiConversationVO`：`{ id, title, pinned, createdAt, updatedAt, lastMessageAt }`。
 
-`AiConversationDetailVO`：`{ conversation, messages }`，`messages` 按时间升序，元素字段为 `{ id, role, content, products, citations, usage, model, degraded, status, createdAt }`。非管理员读取详情时 `citations`、`usage`、`model` 返回 `null`。
+`AiConversationDetailVO`：`{ conversation, messages }`，`messages` 按时间升序，元素字段为 `{ id, role, content, products, citations, suggestedQuestions, usage, model, degraded, status, createdAt }`。`suggestedQuestions` 为助手消息的追问数组，对所有用户返回；非管理员读取详情时 `citations`、`usage`、`model` 返回 `null`。
 
 说明：
 
@@ -1698,6 +1718,12 @@ SSE 事件：
 | POST | `/api/admin/ai/knowledge` | 管理员 | `KnowledgeDocumentRequest` | `ApiResponse<AiKnowledgeDocument>` |
 | PUT | `/api/admin/ai/knowledge/{id}` | 管理员 | `KnowledgeDocumentRequest` | `ApiResponse<AiKnowledgeDocument>` |
 | DELETE | `/api/admin/ai/knowledge/{id}` | 管理员 | 无 | `ApiResponse<Void>` |
+| GET | `/api/admin/ai/prompt-tags` | 管理员 | 无 | `ApiResponse<AiPromptTagVO[]>` |
+| POST | `/api/admin/ai/prompt-tags` | 管理员 | `AiPromptTagRequest` | `ApiResponse<AiPromptTagVO>` |
+| PUT | `/api/admin/ai/prompt-tags/{id}` | 管理员 | `AiPromptTagRequest` | `ApiResponse<AiPromptTagVO>` |
+| DELETE | `/api/admin/ai/prompt-tags/{id}` | 管理员 | 无 | `ApiResponse<Void>` |
+| POST | `/api/admin/ai/prompt-tags/bulk` | 管理员 | `AiPromptTagBulkRequest` | `ApiResponse<AiPromptTagVO[]>` |
+| POST | `/api/admin/ai/prompt-tags/generate` | 管理员 | `AiPromptTagGenerateRequest` | `ApiResponse<AiPromptTagGenerateVO>` |
 
 `AiProductCopyRequest`：`{ productId?, name?, category?, grade?, origin?, flowerMeaning?, occasionTags?, festivalTags?, description?, price?, tone?, length? }`。`productId` 与 `name` 至少提供一个：传 `productId` 时读取已有商品字段并允许用请求字段覆盖；不传 `productId` 时仅按请求字段生成新品文案。`tone` 默认 `温暖`，`length` 取 `short`/`medium`/`long`，默认 `medium`。
 
@@ -1753,6 +1779,14 @@ SSE 事件：
 | `enabled` | boolean | 否 | 默认 `true` |
 
 知识库是公开内容库：启用的文档会进入所有用户的 AI 问答上下文，并可能被用户复述。只允许存放可公开的花语、养护、配送、售后等内容，不要写入成本、供应商、毛利、内部 SOP、客户信息或密钥。知识库新增、更新、删除后会尽力触发向量索引重建；AI 服务不可用时 CRUD 仍成功，但向量索引可能滞后。`POST /api/admin/ai/reindex` 可手动重建商品与知识库索引。
+
+`AiPromptTagRequest`：`{ category: 'SCENE' | 'AUDIENCE' | 'NEED', word, sortOrder? }`。`word` 最长 20 字；同一分类内重复返回 `409`；`sortOrder` 省略时自动追加到该分类末尾。
+
+`AiPromptTagBulkRequest`：`{ category, words: string[], mode?: 'APPEND' | 'REPLACE' }`。`words` 最多 30 个，默认 `APPEND`，自动去重并跳过空值与超长词；`REPLACE` 会先删除该分类全部标签再写入，适合 AI 生成后整体替换。
+
+`AiPromptTagGenerateRequest`：`{ category, theme? }`。调用 AI 服务生成 5–10 个候选标签词；`theme` 最长 100 字，会优先作为第一个候选词。AI 未启用或调用失败时返回本地兜底词，`degraded=true` 并带 `fallbackReason`。
+
+`AiPromptTagGenerateVO`：`{ words, degraded, fallbackReason, totalTokens }`。生成接口只返回草稿，不会写库；管理员确认后调用新增、批量追加或批量替换接口生效。所有写操作都会记录操作日志。
 
 ## 14. 前端对接流程
 

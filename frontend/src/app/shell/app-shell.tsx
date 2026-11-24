@@ -1,7 +1,11 @@
 import { Suspense, useEffect } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import { cn } from "@/lib/cn";
+import { rememberWorkbenchRoute } from "@/lib/workbench-memory";
+import { useAuthStore } from "@/stores/auth";
 import { useUiStore } from "@/stores/ui";
 import { PageLoading } from "@/components/ui/page-loading";
+import { resolveWorkbenchMemoryPath } from "./nav";
 import { Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
 import { PageTransition } from "./page-transition";
@@ -9,9 +13,19 @@ import { CommandMenu } from "@/components/ui/command-menu";
 import { Toaster } from "@/components/ui/toast";
 
 export function AppShell() {
+  const location = useLocation();
+  const user = useAuthStore((state) => state.user);
   const pinned = useUiStore((state) => state.sidebarPinned);
   const setPinned = useUiStore((state) => state.setSidebarPinned);
   const setCommandOpen = useUiStore((state) => state.setCommandOpen);
+  const isChatPage = location.pathname === "/ai" || location.pathname === "/ai/";
+
+  useEffect(() => {
+    if (!user) return;
+    const entry = resolveWorkbenchMemoryPath(location.pathname);
+    if (!entry) return;
+    rememberWorkbenchRoute(entry.workbench, entry.path);
+  }, [location.pathname, user]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -39,7 +53,14 @@ export function AppShell() {
           id="main-content"
           className="app-canvas relative z-[1] min-h-0 flex-1 overflow-y-auto bg-transparent"
         >
-          <div className="relative z-[1] mx-auto w-full max-w-[1600px] px-4 py-5 md:px-6 md:py-6 lg:px-8">
+          <div
+            className={cn(
+              "relative z-[1] w-full",
+              isChatPage
+                ? "py-5 pr-4 pl-4 md:py-6 md:pr-6 md:pl-6 lg:py-6 lg:pr-0 lg:pl-[max(2rem,calc((100%_-_1600px)/2_+_2rem))]"
+                : "mx-auto max-w-[1600px] px-4 py-5 md:px-6 md:py-6 lg:px-8",
+            )}
+          >
             <PageTransition>
               <Suspense fallback={<PageLoading />}>
                 <Outlet />

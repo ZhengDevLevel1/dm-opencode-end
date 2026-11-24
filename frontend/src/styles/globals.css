@@ -744,6 +744,14 @@ h1, h2, h3, h4, h5, h6 {
   background: color-mix(in oklab, var(--foreground) 34%, transparent);
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }
@@ -1104,6 +1112,148 @@ html.reduce-motion .petal-sway {
   .floaty,
   .petal-fall,
   .petal-sway {
+    animation: none !important;
+  }
+}
+
+/* ---------- AI 挑花顾问：花茎生长加载动画 ---------- */
+
+@keyframes stem-grow {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.stem-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: stem-grow 5.2s cubic-bezier(0.16, 0.72, 0.28, 1) forwards;
+}
+
+@keyframes stem-cycle {
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  6% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  90% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(9px) rotate(-3deg);
+  }
+}
+
+.stem-vine {
+  transform-origin: 0% 100%;
+  animation: stem-cycle 7s cubic-bezier(0.4, 0, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes stem-leaf-in {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.stem-leaf {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  animation: stem-leaf-in 0.7s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+
+@keyframes stem-bud-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
+
+.stem-bud,
+.stem-bud-core {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.stem-bud {
+  animation:
+    stem-leaf-in 0.7s cubic-bezier(0.34, 1.5, 0.64, 1) 5.1s both,
+    stem-bud-pulse 1.9s ease-in-out 5.7s infinite;
+}
+
+.stem-bud-core {
+  animation:
+    stem-leaf-in 0.7s cubic-bezier(0.34, 1.5, 0.64, 1) 5.3s both,
+    stem-bud-pulse 1.9s ease-in-out 5.9s infinite;
+}
+
+@keyframes stem-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stem-rise {
+  animation: stem-rise-in 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.stem-ticker {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+
+html.reduce-motion .stem-line {
+  animation: none !important;
+  stroke-dashoffset: 0 !important;
+}
+
+html.reduce-motion .stem-vine {
+  animation: none !important;
+  opacity: 1;
+  transform: none;
+}
+
+html.reduce-motion .stem-leaf,
+html.reduce-motion .stem-bud,
+html.reduce-motion .stem-bud-core,
+html.reduce-motion .stem-rise {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stem-line {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  .stem-vine {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .stem-leaf,
+  .stem-bud,
+  .stem-bud-core,
+  .stem-rise {
     animation: none !important;
   }
 }

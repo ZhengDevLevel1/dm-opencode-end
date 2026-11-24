@@ -6,6 +6,7 @@ import com.flower.ai.qdrant.QdrantService;
 import com.flower.ai.service.AiIndexService;
 import com.flower.ai.service.ChatService;
 import com.flower.ai.service.MerchantService;
+import com.flower.ai.service.PromptTagService;
 import com.flower.ai.service.RetrievalService;
 import com.flower.ai.service.TitleService;
 import org.slf4j.Logger;
@@ -31,6 +32,7 @@ public class InternalAiController {
     private final RetrievalService retrievalService;
     private final ChatService chatService;
     private final MerchantService merchantService;
+    private final PromptTagService promptTagService;
     private final TitleService titleService;
     private final AiIndexService indexService;
     private final QdrantService qdrantService;
@@ -40,6 +42,7 @@ public class InternalAiController {
     public InternalAiController(RetrievalService retrievalService,
                                 ChatService chatService,
                                 MerchantService merchantService,
+                                PromptTagService promptTagService,
                                 TitleService titleService,
                                 AiIndexService indexService,
                                 QdrantService qdrantService,
@@ -48,6 +51,7 @@ public class InternalAiController {
         this.retrievalService = retrievalService;
         this.chatService = chatService;
         this.merchantService = merchantService;
+        this.promptTagService = promptTagService;
         this.titleService = titleService;
         this.indexService = indexService;
         this.qdrantService = qdrantService;
@@ -121,6 +125,11 @@ public class InternalAiController {
     @PostMapping("/recommendation-advice")
     public Map<String, Object> recommendationAdvice(@RequestBody MerchantService.AdviceRequest request) {
         return merchantService.recommendationAdvice(request);
+    }
+
+    @PostMapping("/prompt-tags")
+    public Map<String, Object> promptTags(@RequestBody PromptTagService.PromptTagRequest request) {
+        return promptTagService.generate(request);
     }
 
     @PostMapping("/title")
