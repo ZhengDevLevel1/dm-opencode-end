@@ -20,6 +20,10 @@ public class CartItem {
 
     private Long productId;
 
+    private Long specId;
+
+    private Long wrapId;
+
     private Integer quantity;
 
     private String sourceRequestId;

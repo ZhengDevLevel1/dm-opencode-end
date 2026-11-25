@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ReviewCreateRequest {
 
@@ -19,4 +21,7 @@ public class ReviewCreateRequest {
 
     @Size(max = 500, message = "评价内容不能超过500个字符")
     private String content;
+
+    @Size(max = 6, message = "最多上传6张评价图片")
+    private List<@Size(max = 500, message = "图片地址不能超过500个字符") String> images;
 }

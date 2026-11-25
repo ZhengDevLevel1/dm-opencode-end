@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -24,6 +25,7 @@ public class ReviewVO {
     private String nickname;
     private Integer rating;
     private String content;
+    private List<String> images;
     private String reply;
     private String status;
     private String statusLabel;

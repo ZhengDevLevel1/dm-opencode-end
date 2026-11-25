@@ -14,6 +14,7 @@ import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatDateTime, formatNumber } from "@/lib/format";
+import { resolveImageUrl } from "@/lib/image";
 import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { toast } from "@/stores/toast";
 import type { AdminReviewQuery, ReviewStatus, ReviewVO } from "@/types/api";
@@ -261,6 +262,7 @@ export function AdminReviewsPage() {
                       <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
                         {review.content || "（未填写文字评价）"}
                       </p>
+                      <ReviewImages images={review.images} className="mt-2" />
                       {review.reply ? (
                         <p className="mt-1.5 line-clamp-2 rounded-md bg-muted/60 px-2 py-1 text-[11px] text-muted-foreground">
                           回复：{review.reply}
@@ -428,6 +430,7 @@ function ReplyDialog({
             <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
               {review.content || "（未填写文字评价）"}
             </p>
+            <ReviewImages images={review.images} className="mt-2" />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="admin-review-reply">回复内容 *</Label>
@@ -447,5 +450,26 @@ function ReplyDialog({
         </div>
       ) : null}
     </Dialog>
+  );
+}
+
+function ReviewImages({ images, className }: { images?: string[]; className?: string }) {
+  if (!images || images.length === 0) return null;
+  return (
+    <div className={`flex flex-wrap gap-1.5 ${className ?? ""}`}>
+      {images.map((image, index) => {
+        const resolved = resolveImageUrl(image);
+        if (!resolved) return null;
+        return (
+          <img
+            key={`${image}-${index}`}
+            src={resolved}
+            alt={`评价实拍 ${index + 1}`}
+            className="h-12 w-12 rounded-md border border-border object-cover"
+            loading="lazy"
+          />
+        );
+      })}
+    </div>
   );
 }

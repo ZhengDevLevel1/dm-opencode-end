@@ -55,6 +55,10 @@ export const routeLoaders = {
     import("@/pages/admin/admin-products-page").then((module) => ({
       default: module.AdminProductsPage,
     })),
+  adminCatalog: () =>
+    import("@/pages/admin/admin-catalog-page").then((module) => ({
+      default: module.AdminCatalogPage,
+    })),
   adminTags: () =>
     import("@/pages/admin/admin-tags-page").then((module) => ({
       default: module.AdminTagsPage,
@@ -107,6 +111,7 @@ const exactRoutes: Record<string, () => Promise<unknown>> = {
   "/staff/inventory": routeLoaders.staffInventory,
   "/admin": routeLoaders.adminDashboard,
   "/admin/products": routeLoaders.adminProducts,
+  "/admin/catalog": routeLoaders.adminCatalog,
   "/admin/tags": routeLoaders.adminTags,
   "/admin/metrics": routeLoaders.adminMetrics,
   "/admin/users": routeLoaders.adminUsers,

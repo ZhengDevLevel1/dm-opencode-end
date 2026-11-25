@@ -6,6 +6,7 @@ import { useClientPagination } from "@/hooks/use-client-pagination";
 import { orderService, reviewService } from "@/lib/services";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/format";
+import { resolveImageUrl } from "@/lib/image";
 import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
@@ -13,6 +14,7 @@ import type { OrderItemVO, OrderVO, PageResult, ReviewVO } from "@/types/api";
 import { Rating, StarInput } from "@/components/domain/rating";
 import { ReviewStatusBadge } from "@/components/domain/status-badge";
 import { ProductImage } from "@/components/domain/product-image";
+import { MultiImageUpload } from "@/components/domain/multi-image-upload";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,6 +59,7 @@ export function MyReviewsPage() {
   const [target, setTarget] = useState<PendingItem | null>(null);
   const [rating, setRating] = useState(5);
   const [content, setContent] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const autoOpenRef = useRef(false);
 
   const completedOrders = useQuery({
@@ -159,6 +162,7 @@ export function MyReviewsPage() {
     setTarget(pending);
     setRating(5);
     setContent("");
+    setImages([]);
     if (searchParams.has("orderId") || searchParams.has("orderItemId")) {
       const next = new URLSearchParams(searchParams);
       next.delete("orderId");
@@ -187,11 +191,13 @@ export function MyReviewsPage() {
         orderItemId: target?.item.id ?? 0,
         rating,
         content: content.trim() || undefined,
+        images: images.length > 0 ? images : undefined,
       }),
     onSuccess: () => {
       toast.success("评价已发布", "感谢分享真实感受。");
       setTarget(null);
       setContent("");
+      setImages([]);
       void queryClient.invalidateQueries({ queryKey: ["reviews"] });
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
       void queryClient.invalidateQueries({ queryKey: ["order"] });
@@ -240,6 +246,7 @@ export function MyReviewsPage() {
     if (createReview.isPending) return;
     setTarget(null);
     setContent("");
+    setImages([]);
   };
 
   const historyRecords = history.data?.records ?? [];
@@ -532,6 +539,20 @@ export function MyReviewsPage() {
               {content.length}/500
             </p>
           </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium">实拍图</p>
+            <MultiImageUpload
+              value={images}
+              onChange={setImages}
+              category="review"
+              max={6}
+              showPrimary={false}
+              tileClassName="aspect-square"
+              cropAspect={1}
+              label="上传实拍"
+              hint="选填，最多 6 张；支持 JPG/PNG/WEBP/GIF，单张不超过 5MB。"
+            />
+          </div>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             提交后不可重复评价；如需调整内容，请联系门店工作人员。
           </p>
@@ -573,6 +594,23 @@ function ReviewCard({ review }: { review: ReviewVO }) {
       <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
         {review.content ?? "这位顾客只留下了评分。"}
       </p>
+      {review.images && review.images.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {review.images.map((image, index) => {
+            const resolved = resolveImageUrl(image);
+            if (!resolved) return null;
+            return (
+              <img
+                key={`${image}-${index}`}
+                src={resolved}
+                alt={`${review.productName ?? "花礼"} 实拍 ${index + 1}`}
+                className="h-20 w-20 rounded-lg border border-border object-cover"
+                loading="lazy"
+              />
+            );
+          })}
+        </div>
+      ) : null}
       {review.reply ? (
         <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3.5 py-3">
           <p className="flex items-center gap-1.5 text-[11px] font-medium text-primary">

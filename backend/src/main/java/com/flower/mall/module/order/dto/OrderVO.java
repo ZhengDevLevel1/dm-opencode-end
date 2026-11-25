@@ -33,6 +33,8 @@ public class OrderVO {
     private BigDecimal receiverLongitude;
     private BigDecimal receiverLatitude;
     private String remark;
+    private String greetingCard;
+    private LocalDateTime deliveryAt;
     private String cancelReason;
     private String afterSaleReason;
     private LocalDateTime paidAt;
@@ -56,6 +58,8 @@ public class OrderVO {
                 .receiverLongitude(order.getReceiverLongitude())
                 .receiverLatitude(order.getReceiverLatitude())
                 .remark(order.getRemark())
+                .greetingCard(order.getGreetingCard())
+                .deliveryAt(order.getDeliveryAt())
                 .cancelReason(order.getCancelReason())
                 .afterSaleReason(order.getAfterSaleReason())
                 .paidAt(order.getPaidAt())

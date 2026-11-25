@@ -29,6 +29,7 @@ const StaffOrderDetailPage = lazy(routeLoaders.staffOrderDetail);
 const StaffInventoryPage = lazy(routeLoaders.staffInventory);
 const AdminDashboardPage = lazy(routeLoaders.adminDashboard);
 const AdminProductsPage = lazy(routeLoaders.adminProducts);
+const AdminCatalogPage = lazy(routeLoaders.adminCatalog);
 const AdminTagsPage = lazy(routeLoaders.adminTags);
 const AdminMetricsPage = lazy(routeLoaders.adminMetrics);
 const AdminUsersPage = lazy(routeLoaders.adminUsers);
@@ -173,6 +174,14 @@ export function AppRoutes() {
             element={
               <RequireRole roles={["ADMIN"]}>
                 <AdminProductsPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="admin/catalog"
+            element={
+              <RequireRole roles={["ADMIN"]}>
+                <AdminCatalogPage />
               </RequireRole>
             }
           />

@@ -16,6 +16,7 @@ DROP TABLE IF EXISTS operation_log;
 DROP TABLE IF EXISTS recommendation_log;
 DROP TABLE IF EXISTS recommendation_scene_weight;
 DROP TABLE IF EXISTS recommendation_weight;
+DROP TABLE IF EXISTS review_image;
 DROP TABLE IF EXISTS review;
 DROP TABLE IF EXISTS fulfillment_record;
 DROP TABLE IF EXISTS payment_record;
@@ -24,7 +25,14 @@ DROP TABLE IF EXISTS shop_order;
 DROP TABLE IF EXISTS user_favorite;
 DROP TABLE IF EXISTS cart_item;
 DROP TABLE IF EXISTS inventory_record;
+DROP TABLE IF EXISTS product_spec_flower;
+DROP TABLE IF EXISTS product_spec;
+DROP TABLE IF EXISTS product_flower_material;
+DROP TABLE IF EXISTS product_image;
 DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS business_hour;
+DROP TABLE IF EXISTS wrap_color;
+DROP TABLE IF EXISTS flower_material;
 DROP TABLE IF EXISTS user_address;
 DROP TABLE IF EXISTS sys_user;
 
@@ -90,6 +98,85 @@ CREATE TABLE product (
     deleted TINYINT NOT NULL DEFAULT 0
 );
 
+CREATE TABLE flower_material (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    latin_name VARCHAR(80),
+    note VARCHAR(200),
+    color_hex VARCHAR(20),
+    image_url VARCHAR(500),
+    enabled TINYINT NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_flower_material_name UNIQUE (name)
+);
+
+CREATE TABLE wrap_color (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    hex VARCHAR(20) NOT NULL,
+    ring_hex VARCHAR(20),
+    description VARCHAR(200),
+    enabled TINYINT NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_wrap_color_name UNIQUE (name)
+);
+
+CREATE TABLE business_hour (
+    day_of_week TINYINT PRIMARY KEY,
+    open_time TIME NOT NULL,
+    close_time TIME NOT NULL,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    note VARCHAR(100)
+);
+
+CREATE TABLE product_image (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_product_image_product FOREIGN KEY (product_id) REFERENCES product (id)
+);
+
+CREATE TABLE product_flower_material (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT NOT NULL,
+    material_id BIGINT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    CONSTRAINT uk_product_flower_material UNIQUE (product_id, material_id),
+    CONSTRAINT fk_pfm_product FOREIGN KEY (product_id) REFERENCES product (id),
+    CONSTRAINT fk_pfm_material FOREIGN KEY (material_id) REFERENCES flower_material (id)
+);
+
+CREATE TABLE product_spec (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT NOT NULL,
+    name VARCHAR(60) NOT NULL,
+    description VARCHAR(200),
+    price DECIMAL(10,2),
+    original_price DECIMAL(10,2),
+    sort_order INT NOT NULL DEFAULT 0,
+    enabled TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_product_spec_name UNIQUE (product_id, name),
+    CONSTRAINT fk_product_spec_product FOREIGN KEY (product_id) REFERENCES product (id)
+);
+
+CREATE TABLE product_spec_flower (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    spec_id BIGINT NOT NULL,
+    material_id BIGINT NOT NULL,
+    quantity INT NOT NULL,
+    CONSTRAINT uk_product_spec_flower UNIQUE (spec_id, material_id),
+    CONSTRAINT fk_psf_spec FOREIGN KEY (spec_id) REFERENCES product_spec (id),
+    CONSTRAINT fk_psf_material FOREIGN KEY (material_id) REFERENCES flower_material (id)
+);
+
 CREATE TABLE inventory_record (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     product_id BIGINT NOT NULL,
@@ -110,6 +197,8 @@ CREATE TABLE cart_item (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     product_id BIGINT NOT NULL,
+    spec_id BIGINT NOT NULL DEFAULT 0,
+    wrap_id BIGINT NOT NULL DEFAULT 0,
     quantity INT NOT NULL,
     source_request_id VARCHAR(64),
     source_event_id VARCHAR(80),
@@ -121,7 +210,7 @@ CREATE TABLE cart_item (
     attributed_at DATETIME,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_cart_user_product UNIQUE (user_id, product_id),
+    CONSTRAINT uk_cart_user_product UNIQUE (user_id, product_id, spec_id, wrap_id),
     CONSTRAINT fk_cart_user FOREIGN KEY (user_id) REFERENCES sys_user (id),
     CONSTRAINT fk_cart_product FOREIGN KEY (product_id) REFERENCES product (id)
 );
@@ -149,6 +238,8 @@ CREATE TABLE shop_order (
     receiver_longitude DECIMAL(10,7),
     receiver_latitude DECIMAL(10,7),
     remark VARCHAR(255),
+    greeting_card VARCHAR(100),
+    delivery_at DATETIME,
     cancel_reason VARCHAR(200),
     after_sale_reason VARCHAR(500),
     paid_at DATETIME,
@@ -168,6 +259,10 @@ CREATE TABLE order_item (
     product_name VARCHAR(100) NOT NULL,
     product_image VARCHAR(500),
     category VARCHAR(30),
+    spec_id BIGINT NOT NULL DEFAULT 0,
+    spec_name VARCHAR(60),
+    wrap_id BIGINT NOT NULL DEFAULT 0,
+    wrap_name VARCHAR(60),
     unit_price DECIMAL(10,2) NOT NULL,
     quantity INT NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
@@ -222,6 +317,15 @@ CREATE TABLE review (
     CONSTRAINT fk_review_order_item FOREIGN KEY (order_item_id) REFERENCES order_item (id),
     CONSTRAINT fk_review_user FOREIGN KEY (user_id) REFERENCES sys_user (id),
     CONSTRAINT fk_review_product FOREIGN KEY (product_id) REFERENCES product (id)
+);
+
+CREATE TABLE review_image (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    review_id BIGINT NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_review_image_review FOREIGN KEY (review_id) REFERENCES review (id)
 );
 
 CREATE TABLE recommendation_scene_weight (

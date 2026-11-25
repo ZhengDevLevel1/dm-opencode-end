@@ -20,6 +20,8 @@ import com.flower.mall.module.recommendation.service.UserBehaviorService;
 import com.flower.mall.module.review.dto.ReviewCreateRequest;
 import com.flower.mall.module.review.dto.ReviewVO;
 import com.flower.mall.module.review.entity.Review;
+import com.flower.mall.module.review.entity.ReviewImage;
+import com.flower.mall.module.review.mapper.ReviewImageMapper;
 import com.flower.mall.module.review.mapper.ReviewMapper;
 import com.flower.mall.module.user.entity.User;
 import com.flower.mall.module.user.mapper.UserMapper;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
 public class ReviewService {
 
     private final ReviewMapper reviewMapper;
+    private final ReviewImageMapper reviewImageMapper;
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final ProductMapper productMapper;
@@ -78,6 +81,7 @@ public class ReviewService {
         review.setContent(request.getContent());
         review.setStatus(ReviewStatus.VISIBLE.name());
         reviewMapper.insert(review);
+        saveImages(review.getId(), request.getImages());
 
         OrderItem updateItem = new OrderItem();
         updateItem.setId(orderItem.getId());
@@ -198,8 +202,17 @@ public class ReviewService {
                 ? productMapper.selectBatchIds(reviews.stream().map(Review::getProductId).distinct().toList())
                 .stream().collect(Collectors.toMap(Product::getId, Function.identity()))
                 : Map.of();
+        Map<Long, List<String>> images = reviewImageMapper.selectList(
+                        Wrappers.<ReviewImage>lambdaQuery()
+                                .in(ReviewImage::getReviewId, reviews.stream().map(Review::getId).toList())
+                                .orderByAsc(ReviewImage::getSortOrder)
+                                .orderByAsc(ReviewImage::getId))
+                .stream()
+                .collect(Collectors.groupingBy(ReviewImage::getReviewId,
+                        Collectors.mapping(ReviewImage::getImageUrl, Collectors.toList())));
         return reviews.stream().map(review -> {
             ReviewVO vo = ReviewVO.from(review);
+            vo.setImages(images.getOrDefault(review.getId(), List.of()));
             User user = users.get(review.getUserId());
             if (user != null) {
                 vo.setNickname(StringUtils.hasText(user.getNickname()) ? user.getNickname() : "花友");
@@ -210,6 +223,25 @@ public class ReviewService {
             }
             return vo;
         }).toList();
+    }
+
+    private void saveImages(Long reviewId, List<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return;
+        }
+        List<String> urls = imageUrls.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .limit(6)
+                .toList();
+        for (int index = 0; index < urls.size(); index++) {
+            ReviewImage image = new ReviewImage();
+            image.setReviewId(reviewId);
+            image.setImageUrl(urls.get(index));
+            image.setSortOrder(index * 10);
+            reviewImageMapper.insert(image);
+        }
     }
 
     private long clampSize(long size) {

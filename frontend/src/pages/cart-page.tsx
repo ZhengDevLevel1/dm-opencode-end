@@ -312,6 +312,11 @@ export function CartPage() {
                       >
                         {item.productName}
                       </Link>
+                      {item.specName || item.wrapName ? (
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {[item.specName, item.wrapName].filter(Boolean).join(" / ")}
+                        </p>
+                      ) : null}
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="tabular">{formatCurrency(item.price)}</span>
                         <Badge variant={item.available ? "secondary" : "destructive"}>

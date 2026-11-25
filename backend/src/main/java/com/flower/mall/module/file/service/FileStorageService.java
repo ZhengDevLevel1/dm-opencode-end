@@ -27,7 +27,7 @@ import java.util.UUID;
 public class FileStorageService {
 
     private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
-    private static final Set<String> ALLOWED_CATEGORIES = Set.of("avatar", "product", "background");
+    private static final Set<String> ALLOWED_CATEGORIES = Set.of("avatar", "product", "background", "review", "flower");
     private static final Map<String, String> CONTENT_TYPE_EXTENSIONS = Map.of(
             "image/jpeg", "jpg",
             "image/png", "png",

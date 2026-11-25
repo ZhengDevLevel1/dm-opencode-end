@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -39,4 +40,9 @@ public class CreateOrderRequest {
 
     @Size(max = 255, message = "订单备注不能超过255个字符")
     private String remark;
+
+    @Size(max = 100, message = "贺卡内容不能超过100个字符")
+    private String greetingCard;
+
+    private LocalDateTime deliveryAt;
 }

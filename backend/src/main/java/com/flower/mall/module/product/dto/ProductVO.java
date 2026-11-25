@@ -2,6 +2,7 @@ package com.flower.mall.module.product.dto;
 
 import com.flower.mall.common.enums.ProductStatus;
 import com.flower.mall.common.enums.SeasonSuitability;
+import com.flower.mall.module.catalog.dto.FlowerMaterialVO;
 import com.flower.mall.module.product.entity.Product;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -27,6 +29,9 @@ public class ProductVO {
     private BigDecimal originalPrice;
     private Integer stock;
     private String imageUrl;
+    private List<String> imageUrls;
+    private List<FlowerMaterialVO> flowerMaterials;
+    private List<ProductSpecVO> specs;
     private String description;
     private String aiTags;
     private String aiSellingPoints;

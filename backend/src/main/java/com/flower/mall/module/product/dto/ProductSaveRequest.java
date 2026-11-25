@@ -1,5 +1,6 @@
 package com.flower.mall.module.product.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -9,6 +10,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Data
 public class ProductSaveRequest {
@@ -43,6 +45,16 @@ public class ProductSaveRequest {
 
     @Size(max = 500, message = "图片地址不能超过500个字符")
     private String imageUrl;
+
+    @Size(max = 8, message = "商品最多上传8张图片")
+    private List<@Size(max = 500, message = "图片地址不能超过500个字符") String> imageUrls;
+
+    @Size(max = 20, message = "商品最多选择20种花材")
+    private List<Long> flowerMaterialIds;
+
+    @Size(max = 10, message = "商品最多配置10个规格")
+    @Valid
+    private List<ProductSpecSaveRequest> specs;
 
     @Size(max = 2000, message = "商品描述不能超过2000个字符")
     private String description;

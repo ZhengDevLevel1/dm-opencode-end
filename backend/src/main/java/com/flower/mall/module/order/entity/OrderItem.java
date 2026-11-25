@@ -24,6 +24,14 @@ public class OrderItem {
 
     private String category;
 
+    private Long specId;
+
+    private String specName;
+
+    private Long wrapId;
+
+    private String wrapName;
+
     private BigDecimal unitPrice;
 
     private Integer quantity;

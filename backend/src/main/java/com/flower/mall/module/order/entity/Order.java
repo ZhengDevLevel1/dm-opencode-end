@@ -41,6 +41,10 @@ public class Order {
 
     private String remark;
 
+    private String greetingCard;
+
+    private LocalDateTime deliveryAt;
+
     private String cancelReason;
 
     private String afterSaleReason;

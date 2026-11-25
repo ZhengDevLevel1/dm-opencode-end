@@ -12,15 +12,18 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { useAddressesQuery, useCartQuery } from "@/hooks/queries";
+import { useAddressesQuery, useBusinessHoursQuery, useCartQuery } from "@/hooks/queries";
 import { orderService, paymentService } from "@/lib/services";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
+import { defaultDeliverySelection, deliveryWindowError, toDeliveryAt } from "@/lib/business-hours";
 import { formatCurrency, formatMoney } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
 import type { AddressVO, CartItemVO, OrderVO, PaymentVO } from "@/types/api";
 import { AddressDialog } from "@/components/domain/address-dialog";
+import { DeliveryTimePicker } from "@/components/domain/delivery-time-picker";
+import { GreetingCardEditor } from "@/components/domain/greeting-card-editor";
 import { ProductImage } from "@/components/domain/product-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,10 +41,21 @@ export function CheckoutPage() {
   const queryClient = useQueryClient();
   const cart = useCartQuery();
   const addresses = useAddressesQuery();
+  const hoursQuery = useBusinessHoursQuery();
+  const hours = useMemo(() => hoursQuery.data ?? [], [hoursQuery.data]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [addressQuery, setAddressQuery] = useState("");
   const [addressDialogOpen, setAddressDialogOpen] = useState(false);
   const [remark, setRemark] = useState("");
+  const [greeting, setGreeting] = useState(() => {
+    try {
+      return sessionStorage.getItem("flower.greetingCard") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryTime, setDeliveryTime] = useState("");
   const [snapshot, setSnapshot] = useState<CartItemVO[] | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [payment, setPayment] = useState<PaymentVO | null>(null);
@@ -104,6 +118,38 @@ export function CheckoutPage() {
   const items = snapshot ?? initialItems;
   const selectedAddress =
     addressList.find((address) => address.id === selectedAddressId) ?? null;
+  const deliveryError =
+    deliveryDate && deliveryTime ? deliveryWindowError(deliveryDate, deliveryTime, hours) : null;
+
+  useEffect(() => {
+    if (hours.length === 0) return;
+    let stored: string | null = null;
+    try {
+      stored = sessionStorage.getItem("flower.deliveryAt");
+    } catch {
+      stored = null;
+    }
+    if (stored) {
+      const [date, time] = stored.split("T");
+      if (date && time && !deliveryWindowError(date, time.slice(0, 5), hours)) {
+        setDeliveryDate(date);
+        setDeliveryTime(time.slice(0, 5));
+        return;
+      }
+    }
+    const fallback = defaultDeliverySelection(hours);
+    setDeliveryDate(fallback.date);
+    setDeliveryTime(fallback.time);
+  }, [hours]);
+
+  useEffect(() => {
+    try {
+      if (greeting.trim()) sessionStorage.setItem("flower.greetingCard", greeting);
+      else sessionStorage.removeItem("flower.greetingCard");
+    } catch {
+      /* storage unavailable */
+    }
+  }, [greeting]);
 
   const subtotalCents = items.reduce(
     (total, item) => total + Math.round(item.subtotal * 100),
@@ -135,6 +181,14 @@ export function CheckoutPage() {
       toast.error("请选择收货地址", "可以新增地址或到地址簿管理常用地址。");
       return;
     }
+    if (!deliveryDate || !deliveryTime) {
+      toast.error("请选择送达时间", "花艺师需要提前 1 小时备花。");
+      return;
+    }
+    if (deliveryError) {
+      toast.error("送达时间不可用", deliveryError);
+      return;
+    }
     setSubmitting(true);
     setPaymentError("");
     let order: OrderVO | null = null;
@@ -147,9 +201,17 @@ export function CheckoutPage() {
         receiverAddress: selectedAddress.fullAddress,
         receiverLongitude: selectedAddress.longitude,
         receiverLatitude: selectedAddress.latitude,
+        greetingCard: greeting.trim() || undefined,
+        deliveryAt: toDeliveryAt(deliveryDate, deliveryTime),
         remark: remark.trim() || undefined,
       });
       setCreatedOrder(order);
+      try {
+        sessionStorage.removeItem("flower.greetingCard");
+        sessionStorage.removeItem("flower.deliveryAt");
+      } catch {
+        /* storage unavailable */
+      }
       invalidateAfterOrder();
       try {
         const paymentRecord = await paymentService.create(order.id);
@@ -443,6 +505,27 @@ export function CheckoutPage() {
                   )}
                 </div>
               ) : null}
+
+              <div className="mt-5 space-y-4 border-t border-border/60 pt-4">
+                <DeliveryTimePicker
+                  value={{ date: deliveryDate, time: deliveryTime }}
+                  hours={hours}
+                  onChange={(next) => {
+                    setDeliveryDate(next.date);
+                    setDeliveryTime(next.time);
+                  }}
+                />
+                {deliveryError ? (
+                  <p className="text-[11px] text-destructive">{deliveryError}</p>
+                ) : deliveryDate && deliveryTime ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    已选 {deliveryDate} {deliveryTime}，花艺师会提前完成打包。
+                  </p>
+                ) : null}
+                <div className="rounded-2xl border border-border/60 bg-card p-3.5">
+                  <GreetingCardEditor value={greeting} onChange={setGreeting} compact />
+                </div>
+              </div>
 
               <div className="mt-4 space-y-1.5">
                 <Label htmlFor="remark">订单备注</Label>

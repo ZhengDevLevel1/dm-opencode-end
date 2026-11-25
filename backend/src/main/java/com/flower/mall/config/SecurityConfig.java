@@ -59,7 +59,8 @@ public class SecurityConfig {
                         .requestMatchers("/doc.html", "/webjars/**", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-ui.html", "/favicon.ico", "/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/recommendations/**",
-                                "/api/reviews/products/**", "/api/dict/**", "/api/appearance/**").permitAll()
+                                "/api/reviews/products/**", "/api/dict/**", "/api/appearance/**",
+                                "/api/catalog/**").permitAll()
                         .requestMatchers("/api/ai/**").permitAll()
                         .requestMatchers("/api/recommendation-events/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")

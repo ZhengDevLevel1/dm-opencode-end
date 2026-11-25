@@ -181,6 +181,12 @@ export const navGroups: NavGroup[] = [
         icon: PackageSearch,
       },
       {
+        label: "商品配置",
+        description: "花材、包装与营业时间",
+        to: "/admin/catalog",
+        icon: Flower2,
+      },
+      {
         label: "标签管理",
         description: "场景、节日与花语",
         to: "/admin/tags",
@@ -298,6 +304,11 @@ const staticMeta: Record<string, RouteMeta> = {
   "/staff/inventory": { title: "库存管理", description: "查看流水并调整在售花礼库存", icon: Boxes },
   "/admin": { title: "经营总览", description: "销售额、订单与花礼经营状况", icon: LayoutDashboard },
   "/admin/products": { title: "商品管理", description: "维护花礼信息、状态与库存", icon: PackageSearch },
+  "/admin/catalog": {
+    title: "商品配置",
+    description: "维护花材库、包装色系与营业时间",
+    icon: Flower2,
+  },
   "/admin/tags": { title: "标签管理", description: "维护品类、场景、节日与花语标签及首页展示", icon: Tags },
   "/admin/metrics": { title: "指标配置", description: "调整价格带与库存分档阈值", icon: SlidersHorizontal },
   "/admin/users": { title: "用户管理", description: "账号、角色与启用状态", icon: UsersRound },
@@ -338,6 +349,9 @@ export function getRouteMeta(pathname: string): RouteMeta {
   }
   if (pathname.startsWith("/admin/products")) {
     return staticMeta["/admin/products"];
+  }
+  if (pathname.startsWith("/admin/catalog")) {
+    return staticMeta["/admin/catalog"];
   }
   if (pathname.startsWith("/admin/tags")) {
     return staticMeta["/admin/tags"];

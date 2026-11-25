@@ -29,12 +29,70 @@ INSERT INTO product (id, name, category, flower_meaning, occasion_tags, festival
 (15, '下架测试百合', '百合', '测试商品', '日常', '', 99.00, 129.00, 10, '/images/products/lily-test.svg', '用于验证下架商品不可下单。', 'ALL', 0, 0.00, 0, 'OFF_SHELF', DATEADD('DAY', -60, CURRENT_TIMESTAMP)),
 (16, '康乃馨单支', '康乃馨', '感恩每一天', '母亲节,教师节,日常', '母亲节,教师节', 19.00, 29.00, 6, '/images/products/carnation-single.svg', '单支康乃馨，简单心意，适合日常表达感谢。', 'SPRING', 500, 4.20, 12, 'ON_SALE', DATEADD('DAY', -50, CURRENT_TIMESTAMP));
 
-INSERT INTO shop_order (id, order_no, user_id, total_amount, pay_amount, status, receiver_name, receiver_phone, receiver_address, receiver_longitude, receiver_latitude, remark, cancel_reason, paid_at, completed_at, version, created_at) VALUES
-(1, 'FL202605010001', 3, 358.00, 358.00, 'COMPLETED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, '请在工作日下午配送', NULL, DATEADD('DAY', -5, CURRENT_TIMESTAMP), DATEADD('DAY', -3, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -5, CURRENT_TIMESTAMP)),
-(2, 'FL202605020002', 4, 298.00, 298.00, 'COMPLETED', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '母亲节礼物，请附贺卡', NULL, DATEADD('DAY', -10, CURRENT_TIMESTAMP), DATEADD('DAY', -8, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -10, CURRENT_TIMESTAMP)),
-(3, 'FL202605030003', 4, 238.00, 238.00, 'PENDING_PAYMENT', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, NULL, NULL, NULL, NULL, 0, DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
-(4, 'FL202605040004', 3, 599.00, 599.00, 'CANCELLED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, NULL, '临时取消，改日再订', NULL, NULL, 0, DATEADD('DAY', -15, CURRENT_TIMESTAMP)),
-(5, 'FL202605050005', 4, 189.00, 189.00, 'PAID', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '希望18点前送达', NULL, DATEADD('HOUR', -2, CURRENT_TIMESTAMP), NULL, 0, DATEADD('HOUR', -2, CURRENT_TIMESTAMP));
+INSERT INTO flower_material (id, name, latin_name, note, color_hex, enabled, sort_order) VALUES
+(1, '红玫瑰', 'Rosa rugosa', '主花，热烈浓郁，适合表达爱意', '#B23A48', 1, 10),
+(2, '尤加利', 'Eucalyptus cinerea', '叶材，清冽木质香，增加线条感', '#7D8F69', 1, 20),
+(3, '洋桔梗', 'Eustoma grandiflorum', '配花，花瓣层叠柔和', '#E8B4C8', 1, 30),
+(4, '满天星', 'Gypsophila paniculata', '点缀花，轻盈星点', '#F2EFE9', 1, 40),
+(5, '康乃馨', 'Dianthus caryophyllus', '主花，温柔耐放，适合感恩主题', '#E7A6B1', 1, 50),
+(6, '香水百合', 'Lilium orientalis', '主花，清雅芬芳', '#F7F3EA', 1, 60),
+(7, '向日葵', 'Helianthus annuus', '主花，明亮勇敢', '#E9B949', 1, 70),
+(8, '郁金香', 'Tulipa gesneriana', '主花，优雅柔和', '#D96C75', 1, 80);
+
+INSERT INTO wrap_color (id, name, hex, ring_hex, description, enabled, sort_order) VALUES
+(1, '雾面米白', '#EFE7D8', '#D7CBB8', '经典百搭，突出花材本色', 1, 10),
+(2, '苔藓绿', '#6F7D5C', '#4E5B41', '自然森系，适合枝叶类花束', 1, 20),
+(3, '胭脂粉', '#D9A6B0', '#B77A86', '柔和浪漫，适合告白与纪念日', 1, 30),
+(4, '夜墨黑', '#2E3034', '#17181A', '利落高级，适合红玫瑰', 1, 40),
+(5, '香槟金', '#C9A86A', '#A88A4E', '温润典雅，适合婚礼与庆典', 1, 50);
+
+INSERT INTO business_hour (day_of_week, open_time, close_time, enabled, note) VALUES
+(1, '09:00:00', '20:00:00', 1, '周一鲜切花正常供应'),
+(2, '09:00:00', '20:00:00', 1, '周二鲜切花正常供应'),
+(3, '09:00:00', '20:00:00', 1, '周三鲜切花正常供应'),
+(4, '09:00:00', '20:00:00', 1, '周四鲜切花正常供应'),
+(5, '09:00:00', '20:00:00', 1, '周五鲜切花正常供应'),
+(6, '09:00:00', '20:00:00', 1, '周末建议提前预约'),
+(7, '09:00:00', '20:00:00', 1, '周末建议提前预约');
+
+INSERT INTO product_flower_material (product_id, material_id, sort_order) VALUES
+(1, 1, 10), (1, 2, 20),
+(2, 1, 10), (2, 2, 20),
+(3, 5, 10), (3, 3, 20),
+(4, 6, 10), (4, 4, 20),
+(5, 7, 10), (5, 2, 20),
+(6, 8, 10), (6, 2, 20),
+(7, 1, 10), (7, 3, 20), (7, 4, 30),
+(8, 1, 10), (8, 2, 20),
+(10, 4, 10),
+(11, 5, 10), (11, 6, 20),
+(13, 1, 10), (13, 4, 20),
+(14, 1, 10), (14, 3, 20), (14, 6, 30),
+(15, 6, 10),
+(16, 5, 10);
+
+INSERT INTO product_spec (id, product_id, name, description, price, sort_order, enabled) VALUES
+(1, 1, '心动款 · 11枝', '11朵红玫瑰搭配尤加利叶，适合日常告白', 199.00, 10, 1),
+(2, 1, '深爱款 · 19枝', '19朵红玫瑰，加入满天星点缀，更有层次', 329.00, 20, 1),
+(3, 1, '至臻款 · 33枝', '33朵红玫瑰，仪式感十足的纪念日选择', 529.00, 30, 1),
+(4, 2, '经典款 · 99枝', '99朵香槟玫瑰，巨型花束手工包扎', 599.00, 10, 1),
+(5, 7, '日常款', '玫瑰、洋桔梗与满天星混搭', 189.00, 10, 1),
+(6, 7, '丰盛款', '加大花量，适合生日与探望', 269.00, 20, 1);
+
+INSERT INTO product_spec_flower (spec_id, material_id, quantity) VALUES
+(1, 1, 11), (1, 2, 3),
+(2, 1, 19), (2, 2, 5), (2, 4, 2),
+(3, 1, 33), (3, 2, 8), (3, 4, 3),
+(4, 1, 99), (4, 2, 12),
+(5, 1, 6), (5, 3, 4), (5, 4, 2),
+(6, 1, 9), (6, 3, 6), (6, 4, 3);
+
+INSERT INTO shop_order (id, order_no, user_id, total_amount, pay_amount, status, receiver_name, receiver_phone, receiver_address, receiver_longitude, receiver_latitude, remark, greeting_card, delivery_at, cancel_reason, paid_at, completed_at, version, created_at) VALUES
+(1, 'FL202605010001', 3, 358.00, 358.00, 'COMPLETED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, '请在工作日下午配送', '愿每一天都有花开的好心情。', DATEADD('DAY', -3, CURRENT_TIMESTAMP), NULL, DATEADD('DAY', -5, CURRENT_TIMESTAMP), DATEADD('DAY', -3, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -5, CURRENT_TIMESTAMP)),
+(2, 'FL202605020002', 4, 298.00, 298.00, 'COMPLETED', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '母亲节礼物，请附贺卡', '妈妈，节日快乐，愿您被温柔以待。', DATEADD('DAY', -8, CURRENT_TIMESTAMP), NULL, DATEADD('DAY', -10, CURRENT_TIMESTAMP), DATEADD('DAY', -8, CURRENT_TIMESTAMP), 0, DATEADD('DAY', -10, CURRENT_TIMESTAMP)),
+(3, 'FL202605030003', 4, 238.00, 238.00, 'PENDING_PAYMENT', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, NULL, NULL, DATEADD('DAY', 2, CURRENT_TIMESTAMP), NULL, NULL, NULL, 0, DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+(4, 'FL202605040004', 3, 599.00, 599.00, 'CANCELLED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, NULL, NULL, NULL, '临时取消，改日再订', NULL, NULL, 0, DATEADD('DAY', -15, CURRENT_TIMESTAMP)),
+(5, 'FL202605050005', 4, 189.00, 189.00, 'PAID', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '希望18点前送达', '谢谢你一直陪在我身边。', DATEADD('DAY', 1, CURRENT_TIMESTAMP), NULL, DATEADD('HOUR', -2, CURRENT_TIMESTAMP), NULL, 0, DATEADD('HOUR', -2, CURRENT_TIMESTAMP));
 
 INSERT INTO order_item (id, order_id, product_id, product_name, product_image, category, unit_price, quantity, subtotal, reviewed) VALUES
 (1, 1, 1, '经典红玫瑰礼盒·11朵', '/images/products/rose-11.svg', '玫瑰', 199.00, 1, 199.00, 1),

@@ -392,6 +392,11 @@ export function OrderDetailPage() {
                         >
                           {item.productName}
                         </Link>
+                        {item.specName || item.wrapName ? (
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            {[item.specName, item.wrapName].filter(Boolean).join(" / ")}
+                          </p>
+                        ) : null}
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span>{item.category}</span>
                           <span className="tabular">
@@ -487,6 +492,28 @@ export function OrderDetailPage() {
                   <dd className="mt-0.5 text-sm leading-relaxed">{orderData.receiverAddress}</dd>
                 </div>
               </div>
+              {orderData.deliveryAt ? (
+                <div className="flex items-start gap-2.5">
+                  <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <dt className="text-[11px] text-muted-foreground">预约送达</dt>
+                    <dd className="mt-0.5 text-sm tabular">
+                      {formatDateTime(orderData.deliveryAt)}
+                    </dd>
+                  </div>
+                </div>
+              ) : null}
+              {orderData.greetingCard ? (
+                <div className="flex items-start gap-2.5 sm:col-span-2">
+                  <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div>
+                    <dt className="text-[11px] text-muted-foreground">贺卡留言</dt>
+                    <dd className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">
+                      {orderData.greetingCard}
+                    </dd>
+                  </div>
+                </div>
+              ) : null}
             </dl>
             {orderData.remark || orderData.cancelReason || orderData.afterSaleReason ? (
               <div className="mt-4 space-y-2.5 border-t border-border/60 pt-4 text-sm">

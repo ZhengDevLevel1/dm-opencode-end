@@ -12,6 +12,10 @@ export function invalidateCatalogQueries(queryClient: QueryClient, productId?: n
     queryKeys.adminOverview,
     queryKeys.adminTopProducts,
     queryKeys.adminCategorySales,
+    queryKeys.flowerMaterials,
+    queryKeys.wrapColors,
+    queryKeys.adminFlowerMaterials,
+    queryKeys.adminWrapColors,
   ];
 
   prefixes.forEach((queryKey) => {

@@ -19,6 +19,10 @@ public class OrderItemVO {
     private String productName;
     private String productImage;
     private String category;
+    private Long specId;
+    private String specName;
+    private Long wrapId;
+    private String wrapName;
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal subtotal;
@@ -31,6 +35,10 @@ public class OrderItemVO {
                 .productName(item.getProductName())
                 .productImage(item.getProductImage())
                 .category(item.getCategory())
+                .specId(item.getSpecId())
+                .specName(item.getSpecName())
+                .wrapId(item.getWrapId())
+                .wrapName(item.getWrapName())
                 .unitPrice(item.getUnitPrice())
                 .quantity(item.getQuantity())
                 .subtotal(item.getSubtotal())

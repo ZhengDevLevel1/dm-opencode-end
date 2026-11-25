@@ -16,6 +16,9 @@ import com.flower.mall.module.address.dto.AddressVO;
 import com.flower.mall.module.address.service.AddressService;
 import com.flower.mall.module.cart.entity.CartItem;
 import com.flower.mall.module.cart.service.CartService;
+import com.flower.mall.module.catalog.entity.WrapColor;
+import com.flower.mall.module.catalog.mapper.WrapColorMapper;
+import com.flower.mall.module.catalog.service.BusinessHourService;
 import com.flower.mall.module.inventory.service.InventoryService;
 import com.flower.mall.module.order.dto.AfterSaleHandleRequest;
 import com.flower.mall.module.order.dto.CreateOrderRequest;
@@ -27,7 +30,9 @@ import com.flower.mall.module.order.mapper.OrderMapper;
 import com.flower.mall.module.payment.entity.PaymentRecord;
 import com.flower.mall.module.payment.mapper.PaymentRecordMapper;
 import com.flower.mall.module.product.entity.Product;
+import com.flower.mall.module.product.entity.ProductSpec;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.product.mapper.ProductSpecMapper;
 import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
 import com.flower.mall.module.recommendation.service.RecommendationEventService;
 import com.flower.mall.module.recommendation.service.UserBehaviorService;
@@ -67,6 +72,9 @@ public class OrderService {
     private final UserBehaviorService userBehaviorService;
     private final RecommendationEventService recommendationEventService;
     private final AddressService addressService;
+    private final ProductSpecMapper productSpecMapper;
+    private final WrapColorMapper wrapColorMapper;
+    private final BusinessHourService businessHourService;
 
     @Transactional
     public OrderVO create(CreateOrderRequest request) {
@@ -84,6 +92,8 @@ public class OrderService {
         Map<Long, Product> products = productMapper.selectBatchIds(
                         cartItems.stream().map(CartItem::getProductId).distinct().toList())
                 .stream().collect(Collectors.toMap(Product::getId, Function.identity()));
+        Map<Long, ProductSpec> specs = loadSpecs(cartItems);
+        Map<Long, WrapColor> wraps = loadWraps(cartItems);
 
         BigDecimal total = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
@@ -99,9 +109,13 @@ public class OrderService {
                 throw BusinessException.of(ErrorCode.STOCK_INSUFFICIENT,
                         "商品「" + product.getName() + "」库存不足，当前库存 " + product.getStock());
             }
-            total = total.add(product.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
+            ProductSpec spec = resolveSpec(cartItem, specs, product);
+            resolveWrap(cartItem, wraps);
+            BigDecimal unitPrice = unitPrice(product, spec);
+            total = total.add(unitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity())));
         }
         total = total.setScale(2, RoundingMode.HALF_UP);
+        businessHourService.validateDelivery(request.getDeliveryAt());
 
         Order order = new Order();
         order.setOrderNo(OrderNoGenerator.nextOrderNo());
@@ -118,6 +132,9 @@ public class OrderService {
         order.setReceiverLongitude(address == null ? request.getReceiverLongitude() : address.getLongitude());
         order.setReceiverLatitude(address == null ? request.getReceiverLatitude() : address.getLatitude());
         order.setRemark(request.getRemark());
+        order.setGreetingCard(StringUtils.hasText(request.getGreetingCard())
+                ? request.getGreetingCard().trim() : null);
+        order.setDeliveryAt(request.getDeliveryAt());
         order.setVersion(0);
         orderMapper.insert(order);
 
@@ -127,6 +144,9 @@ public class OrderService {
                 .toList();
         for (CartItem cartItem : sortedItems) {
             Product product = products.get(cartItem.getProductId());
+            ProductSpec spec = resolveSpec(cartItem, specs, product);
+            WrapColor wrap = resolveWrap(cartItem, wraps);
+            BigDecimal unitPrice = unitPrice(product, spec);
             int quantity = cartItem.getQuantity();
             int stockBefore = product.getStock();
             int updated = productMapper.deductStock(product.getId(), quantity);
@@ -141,9 +161,13 @@ public class OrderService {
             item.setProductName(product.getName());
             item.setProductImage(product.getImageUrl());
             item.setCategory(product.getCategory());
-            item.setUnitPrice(product.getPrice());
+            item.setSpecId(spec == null ? 0L : spec.getId());
+            item.setSpecName(spec == null ? null : spec.getName());
+            item.setWrapId(wrap == null ? 0L : wrap.getId());
+            item.setWrapName(wrap == null ? null : wrap.getName());
+            item.setUnitPrice(unitPrice);
             item.setQuantity(quantity);
-            item.setSubtotal(product.getPrice().multiply(BigDecimal.valueOf(quantity))
+            item.setSubtotal(unitPrice.multiply(BigDecimal.valueOf(quantity))
                     .setScale(2, RoundingMode.HALF_UP));
             item.setReviewed(0);
             orderItemMapper.insert(item);
@@ -391,6 +415,59 @@ public class OrderService {
                 cacheService.evict(CacheKeys.productDetail(productId)));
         cacheService.evict(CacheKeys.HOT_PRODUCTS);
         catalogCache.invalidate();
+    }
+
+    private Map<Long, ProductSpec> loadSpecs(List<CartItem> cartItems) {
+        List<Long> specIds = cartItems.stream()
+                .map(CartItem::getSpecId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (specIds.isEmpty()) {
+            return Map.of();
+        }
+        return productSpecMapper.selectBatchIds(specIds).stream()
+                .collect(Collectors.toMap(ProductSpec::getId, Function.identity()));
+    }
+
+    private Map<Long, WrapColor> loadWraps(List<CartItem> cartItems) {
+        List<Long> wrapIds = cartItems.stream()
+                .map(CartItem::getWrapId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        if (wrapIds.isEmpty()) {
+            return Map.of();
+        }
+        return wrapColorMapper.selectBatchIds(wrapIds).stream()
+                .collect(Collectors.toMap(WrapColor::getId, Function.identity()));
+    }
+
+    private ProductSpec resolveSpec(CartItem cartItem, Map<Long, ProductSpec> specs, Product product) {
+        if (cartItem.getSpecId() == null || cartItem.getSpecId() <= 0) {
+            return null;
+        }
+        ProductSpec spec = specs.get(cartItem.getSpecId());
+        if (spec == null || spec.getEnabled() == null || spec.getEnabled() != 1
+                || !product.getId().equals(spec.getProductId())) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "购物车中的规格已失效，请重新选择");
+        }
+        return spec;
+    }
+
+    private WrapColor resolveWrap(CartItem cartItem, Map<Long, WrapColor> wraps) {
+        if (cartItem.getWrapId() == null || cartItem.getWrapId() <= 0) {
+            return null;
+        }
+        WrapColor wrap = wraps.get(cartItem.getWrapId());
+        if (wrap == null || wrap.getEnabled() == null || wrap.getEnabled() != 1) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "购物车中的包装色系已失效，请重新选择");
+        }
+        return wrap;
+    }
+
+    private BigDecimal unitPrice(Product product, ProductSpec spec) {
+        return spec != null && spec.getPrice() != null ? spec.getPrice() : product.getPrice();
     }
 
     private PageResult<OrderVO> toPageResult(IPage<Order> orderPage, boolean includeBuyer) {

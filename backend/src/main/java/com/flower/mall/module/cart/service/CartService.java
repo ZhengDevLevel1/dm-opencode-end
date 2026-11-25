@@ -10,8 +10,12 @@ import com.flower.mall.module.cart.dto.CartItemVO;
 import com.flower.mall.module.cart.dto.CartUpdateRequest;
 import com.flower.mall.module.cart.entity.CartItem;
 import com.flower.mall.module.cart.mapper.CartItemMapper;
+import com.flower.mall.module.catalog.entity.WrapColor;
+import com.flower.mall.module.catalog.mapper.WrapColorMapper;
 import com.flower.mall.module.product.entity.Product;
+import com.flower.mall.module.product.entity.ProductSpec;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.product.mapper.ProductSpecMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +34,8 @@ public class CartService {
 
     private final CartItemMapper cartItemMapper;
     private final ProductMapper productMapper;
+    private final ProductSpecMapper productSpecMapper;
+    private final WrapColorMapper wrapColorMapper;
 
     public List<CartItemVO> list() {
         Long userId = SecurityUtils.currentUserId();
@@ -46,10 +52,16 @@ public class CartService {
         Product product = productMapper.selectById(request.getProductId());
 
         validateProduct(product, request.getQuantity());
+        ProductSpec spec = resolveSpec(product, request.getSpecId());
+        WrapColor wrap = resolveWrap(request.getWrapId());
+        Long specId = spec == null ? 0L : spec.getId();
+        Long wrapId = wrap == null ? 0L : wrap.getId();
 
         CartItem existing = cartItemMapper.selectOne(Wrappers.<CartItem>lambdaQuery()
                 .eq(CartItem::getUserId, userId)
-                .eq(CartItem::getProductId, request.getProductId()));
+                .eq(CartItem::getProductId, request.getProductId())
+                .eq(CartItem::getSpecId, specId)
+                .eq(CartItem::getWrapId, wrapId));
 
         int targetQuantity = request.getQuantity();
 
@@ -59,16 +71,41 @@ public class CartService {
             existing.setQuantity(targetQuantity);
             applyAttribution(existing, request.getAttribution());
             cartItemMapper.updateById(existing);
-            return CartItemVO.from(existing, product);
+            return CartItemVO.from(existing, product, spec, wrap);
         }
 
         CartItem item = new CartItem();
         item.setUserId(userId);
         item.setProductId(request.getProductId());
+        item.setSpecId(specId);
+        item.setWrapId(wrapId);
         item.setQuantity(request.getQuantity());
         applyAttribution(item, request.getAttribution());
         cartItemMapper.insert(item);
-        return CartItemVO.from(item, product);
+        return CartItemVO.from(item, product, spec, wrap);
+    }
+
+    private ProductSpec resolveSpec(Product product, Long specId) {
+        if (specId == null || specId <= 0) {
+            return null;
+        }
+        ProductSpec spec = productSpecMapper.selectById(specId);
+        if (spec == null || !product.getId().equals(spec.getProductId())
+                || spec.getEnabled() == null || spec.getEnabled() != 1) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "所选规格不存在或已停用");
+        }
+        return spec;
+    }
+
+    private WrapColor resolveWrap(Long wrapId) {
+        if (wrapId == null || wrapId <= 0) {
+            return null;
+        }
+        WrapColor wrap = wrapColorMapper.selectById(wrapId);
+        if (wrap == null || wrap.getEnabled() == null || wrap.getEnabled() != 1) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "所选包装色系不存在或已停用");
+        }
+        return wrap;
     }
 
     private void applyAttribution(CartItem item, com.flower.mall.module.cart.dto.CartAttribution attribution) {
@@ -93,7 +130,11 @@ public class CartService {
         validateProduct(product, request.getQuantity());
         item.setQuantity(request.getQuantity());
         cartItemMapper.updateById(item);
-        return CartItemVO.from(item, product);
+        ProductSpec spec = item.getSpecId() == null || item.getSpecId() <= 0
+                ? null : productSpecMapper.selectById(item.getSpecId());
+        WrapColor wrap = item.getWrapId() == null || item.getWrapId() <= 0
+                ? null : wrapColorMapper.selectById(item.getWrapId());
+        return CartItemVO.from(item, product, spec, wrap);
     }
 
     @Transactional
@@ -135,9 +176,29 @@ public class CartService {
         List<Long> productIds = items.stream().map(CartItem::getProductId).distinct().toList();
         Map<Long, Product> products = productMapper.selectBatchIds(productIds).stream()
                 .collect(Collectors.toMap(Product::getId, Function.identity()));
+        List<Long> specIds = items.stream()
+                .map(CartItem::getSpecId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        Map<Long, ProductSpec> specs = specIds.isEmpty()
+                ? Map.of()
+                : productSpecMapper.selectBatchIds(specIds).stream()
+                .collect(Collectors.toMap(ProductSpec::getId, Function.identity()));
+        List<Long> wrapIds = items.stream()
+                .map(CartItem::getWrapId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .toList();
+        Map<Long, WrapColor> wraps = wrapIds.isEmpty()
+                ? Map.of()
+                : wrapColorMapper.selectBatchIds(wrapIds).stream()
+                .collect(Collectors.toMap(WrapColor::getId, Function.identity()));
         return items.stream()
                 .filter(item -> products.containsKey(item.getProductId()))
-                .map(item -> CartItemVO.from(item, products.get(item.getProductId())))
+                .map(item -> CartItemVO.from(item, products.get(item.getProductId()),
+                        item.getSpecId() == null ? null : specs.get(item.getSpecId()),
+                        item.getWrapId() == null ? null : wraps.get(item.getWrapId())))
                 .toList();
     }
 

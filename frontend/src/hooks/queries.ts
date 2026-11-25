@@ -5,6 +5,7 @@ import {
   addressService,
   appearanceService,
   cartService,
+  catalogService,
   dictService,
   favoriteService,
   preferenceService,
@@ -103,6 +104,30 @@ export function useDict() {
     queryFn: dictService.options,
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
+  });
+}
+
+export function useFlowerMaterialsQuery() {
+  return useQuery({
+    queryKey: queryKeys.flowerMaterials,
+    queryFn: catalogService.flowerMaterials,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useWrapColorsQuery() {
+  return useQuery({
+    queryKey: queryKeys.wrapColors,
+    queryFn: catalogService.wrapColors,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useBusinessHoursQuery() {
+  return useQuery({
+    queryKey: queryKeys.businessHours,
+    queryFn: catalogService.businessHours,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

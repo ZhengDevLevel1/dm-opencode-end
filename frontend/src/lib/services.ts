@@ -47,6 +47,8 @@ import type {
   AfterSaleRequest,
   AuthBackgroundRequest,
   AuthBackgroundVO,
+  BusinessHourBatchRequest,
+  BusinessHourVO,
   CancelOrderRequest,
   CartAddRequest,
   CartItemVO,
@@ -58,6 +60,8 @@ import type {
   EmailCodeLoginRequest,
   EmailCodeRequest,
   FileUploadVO,
+  FlowerMaterialSaveRequest,
+  FlowerMaterialVO,
   FulfillmentRequest,
   FulfillmentVO,
   ImageCategory,
@@ -107,6 +111,8 @@ import type {
   TopProductVO,
   UpdateProfileRequest,
   UserVO,
+  WrapColorSaveRequest,
+  WrapColorVO,
 } from "@/types/api";
 
 export const appearanceService = {
@@ -137,6 +143,12 @@ export const fileService = {
     form.append("category", category);
     return api.post<FileUploadVO>("/files/images", form, { timeout: 30_000 });
   },
+};
+
+export const catalogService = {
+  flowerMaterials: () => api.get<FlowerMaterialVO[]>("/catalog/flower-materials"),
+  wrapColors: () => api.get<WrapColorVO[]>("/catalog/wrap-colors"),
+  businessHours: () => api.get<BusinessHourVO[]>("/catalog/business-hours"),
 };
 
 export const dictService = {
@@ -267,6 +279,22 @@ export const adminService = {
     api.put<ProductVO>(`/admin/products/${id}`, body),
   setProductStatus: (id: number, status: ProductStatus) =>
     api.put<ProductVO>(`/admin/products/${id}/status`, undefined, { query: { status } }),
+  flowerMaterials: () => api.get<FlowerMaterialVO[]>("/admin/catalog/flower-materials"),
+  createFlowerMaterial: (body: FlowerMaterialSaveRequest) =>
+    api.post<FlowerMaterialVO>("/admin/catalog/flower-materials", body),
+  updateFlowerMaterial: (id: number, body: FlowerMaterialSaveRequest) =>
+    api.put<FlowerMaterialVO>(`/admin/catalog/flower-materials/${id}`, body),
+  deleteFlowerMaterial: (id: number) =>
+    api.delete<void>(`/admin/catalog/flower-materials/${id}`),
+  wrapColors: () => api.get<WrapColorVO[]>("/admin/catalog/wrap-colors"),
+  createWrapColor: (body: WrapColorSaveRequest) =>
+    api.post<WrapColorVO>("/admin/catalog/wrap-colors", body),
+  updateWrapColor: (id: number, body: WrapColorSaveRequest) =>
+    api.put<WrapColorVO>(`/admin/catalog/wrap-colors/${id}`, body),
+  deleteWrapColor: (id: number) => api.delete<void>(`/admin/catalog/wrap-colors/${id}`),
+  businessHours: () => api.get<BusinessHourVO[]>("/admin/catalog/business-hours"),
+  saveBusinessHours: (body: BusinessHourBatchRequest) =>
+    api.put<BusinessHourVO[]>("/admin/catalog/business-hours", body),
   deleteProduct: (id: number) => api.delete<void>(`/admin/products/${id}`),
 
   reviews: (query: AdminReviewQuery) =>

@@ -30,6 +30,8 @@ const sizeClass = {
 const FOCUSABLE =
   'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
+const dialogStack: string[] = [];
+
 export function Dialog({
   open,
   onOpenChange,
@@ -51,6 +53,7 @@ export function Dialog({
 
   useEffect(() => {
     if (!open) return;
+    dialogStack.push(titleId);
     const previousFocus = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -62,6 +65,7 @@ export function Dialog({
 
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (dialogStack[dialogStack.length - 1] !== titleId) return;
         event.preventDefault();
         onOpenChangeRef.current(false);
         return;
@@ -86,10 +90,12 @@ export function Dialog({
     return () => {
       window.clearTimeout(focusTimer);
       document.removeEventListener("keydown", handleKey);
+      const index = dialogStack.lastIndexOf(titleId);
+      if (index >= 0) dialogStack.splice(index, 1);
       document.body.style.overflow = previousOverflow;
       previousFocus?.focus?.();
     };
-  }, [open]);
+  }, [open, titleId]);
 
   if (!open) return null;
 

@@ -7,6 +7,8 @@ import { z } from "zod";
 import {
   Archive,
   ArchiveRestore,
+  Check,
+  Flower2,
   MoreHorizontal,
   PackagePlus,
   Pencil,
@@ -21,19 +23,21 @@ import { invalidateCatalogQueries } from "@/lib/query-invalidation";
 import { getErrorMessage } from "@/lib/api-client";
 import { formatCurrency, formatDateTime, formatNumber } from "@/lib/format";
 import { PAGE_SIZE_OPTIONS } from "@/lib/page-size-options";
-import { useDict } from "@/hooks/queries";
+import { useDict, useFlowerMaterialsQuery } from "@/hooks/queries";
 import { toast } from "@/stores/toast";
 import { cn } from "@/lib/cn";
 import type {
   ProductQuery,
   ProductSaveRequest,
   ProductSort,
+  ProductSpecSaveRequest,
+  ProductSpecVO,
   ProductStatus,
   ProductVO,
   SeasonSuitability,
   StockLevel,
 } from "@/types/api";
-import { ImageUpload } from "@/components/domain/image-upload";
+import { MultiImageUpload } from "@/components/domain/multi-image-upload";
 import { ProductImage } from "@/components/domain/product-image";
 import { Rating } from "@/components/domain/rating";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +56,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableWrap, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { TagPicker } from "@/components/ui/tag-picker";
 import {
@@ -94,18 +99,6 @@ const productSchema = z.object({
   flowerMeaning: z.string().trim().max(200, "花语最多 200 个字符").optional(),
   occasionTags: z.string().trim().max(200, "场景标签最多 200 个字符").optional(),
   festivalTags: z.string().trim().max(200, "节日标签最多 200 个字符").optional(),
-  price: z
-    .string()
-    .trim()
-    .min(1, "请输入价格")
-    .refine((value) => Number.isFinite(Number(value)) && Number(value) >= 0.01, "价格不能低于 0.01"),
-  originalPrice: z
-    .string()
-    .trim()
-    .refine(
-      (value) => !value || (Number.isFinite(Number(value)) && Number(value) >= 0.01),
-      "划线价不能低于 0.01",
-    ),
   stock: z
     .string()
     .trim()
@@ -119,6 +112,38 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
+interface SpecDraft {
+  id?: number;
+  name: string;
+  description: string;
+  price: string;
+  originalPrice: string;
+  enabled: boolean;
+  flowers: Record<number, string>;
+}
+
+function toSpecDrafts(specs: ProductSpecVO[] | undefined, materialIds: number[]): SpecDraft[] {
+  return (specs ?? []).map((spec) => {
+    const quantities = new Map(
+      (spec.flowers ?? []).map((flower) => [flower.materialId, flower.quantity]),
+    );
+    return {
+      id: spec.id,
+      name: spec.name,
+      description: spec.description ?? "",
+      price: spec.price ? String(spec.price) : "",
+      originalPrice: spec.originalPrice ? String(spec.originalPrice) : "",
+      enabled: spec.enabled,
+      flowers: Object.fromEntries(
+        materialIds.map((materialId) => [
+          materialId,
+          String(Math.max(1, quantities.get(materialId) ?? 1)),
+        ]),
+      ),
+    };
+  });
+}
+
 function toFormValues(product: ProductVO | null): ProductFormValues {
   return {
     name: product?.name ?? "",
@@ -126,8 +151,6 @@ function toFormValues(product: ProductVO | null): ProductFormValues {
     flowerMeaning: product?.flowerMeaning ?? "",
     occasionTags: product?.occasionTags ?? "",
     festivalTags: product?.festivalTags ?? "",
-    price: product ? String(product.price) : "",
-    originalPrice: product?.originalPrice ? String(product.originalPrice) : "",
     stock: product ? String(product.stock) : "0",
     imageUrl: product?.imageUrl ?? "",
     description: product?.description ?? "",
@@ -573,12 +596,8 @@ export function AdminProductsPage() {
                     <TD>
                       <p className="text-xs font-medium tabular">
                         {formatCurrency(product.price)}
+                        <span className="ml-1 text-[10px] font-normal text-muted-foreground">起</span>
                       </p>
-                      {product.originalPrice ? (
-                        <p className="text-[10px] text-muted-foreground line-through tabular">
-                          {formatCurrency(product.originalPrice)}
-                        </p>
-                      ) : null}
                     </TD>
                     <TD>
                       <span
@@ -720,38 +739,71 @@ function ProductEditorDialog({
 }) {
   const queryClient = useQueryClient();
   const dict = useDict();
+  const flowerMaterials = useFlowerMaterialsQuery();
   const {
     register,
     control,
     handleSubmit,
     reset,
-    setValue,
-    watch,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: toFormValues(product),
   });
-  const imageUrl = watch("imageUrl");
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [materialIds, setMaterialIds] = useState<number[]>([]);
+  const [specDrafts, setSpecDrafts] = useState<SpecDraft[]>([]);
 
   useEffect(() => {
-    if (open) reset(toFormValues(product));
+    if (!open) return;
+    reset(toFormValues(product));
+    setImageUrls(
+      product?.imageUrls && product.imageUrls.length > 0
+        ? product.imageUrls
+        : product?.imageUrl
+          ? [product.imageUrl]
+          : [],
+    );
+    const ids = product?.flowerMaterials?.map((material) => material.id) ?? [];
+    setMaterialIds(ids);
+    setSpecDrafts(toSpecDrafts(product?.specs, ids));
   }, [open, product, reset]);
 
   const mutation = useMutation({
     mutationFn: (values: ProductFormValues) => {
+      const specs: ProductSpecSaveRequest[] = specDrafts
+        .filter((spec) => spec.name.trim())
+        .map((spec, index) => ({
+          id: spec.id,
+          name: spec.name.trim(),
+          description: spec.description.trim() || undefined,
+          price: Number(spec.price),
+          originalPrice: Number(spec.originalPrice),
+          sortOrder: index * 10,
+          enabled: spec.enabled ? 1 : 0,
+          flowers: materialIds.map((materialId) => ({
+            materialId,
+            quantity: Number(spec.flowers[materialId] ?? 1),
+          })),
+        }));
+      const prices = specs
+        .map((spec) => spec.price)
+        .filter((price): price is number => typeof price === "number" && price > 0);
+      if (prices.length === 0) {
+        throw new Error("请至少填写一个规格售价");
+      }
       const body: ProductSaveRequest = {
         name: values.name.trim(),
         category: values.category.trim(),
         flowerMeaning: values.flowerMeaning?.trim() || undefined,
         occasionTags: values.occasionTags?.trim() || undefined,
         festivalTags: values.festivalTags?.trim() || undefined,
-        price: Number(values.price),
-        originalPrice: values.originalPrice.trim()
-          ? Number(values.originalPrice)
-          : undefined,
+        price: Math.min(...prices),
         stock: Number(values.stock),
-        imageUrl: values.imageUrl?.trim() || undefined,
+        imageUrl: imageUrls[0],
+        imageUrls,
+        flowerMaterialIds: materialIds,
+        specs,
         description: values.description?.trim() || undefined,
         seasonSuitability: values.seasonSuitability,
         status: values.status,
@@ -778,6 +830,85 @@ function ProductEditorDialog({
     .filter(Boolean)
     .map((item) => ({ value: item, label: item }));
 
+  const materialOptions = flowerMaterials.data ?? [];
+  const selectedMaterials = materialOptions.filter((material) => materialIds.includes(material.id));
+
+  const toggleMaterial = (materialId: number) => {
+    const active = materialIds.includes(materialId);
+    setMaterialIds((current) =>
+      active ? current.filter((id) => id !== materialId) : [...current, materialId],
+    );
+    if (!active) {
+      setSpecDrafts((current) =>
+        current.map((spec) => ({
+          ...spec,
+          flowers: {
+            ...spec.flowers,
+            [materialId]: spec.flowers[materialId] && Number(spec.flowers[materialId]) >= 1
+              ? spec.flowers[materialId]
+              : "1",
+          },
+        })),
+      );
+    }
+  };
+
+  const updateSpec = (index: number, patch: Partial<SpecDraft>) => {
+    setSpecDrafts((current) =>
+      current.map((spec, currentIndex) =>
+        currentIndex === index ? { ...spec, ...patch } : spec,
+      ),
+    );
+  };
+
+  const updateSpecFlower = (index: number, materialId: number, value: string) => {
+    setSpecDrafts((current) =>
+      current.map((spec, currentIndex) =>
+        currentIndex === index
+          ? { ...spec, flowers: { ...spec.flowers, [materialId]: value } }
+          : spec,
+      ),
+    );
+  };
+
+  const addSpec = () => {
+    setSpecDrafts((current) => [
+      ...current,
+      {
+        name: "",
+        description: "",
+        price: "",
+        originalPrice: "",
+        enabled: true,
+        flowers: Object.fromEntries(materialIds.map((materialId) => [materialId, "1"])),
+      },
+    ]);
+  };
+
+  const removeSpec = (index: number) => {
+    setSpecDrafts((current) => current.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const specError = (() => {
+    if (specDrafts.length === 0) return "请至少添加一个规格后再保存商品。";
+    for (const [index, spec] of specDrafts.entries()) {
+      if (!spec.name.trim()) return `请填写规格 ${index + 1} 的名称。`;
+      if (spec.name.trim().length > 60) return `规格 ${index + 1} 的名称不能超过 60 个字。`;
+      if (!(Number(spec.price) > 0)) return `规格 ${index + 1} 的售价必须大于 0。`;
+      if (!(Number(spec.originalPrice) > 0)) return `规格 ${index + 1} 的划线价必须大于 0。`;
+      if (Number(spec.originalPrice) < Number(spec.price)) {
+        return `规格 ${index + 1} 的划线价不能低于售价。`;
+      }
+      for (const material of selectedMaterials) {
+        const quantity = Number(spec.flowers[material.id]);
+        if (!Number.isInteger(quantity) || quantity < 1) {
+          return `规格 ${index + 1} 中「${material.name}」的枝数至少为 1。`;
+        }
+      }
+    }
+    return null;
+  })();
+
   return (
     <Dialog
       open={open}
@@ -788,7 +919,7 @@ function ProductEditorDialog({
           ? "修改库存后，后端会按新旧库存差异自动生成库存变动记录。"
           : "创建商品时初始销量与评分为 0；初始库存大于 0 会生成入库记录。"
       }
-      size="lg"
+      size="xl"
       footer={
         <div className="flex items-center justify-between gap-2">
           <p className="text-[11px] text-muted-foreground">带 * 的字段为必填项。</p>
@@ -801,6 +932,7 @@ function ProductEditorDialog({
               form="admin-product-form"
               size="sm"
               loading={mutation.isPending}
+              disabled={Boolean(specError)}
             >
               {product ? "保存修改" : "创建商品"}
             </Button>
@@ -858,33 +990,6 @@ function ProductEditorDialog({
                 />
               )}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="product-price">售价（元）*</Label>
-            <Input
-              id="product-price"
-              type="number"
-              min={0.01}
-              step={0.01}
-              inputMode="decimal"
-              aria-invalid={Boolean(errors.price)}
-              {...register("price")}
-            />
-            <FieldError message={errors.price?.message} />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="product-original-price">划线价（元）</Label>
-            <Input
-              id="product-original-price"
-              type="number"
-              min={0.01}
-              step={0.01}
-              inputMode="decimal"
-              placeholder="可选"
-              aria-invalid={Boolean(errors.originalPrice)}
-              {...register("originalPrice")}
-            />
-            <FieldError message={errors.originalPrice?.message} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="product-stock">库存 *</Label>
@@ -993,18 +1098,217 @@ function ProductEditorDialog({
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label>商品图片</Label>
-          <ImageUpload
-            value={imageUrl}
-            onChange={(url) =>
-              setValue("imageUrl", url, { shouldDirty: true, shouldValidate: true })
-            }
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <Label>商品图片</Label>
+            <span className="text-[11px] text-muted-foreground">
+              第一张为主图，最多 8 张
+            </span>
+          </div>
+          <MultiImageUpload
+            value={imageUrls}
+            onChange={setImageUrls}
             category="product"
+            max={8}
             cropAspect={4 / 5}
-            className="aspect-[4/5] w-40"
-            actionLabel="上传商品图片"
           />
+        </div>
+
+        <div className="space-y-2 rounded-xl border border-border/60 p-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <Label className="flex items-center gap-1.5">
+                <Flower2 className="h-3.5 w-3.5 text-flower-rose" />
+                花材选择
+              </Label>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                选中的花材可出现在详情页，并在规格中填写枝数。
+              </p>
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              已选 {materialIds.length}/{materialOptions.length}
+            </span>
+          </div>
+          {flowerMaterials.isLoading ? (
+            <div className="grid gap-2 sm:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-9 w-full" />
+              ))}
+            </div>
+          ) : materialOptions.length === 0 ? (
+            <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              花材库为空，请先到「商品配置」添加花材。
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {materialOptions.map((material) => {
+                const active = materialIds.includes(material.id);
+                return (
+                  <button
+                    key={material.id}
+                    type="button"
+                    onClick={() => toggleMaterial(material.id)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-colors",
+                      active
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border/60 text-muted-foreground hover:border-primary/40",
+                      !material.enabled && "opacity-60",
+                    )}
+                  >
+                    <span
+                      className="h-4 w-4 shrink-0 rounded-full border border-border/60"
+                      style={{ background: material.colorHex || "#d8c7b8" }}
+                    />
+                    <span className="min-w-0 flex-1 truncate">{material.name}</span>
+                    {!material.enabled ? (
+                      <span className="text-[10px]">停用</span>
+                    ) : active ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2 rounded-xl border border-border/60 p-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <Label>规格设置 *</Label>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                每个规格独立设置售价与划线价；总花枝数按各花材数量自动汇总。
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={addSpec}>
+              <Plus className="h-3.5 w-3.5" />
+              新增规格
+            </Button>
+          </div>
+          {specDrafts.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              请至少添加一个规格，填写规格名称、售价和划线价后才能保存商品。
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {specDrafts.map((spec, index) => {
+                const totalStems = selectedMaterials.reduce(
+                  (sum, material) => sum + (Number(spec.flowers[material.id] ?? 0) || 0),
+                  0,
+                );
+                return (
+                  <div
+                    key={spec.id ?? `new-${index}`}
+                    className="space-y-3 rounded-lg border border-border/60 bg-muted/20 p-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        规格 {index + 1}
+                        {totalStems > 0 ? ` · 共 ${totalStems} 枝` : ""}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-muted-foreground">启用</span>
+                        <Switch
+                          checked={spec.enabled}
+                          onCheckedChange={(enabled) => updateSpec(index, { enabled })}
+                          label={`规格 ${index + 1} 启用`}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="删除规格"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => removeSpec(index)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">规格名称 *</Label>
+                        <Input
+                          value={spec.name}
+                          maxLength={60}
+                          placeholder="例如：告白款 · 33 枝"
+                          onChange={(event) => updateSpec(index, { name: event.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">售价（元）*</Label>
+                        <Input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={spec.price}
+                          placeholder="例如：299"
+                          onChange={(event) => updateSpec(index, { price: event.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">划线价（元）*</Label>
+                        <Input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          value={spec.originalPrice}
+                          placeholder="例如：399"
+                          onChange={(event) =>
+                            updateSpec(index, { originalPrice: event.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">规格说明</Label>
+                        <Input
+                          value={spec.description}
+                          maxLength={200}
+                          placeholder="例如：适合日常惊喜"
+                          onChange={(event) =>
+                            updateSpec(index, { description: event.target.value })
+                          }
+                        />
+                      </div>
+                    </div>
+                    {selectedMaterials.length === 0 ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        先选择花材后，可在这里填写每种花材的枝数。
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {selectedMaterials.map((material) => (
+                          <div key={material.id} className="flex items-center gap-2">
+                            <span
+                              className="h-3.5 w-3.5 shrink-0 rounded-full border border-border/60"
+                              style={{ background: material.colorHex || "#d8c7b8" }}
+                            />
+                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                              {material.name}
+                            </span>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={999}
+                              value={spec.flowers[material.id] ?? "1"}
+                              placeholder="至少 1"
+                              aria-label={`${material.name}枝数`}
+                              className="h-8 w-20 text-right"
+                              onChange={(event) =>
+                                updateSpecFlower(index, material.id, event.target.value)
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {specError ? <p className="text-[11px] text-destructive">{specError}</p> : null}
         </div>
 
         <div className="space-y-1.5">

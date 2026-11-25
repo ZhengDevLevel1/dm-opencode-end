@@ -126,7 +126,7 @@ export interface UpdateProfileRequest {
   avatarUrl?: string;
 }
 
-export type ImageCategory = "avatar" | "product" | "background";
+export type ImageCategory = "avatar" | "product" | "background" | "review" | "flower";
 
 export interface FileUploadVO {
   url: string;
@@ -277,6 +277,109 @@ export interface MapPreference {
   snapToLandmark: boolean;
 }
 
+export interface FlowerMaterialVO {
+  id: number;
+  name: string;
+  latinName?: string;
+  note?: string;
+  colorHex?: string;
+  imageUrl?: string;
+  enabled: boolean;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface FlowerMaterialSaveRequest {
+  name: string;
+  latinName?: string;
+  note?: string;
+  colorHex?: string;
+  imageUrl?: string;
+  enabled?: number;
+  sortOrder?: number;
+}
+
+export interface WrapColorVO {
+  id: number;
+  name: string;
+  hex: string;
+  ringHex?: string;
+  description?: string;
+  enabled: boolean;
+  sortOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface WrapColorSaveRequest {
+  name: string;
+  hex: string;
+  ringHex?: string;
+  description?: string;
+  enabled?: number;
+  sortOrder?: number;
+}
+
+export interface BusinessHourVO {
+  dayOfWeek: number;
+  dayLabel: string;
+  openTime: string;
+  closeTime: string;
+  enabled: boolean;
+  note?: string;
+}
+
+export interface BusinessHourSaveRequest {
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
+  enabled?: number;
+  note?: string;
+}
+
+export interface BusinessHourBatchRequest {
+  hours: BusinessHourSaveRequest[];
+}
+
+export interface ProductSpecFlowerVO {
+  materialId: number;
+  name: string;
+  latinName?: string;
+  colorHex?: string;
+  imageUrl?: string;
+  quantity: number;
+}
+
+export interface ProductSpecVO {
+  id: number;
+  name: string;
+  description?: string;
+  price?: number;
+  originalPrice?: number;
+  effectivePrice: number;
+  totalStems: number;
+  enabled: boolean;
+  sortOrder?: number;
+  flowers: ProductSpecFlowerVO[];
+}
+
+export interface ProductSpecFlowerSaveRequest {
+  materialId: number;
+  quantity: number;
+}
+
+export interface ProductSpecSaveRequest {
+  id?: number;
+  name: string;
+  description?: string;
+  price?: number;
+  originalPrice?: number;
+  sortOrder?: number;
+  enabled?: number;
+  flowers?: ProductSpecFlowerSaveRequest[];
+}
+
 export interface ProductVO {
   id: number;
   name: string;
@@ -288,6 +391,9 @@ export interface ProductVO {
   originalPrice?: number;
   stock: number;
   imageUrl?: string;
+  imageUrls?: string[];
+  flowerMaterials?: FlowerMaterialVO[];
+  specs?: ProductSpecVO[];
   description?: string;
   seasonSuitability: SeasonSuitability;
   seasonLabel: string;
@@ -327,6 +433,9 @@ export interface ProductSaveRequest {
   originalPrice?: number;
   stock: number;
   imageUrl?: string;
+  imageUrls?: string[];
+  flowerMaterialIds?: number[];
+  specs?: ProductSpecSaveRequest[];
   description?: string;
   seasonSuitability: SeasonSuitability;
   status?: ProductStatus;
@@ -337,6 +446,10 @@ export interface CartItemVO {
   productId: number;
   productName: string;
   productImage?: string;
+  specId?: number;
+  specName?: string;
+  wrapId?: number;
+  wrapName?: string;
   price: number;
   quantity: number;
   subtotal: number;
@@ -349,6 +462,8 @@ export interface CartItemVO {
 export interface CartAddRequest {
   productId: number;
   quantity: number;
+  specId?: number;
+  wrapId?: number;
   attribution?: CartAttribution;
 }
 
@@ -362,6 +477,10 @@ export interface OrderItemVO {
   productName: string;
   productImage?: string;
   category: string;
+  specId?: number;
+  specName?: string;
+  wrapId?: number;
+  wrapName?: string;
   unitPrice: number;
   quantity: number;
   subtotal: number;
@@ -384,6 +503,8 @@ export interface OrderVO {
   receiverLongitude?: number;
   receiverLatitude?: number;
   remark?: string;
+  greetingCard?: string;
+  deliveryAt?: string;
   cancelReason?: string;
   afterSaleReason?: string;
   paidAt?: string;
@@ -400,6 +521,8 @@ export interface CreateOrderRequest {
   receiverAddress: string;
   receiverLongitude?: number;
   receiverLatitude?: number;
+  greetingCard?: string;
+  deliveryAt?: string;
   remark?: string;
 }
 
@@ -481,6 +604,7 @@ export interface ReviewCreateRequest {
   orderItemId: number;
   rating: number;
   content?: string;
+  images?: string[];
 }
 
 export interface ReviewReplyRequest {
@@ -497,6 +621,7 @@ export interface ReviewVO {
   nickname?: string;
   rating: number;
   content?: string;
+  images?: string[];
   reply?: string;
   status: ReviewStatus;
   statusLabel: string;
