@@ -654,7 +654,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
   "backgroundOpacity": 0.82,
   "backgroundBlur": 0,
   "componentOpacity": 1,
-  "sidebarPinned": true
+  "sidebarPinned": true,
+  "sidebarLocked": false
 }
 ```
 
@@ -676,7 +677,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 | `backgroundImage` | ≤ 500 字符 |
 | `backgroundOpacity` / `componentOpacity` | 0–1 |
 | `backgroundBlur` | 0–30 |
-| `sidebarPinned` | boolean，左侧菜单栏是否固定，按账号保存 |
+| `sidebarPinned` | boolean，左侧菜单栏是否固定展开，按账号保存 |
+| `sidebarLocked` | boolean，左侧菜单栏是否固定收起（悬停不展开），与 `sidebarPinned` 互斥；按账号保存 |
 
 `GET /api/auth/preferences/map`（登录）
 
@@ -694,7 +696,7 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
 - 只更新地图选点开关，不会覆盖用户的外观偏好；`snapToLandmark` 必填，缺失时返回 `400`。
 - 该开关控制地址选择器选点后是否自动跳转到最近地标。
 
-表结构：`user_theme_preference`，主键 `user_id`，外键关联 `sys_user.id`；地图选点偏好字段为 `map_snap_to_landmark`。
+表结构：`user_theme_preference`，主键 `user_id`，外键关联 `sys_user.id`；侧栏固定字段为 `sidebar_pinned` / `sidebar_locked`，地图选点偏好字段为 `map_snap_to_landmark`。
 - 最长 500 字符；更新会记录操作日志（模块「外观管理」）。
 - 数据保存在 `appearance_setting` 表单行记录（`id=1`），首次读取或更新时自动创建。
 

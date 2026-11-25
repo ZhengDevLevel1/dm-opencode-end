@@ -52,6 +52,8 @@ public class UserThemePreference {
 
     private Boolean sidebarPinned;
 
+    private Boolean sidebarLocked;
+
     private Boolean mapSnapToLandmark;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)

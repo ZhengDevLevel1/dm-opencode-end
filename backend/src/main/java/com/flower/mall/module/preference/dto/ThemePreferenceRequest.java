@@ -87,4 +87,7 @@ public class ThemePreferenceRequest {
 
     @NotNull(message = "侧栏固定状态不能为空")
     private Boolean sidebarPinned;
+
+    @NotNull(message = "侧栏固定收起状态不能为空")
+    private Boolean sidebarLocked;
 }

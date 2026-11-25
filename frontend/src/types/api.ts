@@ -267,6 +267,7 @@ export interface ThemePreference {
   backgroundBlur: number;
   componentOpacity: number;
   sidebarPinned: boolean;
+  sidebarLocked: boolean;
   updatedAt?: string;
 }
 

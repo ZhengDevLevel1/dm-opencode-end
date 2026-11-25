@@ -166,6 +166,7 @@ function CopySection() {
   const selectProduct = (value: string) => {
     setProductId(value);
     if (!value) {
+      setForm({ ...EMPTY_COPY_FORM });
       return;
     }
     const product = productRecords.find((item) => String(item.id) === value);

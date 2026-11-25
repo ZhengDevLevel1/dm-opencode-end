@@ -89,6 +89,8 @@ public class ThemePreferenceService {
         target.setBackgroundOpacity(source.getBackgroundOpacity());
         target.setBackgroundBlur(source.getBackgroundBlur());
         target.setComponentOpacity(source.getComponentOpacity());
-        target.setSidebarPinned(source.getSidebarPinned());
+        boolean locked = Boolean.TRUE.equals(source.getSidebarLocked());
+        target.setSidebarPinned(!locked && Boolean.TRUE.equals(source.getSidebarPinned()));
+        target.setSidebarLocked(locked);
     }
 }

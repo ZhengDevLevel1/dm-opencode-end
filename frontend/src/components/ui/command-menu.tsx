@@ -1,31 +1,51 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
+  ChevronDown,
+  ClipboardList,
+  LayoutDashboard,
   Loader2,
   PackageSearch,
   ReceiptText,
   Search,
+  ShoppingBag,
   UsersRound,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useUiStore } from "@/stores/ui";
 import { useAuthStore } from "@/stores/auth";
+import { useThemeStore } from "@/stores/theme";
 import { canSeeRole, navGroups } from "@/app/shell/nav";
 import { queryKeys } from "@/lib/query-keys";
 import { adminService, productService, staffService } from "@/lib/services";
 import { formatCurrency } from "@/lib/format";
 import { roleLabelOf } from "@/lib/permissions";
 
+type CommandSectionKey = "mall" | "staff" | "admin";
+
 interface CommandEntry {
   id: string;
-  group: string;
   label: string;
   description?: string;
   icon: typeof Search;
   onSelect: () => void;
 }
+
+interface CommandSection {
+  key: CommandSectionKey | "recent";
+  label: string;
+  icon?: typeof Search;
+  entries: CommandEntry[];
+}
+
+const commandSections: Array<{ key: CommandSectionKey; label: string; icon: typeof Search }> = [
+  { key: "mall", label: "商城", icon: ShoppingBag },
+  { key: "staff", label: "履约", icon: ClipboardList },
+  { key: "admin", label: "管理", icon: LayoutDashboard },
+];
 
 const RECENT_KEY = "flower.command.recent";
 
@@ -53,12 +73,16 @@ export function CommandMenu() {
   const open = useUiStore((state) => state.commandOpen);
   const setOpen = useUiStore((state) => state.setCommandOpen);
   const user = useAuthStore((state) => state.user);
+  const reduceMotionSetting = useThemeStore((state) => state.reduceMotion);
+  const prefersReducedMotion = useReducedMotion();
+  const reduceMotion = Boolean(reduceMotionSetting || prefersReducedMotion);
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selected, setSelected] = useState(0);
   const [recent, setRecent] = useState<string[]>(readRecent);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => new Set());
 
   const trimmed = query.trim();
   const debouncedTrimmed = debouncedQuery.trim();
@@ -106,8 +130,8 @@ export function CommandMenu() {
     staleTime: 15_000,
   });
 
-  const pageEntries = useMemo(() => {
-    const entries: CommandEntry[] = [];
+  const pageEntriesBySection = useMemo(() => {
+    const sections: Record<CommandSectionKey, CommandEntry[]> = { mall: [], staff: [], admin: [] };
     navGroups.forEach((group) => {
       if (group.roles && !canSeeRole(user?.role, group.roles)) return;
       if (group.auth && !user) return;
@@ -115,9 +139,8 @@ export function CommandMenu() {
         if (!item.label.toLowerCase().includes(trimmed.toLowerCase()) && !item.description.toLowerCase().includes(trimmed.toLowerCase())) {
           return;
         }
-        entries.push({
+        sections[group.workbench].push({
           id: `page-${item.to}`,
-          group: "页面快捷入口",
           label: item.label,
           description: item.description,
           icon: item.icon,
@@ -125,14 +148,13 @@ export function CommandMenu() {
         });
       });
     });
-    return entries;
+    return sections;
   }, [trimmed, user, navigate]);
 
   const recentEntries = useMemo<CommandEntry[]>(() => {
     if (trimmed || recent.length === 0) return [];
     return recent.map((term) => ({
       id: `recent-${term}`,
-      group: "最近搜索",
       label: term,
       description: "继续搜索这个关键词",
       icon: Search,
@@ -143,13 +165,12 @@ export function CommandMenu() {
     }));
   }, [recent, trimmed]);
 
-  const resultEntries = useMemo<CommandEntry[]>(() => {
-    if (!debouncedTrimmed) return [];
-    const entries: CommandEntry[] = [];
+  const resultEntriesBySection = useMemo(() => {
+    const sections: Record<CommandSectionKey, CommandEntry[]> = { mall: [], staff: [], admin: [] };
+    if (!debouncedTrimmed) return sections;
     productQuery.data?.records.forEach((product) => {
-      entries.push({
+      sections.mall.push({
         id: `product-${product.id}`,
-        group: "商品搜索",
         label: product.name,
         description: `${product.category} · ${formatCurrency(product.price)} · 库存 ${product.stock}`,
         icon: PackageSearch,
@@ -162,9 +183,8 @@ export function CommandMenu() {
     });
     if (isStaff) {
       staffOrderQuery.data?.records.forEach((order) => {
-        entries.push({
+        sections.staff.push({
           id: `order-${order.id}`,
-          group: "订单搜索",
           label: order.orderNo,
           description: `${order.receiverName} · ${order.statusLabel} · ${formatCurrency(order.payAmount)}`,
           icon: ReceiptText,
@@ -178,9 +198,8 @@ export function CommandMenu() {
     }
     if (isAdmin) {
       userQuery.data?.records.forEach((item) => {
-        entries.push({
+        sections.admin.push({
           id: `user-${item.id}`,
-          group: "用户搜索",
           label: item.nickname || item.username,
           description: `@${item.username} · ${roleLabelOf(item.role, item.roleLabel)} · ${item.statusLabel}`,
           icon: UsersRound,
@@ -192,7 +211,7 @@ export function CommandMenu() {
         });
       });
     }
-    return entries;
+    return sections;
   }, [
     trimmed,
     debouncedTrimmed,
@@ -204,9 +223,26 @@ export function CommandMenu() {
     navigate,
   ]);
 
+  const sections = useMemo<CommandSection[]>(() => {
+    const result: CommandSection[] = [];
+    if (recentEntries.length > 0) {
+      result.push({ key: "recent", label: "最近搜索", icon: Search, entries: recentEntries });
+    }
+    commandSections.forEach(({ key, label, icon }) => {
+      const entries = [...resultEntriesBySection[key], ...pageEntriesBySection[key]];
+      if (entries.length > 0) {
+        result.push({ key, label, icon, entries });
+      }
+    });
+    return result;
+  }, [recentEntries, resultEntriesBySection, pageEntriesBySection]);
+
   const entries = useMemo(
-    () => [...recentEntries, ...pageEntries, ...resultEntries],
-    [recentEntries, pageEntries, resultEntries],
+    () =>
+      sections.flatMap((section) =>
+        collapsedSections.has(section.key) ? [] : section.entries,
+      ),
+    [sections, collapsedSections],
   );
 
   const loading =
@@ -239,13 +275,20 @@ export function CommandMenu() {
 
   if (!open) return null;
 
-  const grouped = entries.reduce<Record<string, CommandEntry[]>>((acc, entry) => {
-    acc[entry.group] = acc[entry.group] ?? [];
-    acc[entry.group].push(entry);
-    return acc;
-  }, {});
-
   let flatIndex = -1;
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+    inputRef.current?.focus();
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Escape") {
@@ -302,7 +345,7 @@ export function CommandMenu() {
           </kbd>
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-2">
-          {entries.length === 0 ? (
+          {sections.length === 0 ? (
             <div className="px-4 py-12 text-center">
               <p className="text-sm font-medium">没有找到相关记录</p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -310,52 +353,101 @@ export function CommandMenu() {
               </p>
             </div>
           ) : (
-            Object.entries(grouped).map(([group, groupEntries]) => (
-              <div key={group} className="mb-2 last:mb-0">
-                <p className="px-2.5 pt-1.5 pb-1 text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
-                  {group}
-                </p>
-                {groupEntries.map((entry) => {
-                  flatIndex += 1;
-                  const index = flatIndex;
-                  const Icon = entry.icon;
-                  return (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      data-command-index={index}
-                      onMouseEnter={() => setSelected(index)}
-                      onClick={() => {
-                        if (!entry.id.startsWith("recent-") && trimmed) {
-                          saveRecent(trimmed);
-                          setRecent(readRecent());
-                        }
-                        entry.onSelect();
-                        setOpen(false);
-                        if (!entry.id.startsWith("recent-")) setQuery("");
-                      }}
+            sections.map((section, sectionIndex) => {
+              const SectionIcon = section.icon;
+              const collapsed = collapsedSections.has(section.key);
+              return (
+                <div
+                  key={section.key}
+                  className={cn(
+                    "mb-1 last:mb-0",
+                    sectionIndex > 0 && "border-t border-border/50 pt-1",
+                  )}
+                >
+                  <button
+                    type="button"
+                    aria-expanded={!collapsed}
+                    onClick={() => toggleSection(section.key)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") event.stopPropagation();
+                    }}
+                    className="group flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent/40"
+                  >
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      {SectionIcon ? <SectionIcon className="h-3.5 w-3.5" /> : null}
+                    </span>
+                    <span className="text-sm font-semibold tracking-wide text-foreground">
+                      {section.label}
+                    </span>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground tabular">
+                      {section.entries.length}
+                    </span>
+                    <ChevronDown
                       className={cn(
-                        "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
-                        selected === index
-                          ? "bg-accent text-accent-foreground"
-                          : "hover:bg-accent/50",
+                        "ml-auto h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                        collapsed && "-rotate-90",
                       )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{entry.label}</span>
-                        {entry.description ? (
-                          <span className="block truncate text-[11px] text-muted-foreground">
-                            {entry.description}
-                          </span>
-                        ) : null}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0" />
-                    </button>
-                  );
-                })}
-              </div>
-            ))
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {collapsed ? null : (
+                      <motion.div
+                        key="section-entries"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={
+                          reduceMotion
+                            ? { duration: 0 }
+                            : { duration: 0.22, ease: [0.4, 0, 0.2, 1] }
+                        }
+                        className="overflow-hidden"
+                      >
+                        {section.entries.map((entry) => {
+                          flatIndex += 1;
+                          const index = flatIndex;
+                          const Icon = entry.icon;
+                          return (
+                            <button
+                              key={entry.id}
+                              type="button"
+                              data-command-index={index}
+                              onMouseEnter={() => setSelected(index)}
+                              onClick={() => {
+                                if (!entry.id.startsWith("recent-") && trimmed) {
+                                  saveRecent(trimmed);
+                                  setRecent(readRecent());
+                                }
+                                entry.onSelect();
+                                setOpen(false);
+                                if (!entry.id.startsWith("recent-")) setQuery("");
+                              }}
+                              className={cn(
+                                "flex w-full cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
+                                selected === index
+                                  ? "bg-accent text-accent-foreground"
+                                  : "hover:bg-accent/50",
+                              )}
+                            >
+                              <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">{entry.label}</span>
+                                {entry.description ? (
+                                  <span className="block truncate text-[11px] text-muted-foreground">
+                                    {entry.description}
+                                  </span>
+                                ) : null}
+                              </span>
+                              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0" />
+                            </button>
+                          );
+                        })}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })
           )}
         </div>
         <div className="flex items-center justify-between border-t border-border/60 px-4 py-2 text-[10px] text-muted-foreground">

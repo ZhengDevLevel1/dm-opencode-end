@@ -52,7 +52,8 @@ class ThemePreferenceIntegrationTest {
                 .andExpect(jsonPath("$.data.fontSize").value(15.5))
                 .andExpect(jsonPath("$.data.scale").value(1.05))
                 .andExpect(jsonPath("$.data.componentOpacity").value(0.9))
-                .andExpect(jsonPath("$.data.sidebarPinned").value(true));
+                .andExpect(jsonPath("$.data.sidebarPinned").value(true))
+                .andExpect(jsonPath("$.data.sidebarLocked").value(false));
 
         mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(customer)))
                 .andExpect(status().isOk())
@@ -60,7 +61,31 @@ class ThemePreferenceIntegrationTest {
                 .andExpect(jsonPath("$.data.radius").value("round"))
                 .andExpect(jsonPath("$.data.fontFamily").value("kai"))
                 .andExpect(jsonPath("$.data.fontSize").value(15.5))
-                .andExpect(jsonPath("$.data.sidebarPinned").value(true));
+                .andExpect(jsonPath("$.data.sidebarPinned").value(true))
+                .andExpect(jsonPath("$.data.sidebarLocked").value(false));
+
+        mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    @Test
+    void sidebarLockOverridesPinnedAndIsSavedPerUser() throws Exception {
+        String customer = login("customer", "customer123");
+        String alice = login("alice", "alice123");
+
+        mockMvc.perform(put("/api/auth/preferences")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(themePreferenceBody("true", "true")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sidebarPinned").value(false))
+                .andExpect(jsonPath("$.data.sidebarLocked").value(true));
+
+        mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(customer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sidebarPinned").value(false))
+                .andExpect(jsonPath("$.data.sidebarLocked").value(true));
 
         mockMvc.perform(get("/api/auth/preferences").header("Authorization", bearer(alice)))
                 .andExpect(status().isOk())
@@ -149,8 +174,8 @@ class ThemePreferenceIntegrationTest {
                                  "density":"compact","sidebarStyle":"panel","scale":2.0,
                                  "reduceMotion":true,"highContrast":false,"background":"gradient",
                                  "backgroundImage":"","backgroundOpacity":0.7,
-                                 "backgroundBlur":8,"componentOpacity":0.9,
-                                 "sidebarPinned":false}
+                                  "backgroundBlur":8,"componentOpacity":0.9,
+                                  "sidebarPinned":false,"sidebarLocked":false}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
@@ -168,8 +193,8 @@ class ThemePreferenceIntegrationTest {
                                  "density":"compact","sidebarStyle":"panel","scale":1.0,
                                  "reduceMotion":true,"highContrast":false,"background":"gradient",
                                  "backgroundImage":"","backgroundOpacity":0.7,
-                                 "backgroundBlur":8,"componentOpacity":0.9,
-                                 "sidebarPinned":false}
+                                  "backgroundBlur":8,"componentOpacity":0.9,
+                                  "sidebarPinned":false,"sidebarLocked":false}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(400));
@@ -187,6 +212,25 @@ class ThemePreferenceIntegrationTest {
                                  "density":"compact","sidebarStyle":"panel","scale":1.0,
                                  "reduceMotion":true,"highContrast":false,"background":"gradient",
                                  "backgroundImage":"","backgroundOpacity":0.7,
+                                  "backgroundBlur":8,"componentOpacity":0.9,
+                                  "sidebarPinned":false,"sidebarLocked":false}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400));
+    }
+
+    @Test
+    void missingSidebarLockedIsRejected() throws Exception {
+        String customer = login("customer", "customer123");
+        mockMvc.perform(put("/api/auth/preferences")
+                        .header("Authorization", bearer(customer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"dark","palette":"rose-pine","accent":"rose",
+                                 "customAccent":"#c25b6a","fontFamily":"default","fontSize":14,"radius":"round",
+                                 "density":"compact","sidebarStyle":"panel","scale":1.0,
+                                 "reduceMotion":true,"highContrast":false,"background":"gradient",
+                                 "backgroundImage":"","backgroundOpacity":0.7,
                                  "backgroundBlur":8,"componentOpacity":0.9,
                                  "sidebarPinned":false}
                                 """))
@@ -195,6 +239,10 @@ class ThemePreferenceIntegrationTest {
     }
 
     private String themePreferenceBody() {
+        return themePreferenceBody("true", "false");
+    }
+
+    private String themePreferenceBody(String sidebarPinned, String sidebarLocked) {
         return """
                 {
                   "mode": "dark",
@@ -214,9 +262,10 @@ class ThemePreferenceIntegrationTest {
                   "backgroundOpacity": 0.7,
                   "backgroundBlur": 8,
                   "componentOpacity": 0.9,
-                  "sidebarPinned": true
+                  "sidebarPinned": %s,
+                  "sidebarLocked": %s
                 }
-                """;
+                """.formatted(sidebarPinned, sidebarLocked);
     }
 
     private String login(String username, String password) throws Exception {

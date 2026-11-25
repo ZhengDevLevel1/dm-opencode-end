@@ -1,7 +1,7 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { ChevronsRight, Flower2, Pin, PinOff, X } from "lucide-react";
+import { ChevronsRight, Flower2, Lock, LockOpen, Pin, PinOff, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { getWorkbenchRoute } from "@/lib/workbench-memory";
 import { preloadRoute } from "@/app/route-loaders";
@@ -78,6 +78,7 @@ function WorkbenchSwitch({ expanded }: { expanded: boolean }) {
   if (!user || links.length <= 1) return null;
 
   const current = resolveWorkbench(location.pathname);
+  const currentLabel = links.find((link) => resolveWorkbench(link.to) === current)?.label ?? "";
   const next = links[(links.findIndex((link) => resolveWorkbench(link.to) === current) + 1) % links.length];
   const targetFor = (key: WorkbenchKey, fallback: string) => {
     if (key === current) return fallback;
@@ -90,49 +91,66 @@ function WorkbenchSwitch({ expanded }: { expanded: boolean }) {
 
   return (
     <div className="px-2 pb-3">
-      {expanded ? (
-        <LayoutGroup id={`workbench-switch-${switchId}`}>
-          <div className="flex rounded-lg bg-sidebar-accent/60 p-0.5">
-            {links.map((link) => {
-              const key = resolveWorkbench(link.to);
-              const active = current === key;
-              const target = targetFor(key, link.to);
-              return (
-                <button
-                  key={link.to}
-                  type="button"
-                  onMouseEnter={() => preloadRoute(target)}
-                  onFocus={() => preloadRoute(target)}
-                  onClick={() => navigate(target)}
-                  className={cn(
-                    "relative flex-1 cursor-pointer rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
-                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {active ? (
-                    <motion.span
-                      layoutId={`workbench-switch-pill-${switchId}`}
-                      className="absolute inset-0 rounded-md bg-card shadow-sm"
-                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                    />
-                  ) : null}
-                  <span className="relative z-10">{link.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </LayoutGroup>
-      ) : (
-        <button
-          type="button"
-          onClick={() => navigate(nextTarget)}
-          className="flex h-9 w-12 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent/40"
-          aria-label={next ? `切换到${next.label}` : "切换工作台"}
-          title={next ? `切换到${next.label}` : "切换工作台"}
+      <div className="relative h-9">
+        <div
+          className={cn(
+            "absolute inset-0 flex items-center transition-opacity duration-200",
+            expanded ? "pointer-events-none opacity-0" : "opacity-100",
+          )}
+          aria-hidden={expanded}
         >
-          <ChevronsRight className="h-4 w-4" />
-        </button>
-      )}
+          <button
+            type="button"
+            onClick={() => navigate(nextTarget)}
+            tabIndex={expanded ? -1 : undefined}
+            className="flex h-9 w-12 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-sidebar-accent/40"
+            aria-label={next ? `当前${currentLabel}，切换到${next.label}` : "切换工作台"}
+            title={next ? `当前${currentLabel} · 点击切换到${next.label}` : "切换工作台"}
+          >
+            <ChevronsRight className="h-4 w-4 shrink-0" />
+          </button>
+        </div>
+        <div
+          className={cn(
+            "absolute inset-0 flex items-center transition-opacity duration-200",
+            expanded ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+          aria-hidden={!expanded}
+        >
+          <LayoutGroup id={`workbench-switch-${switchId}`}>
+            <div className="flex w-full rounded-lg bg-sidebar-accent/60 p-0.5">
+              {links.map((link) => {
+                const key = resolveWorkbench(link.to);
+                const active = current === key;
+                const target = targetFor(key, link.to);
+                return (
+                  <button
+                    key={link.to}
+                    type="button"
+                    tabIndex={expanded ? undefined : -1}
+                    onMouseEnter={() => preloadRoute(target)}
+                    onFocus={() => preloadRoute(target)}
+                    onClick={() => navigate(target)}
+                    className={cn(
+                      "relative flex-1 cursor-pointer rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors",
+                      active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {active ? (
+                      <motion.span
+                        layoutId={`workbench-switch-pill-${switchId}`}
+                        className="absolute inset-0 rounded-md bg-card shadow-sm"
+                        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                      />
+                    ) : null}
+                    <span className="relative z-10">{link.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </LayoutGroup>
+        </div>
+      </div>
     </div>
   );
 }
@@ -141,10 +159,12 @@ function SidebarContent({
   expanded,
   mobile,
   onNavigate,
+  onUnlock,
 }: {
   expanded: boolean;
   mobile?: boolean;
   onNavigate?: () => void;
+  onUnlock?: () => void;
 }) {
   const user = useAuthStore((state) => state.user);
   const counts = useBadgeCounts();
@@ -197,13 +217,22 @@ function SidebarContent({
             <LayoutGroup id={layoutKey}>
               {groups.map((group) => (
                 <div key={group.label} className="mb-4 last:mb-0">
-              {expanded ? (
-                <p className="mb-1.5 px-2 text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+              <div className="relative mb-2 h-4">
+                <p
+                  className={cn(
+                    "absolute inset-0 flex items-center px-2 text-[10px] font-medium tracking-[0.16em] text-muted-foreground uppercase transition-opacity duration-150",
+                    expanded ? "opacity-100" : "opacity-0",
+                  )}
+                >
                   {group.label}
                 </p>
-              ) : (
-                <div className="mb-2 ml-2 h-px w-10 bg-sidebar-border" />
-              )}
+                <div
+                  className={cn(
+                    "absolute top-1/2 left-2 h-px w-10 -translate-y-1/2 bg-sidebar-border transition-opacity duration-150",
+                    expanded ? "opacity-0" : "opacity-100",
+                  )}
+                />
+              </div>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const Icon = item.icon;
@@ -307,39 +336,59 @@ function SidebarContent({
           </motion.div>
         </AnimatePresence>
       </nav>
-      <SidebarFooter expanded={expanded} />
+      <SidebarFooter expanded={expanded} onUnlock={onUnlock} />
     </div>
   );
 }
 
-function SidebarFooter({ expanded }: { expanded: boolean }) {
+function SidebarFooter({ expanded, onUnlock }: { expanded: boolean; onUnlock?: () => void }) {
   const pinned = useUiStore((state) => state.sidebarPinned);
+  const locked = useUiStore((state) => state.sidebarLocked);
   const setPinned = useUiStore((state) => state.setSidebarPinned);
+  const setLocked = useUiStore((state) => state.setSidebarLocked);
   return (
-    <div className="shrink-0 border-t border-sidebar-border px-3 py-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <div
-          className={cn(
-            "min-w-0 transition-opacity duration-200",
-            expanded ? "opacity-100" : "opacity-0",
-          )}
-        >
-          <p className="text-[10px] tracking-wider text-muted-foreground uppercase">
-            Bloom Isle · 花店管理
-          </p>
-          <p className="mt-0.5 text-[10px] text-muted-foreground">© 2026 花屿</p>
-        </div>
+    <div data-sidebar-footer className="shrink-0 border-t border-sidebar-border px-3 py-2.5">
+      <div className="relative flex h-9 items-center">
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label={pinned ? "取消固定侧栏" : "固定侧栏"}
-          aria-pressed={pinned}
-          title={pinned ? "取消固定侧栏" : "固定侧栏"}
-          onClick={() => setPinned(!pinned)}
-          className={cn(pinned && "text-primary")}
+          aria-label={locked ? "取消固定收起侧栏" : "固定收起侧栏"}
+          aria-pressed={locked}
+          title={locked ? "取消固定收起侧栏" : "固定收起侧栏（悬停不展开）"}
+          onClick={() => {
+            if (locked) onUnlock?.();
+            setLocked(!locked);
+          }}
+          className={cn("absolute left-0 z-10", locked && "text-primary")}
         >
-          {pinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
+          {locked ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
         </Button>
+        <div
+          aria-hidden={!expanded}
+          className={cn(
+            "flex min-w-0 flex-1 items-center justify-between pl-10 transition-opacity duration-150",
+            expanded ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+        >
+          <div className="min-w-0">
+            <p className="truncate text-[10px] leading-tight tracking-wider text-muted-foreground uppercase">
+              Bloom Isle · 花店管理
+            </p>
+            <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground">© 2026 花屿</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={pinned ? "取消固定侧栏" : "固定侧栏"}
+            aria-pressed={pinned}
+            title={pinned ? "取消固定侧栏" : "固定侧栏"}
+            tabIndex={expanded ? undefined : -1}
+            onClick={() => setPinned(!pinned)}
+            className={cn("shrink-0", pinned && "text-primary")}
+          >
+            {pinned ? <Pin className="h-3.5 w-3.5" /> : <PinOff className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -347,6 +396,7 @@ function SidebarFooter({ expanded }: { expanded: boolean }) {
 
 export function Sidebar() {
   const pinned = useUiStore((state) => state.sidebarPinned);
+  const locked = useUiStore((state) => state.sidebarLocked);
   const mobileOpen = useUiStore((state) => state.mobileNavOpen);
   const setMobileOpen = useUiStore((state) => state.setMobileNavOpen);
   const reduceMotionSetting = useThemeStore((state) => state.reduceMotion);
@@ -354,7 +404,20 @@ export function Sidebar() {
   const [hovered, setHovered] = useState(false);
   const [focusWithin, setFocusWithin] = useState(false);
   const reduceMotion = Boolean(reduceMotionSetting || prefersReducedMotion);
-  const collapsed = !pinned && !hovered && !focusWithin;
+  const collapsed = !pinned && (locked || (!hovered && !focusWithin));
+  const [contentExpanded, setContentExpanded] = useState(!collapsed);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setContentExpanded(!collapsed);
+      return;
+    }
+    if (!collapsed) {
+      const timer = window.setTimeout(() => setContentExpanded(true), 260);
+      return () => window.clearTimeout(timer);
+    }
+    setContentExpanded(false);
+  }, [collapsed, reduceMotion]);
 
   return (
     <>
@@ -370,10 +433,15 @@ export function Sidebar() {
                 ease: [0.4, 0, 0.1, 1],
               }
         }
-        onMouseEnter={() => setHovered(true)}
+        onMouseOver={(event) => {
+          if (!(event.target as Element).closest("[data-sidebar-footer]")) {
+            setHovered(true);
+          }
+        }}
         onMouseLeave={() => setHovered(false)}
         onFocusCapture={(event) => {
-          if ((event.target as Element).matches(":focus-visible")) {
+          const target = event.target as Element;
+          if (target.matches(":focus-visible") && !target.closest("[data-sidebar-footer]")) {
             setFocusWithin(true);
           }
         }}
@@ -385,7 +453,13 @@ export function Sidebar() {
         className="relative z-30 hidden h-full shrink-0 overflow-hidden border-r border-sidebar-border md:block"
       >
         <div className="h-full w-[248px]">
-          <SidebarContent expanded={!collapsed} />
+          <SidebarContent
+            expanded={contentExpanded}
+            onUnlock={() => {
+              setHovered(false);
+              setFocusWithin(false);
+            }}
+          />
         </div>
       </motion.aside>
 

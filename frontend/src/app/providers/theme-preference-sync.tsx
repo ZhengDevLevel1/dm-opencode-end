@@ -34,6 +34,7 @@ function toPayload(state: ThemeState): ThemePayload {
     backgroundBlur: state.backgroundBlur,
     componentOpacity: state.componentOpacity,
     sidebarPinned: useUiStore.getState().sidebarPinned,
+    sidebarLocked: useUiStore.getState().sidebarLocked,
   };
 }
 
@@ -57,6 +58,7 @@ function normalize(preference: ThemePreference): ThemePayload {
     backgroundBlur: preference.backgroundBlur,
     componentOpacity: preference.componentOpacity,
     sidebarPinned: preference.sidebarPinned ?? false,
+    sidebarLocked: preference.sidebarLocked ?? false,
   };
 }
 
@@ -65,12 +67,12 @@ function serialize(payload: ThemePayload): string {
 }
 
 function applyPayload(payload: ThemePayload) {
-  const { sidebarPinned, ...theme } = payload;
+  const { sidebarPinned, sidebarLocked, ...theme } = payload;
   useThemeStore.setState({
     ...theme,
     fontSize: theme.fontSize ?? DEFAULT_FONT_SIZE,
   });
-  useUiStore.getState().setSidebarPinned(sidebarPinned);
+  useUiStore.setState({ sidebarPinned, sidebarLocked: sidebarLocked && !sidebarPinned });
 }
 
 export function ThemePreferenceSync() {
@@ -104,6 +106,7 @@ export function ThemePreferenceSync() {
           lastSyncedRef.current = "";
         }
         useUiStore.getState().setSidebarPinned(false);
+        useUiStore.getState().setSidebarLocked(false);
         prevUserIdRef.current = null;
         window.setTimeout(() => {
           applyingRef.current = false;

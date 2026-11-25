@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Noto Serif SC", "Cormorant Garamond", ui-serif, Georgia, serif;
+  --font-sans: "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cormorant Garamond", "Noto Serif SC", serif;
+
+  --color-cream-50: #fdfbf7;
+  --color-cream-100: #f8f3ea;
+  --color-cream-200: #efe7d9;
+
+  --color-moss-50: #f2f6f2;
+  --color-moss-100: #dbe5db;
+  --color-moss-500: #4a6b52;
+  --color-moss-600: #36503d;
+  --color-moss-700: #24382a;
+  --color-moss-800: #1b2c22;
+  --color-moss-900: #14201a;
+
+  --color-blush-50: #fdf5f4;
+  --color-blush-100: #f9e7e6;
+  --color-blush-200: #f2cfd0;
+  --color-blush-400: #d98f9a;
+  --color-blush-500: #c0707e;
+  --color-blush-600: #a5566a;
+
+  /* brass — herbarium labels & plant markers */
+  --color-brass-100: #efe6d4;
+  --color-brass-300: #c9b48a;
+  --color-brass-500: #a08a5b;
+  --color-brass-700: #6f5c37;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-cream-50);
+  color: var(--color-moss-900);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-blush-200);
+  color: var(--color-moss-900);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-cream-100);
+}
+::-webkit-scrollbar-thumb {
+  background: #d9cfbe;
+  border-radius: 999px;
+  border: 3px solid var(--color-cream-100);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c3b7a1;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ---- paper grain: gives the cream ground a real material ---- */
+.grain-overlay {
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ---- soft top wash behind the hero ---- */
+.hero-wash {
+  background:
+    radial-gradient(120% 90% at 8% 0%, rgba(242, 207, 208, 0.34) 0%, rgba(242, 207, 208, 0) 55%),
+    radial-gradient(110% 80% at 96% 4%, rgba(219, 229, 219, 0.5) 0%, rgba(219, 229, 219, 0) 60%),
+    linear-gradient(180deg, #fdfbf7 0%, #fdfbf7 62%, rgba(253, 251, 247, 0) 100%);
+}
+
+/* ---- display numerals: old-style figures look wrong at large sizes ---- */
+.num {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* ---- a hairline rule that reads as printed, not as a border ---- */
+.rule-brass {
+  background: linear-gradient(
+    90deg,
+    var(--color-brass-300) 0%,
+    var(--color-brass-300) 28%,
+    rgba(201, 180, 138, 0) 100%
+  );
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* `backwards` not `both`: keeps a lingering `transform` off the element, which would
+   otherwise create a containing block + stacking context for `position: fixed` descendants. */
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.animate-toast-in {
+  animation: toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.animate-soft-pulse {
+  animation: soft-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes rule-draw {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.animate-rule {
+  transform-origin: left;
+  animation: rule-draw 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-fade-up,
+  .animate-toast-in,
+  .animate-rule,
+  .animate-soft-pulse {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
