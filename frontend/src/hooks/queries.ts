@@ -131,6 +131,14 @@ export function useBusinessHoursQuery() {
   });
 }
 
+export function useStoreProfileQuery() {
+  return useQuery({
+    queryKey: queryKeys.storeProfile,
+    queryFn: catalogService.storeProfile,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useCartQuery(enabled = true) {
   const authenticated = useAuthStore((state) => Boolean(state.user));
   return useQuery({

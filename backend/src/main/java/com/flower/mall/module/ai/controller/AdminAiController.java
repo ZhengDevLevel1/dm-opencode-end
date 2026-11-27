@@ -3,6 +3,8 @@ package com.flower.mall.module.ai.controller;
 import com.flower.mall.common.api.ApiResponse;
 import com.flower.mall.common.api.PageResult;
 import com.flower.mall.module.ai.dto.AiCallLogVO;
+import com.flower.mall.module.ai.dto.AiCareGuideRequest;
+import com.flower.mall.module.ai.dto.AiCareGuideVO;
 import com.flower.mall.module.ai.dto.AiHealthVO;
 import com.flower.mall.module.ai.dto.AiMetricsVO;
 import com.flower.mall.module.ai.dto.AiProductCopyApplyRequest;
@@ -66,6 +68,12 @@ public class AdminAiController {
     @PostMapping("/product-copy/apply")
     public ApiResponse<ProductVO> applyProductCopy(@Valid @RequestBody AiProductCopyApplyRequest request) {
         return ApiResponse.ok(merchantService.applyProductCopy(request));
+    }
+
+    @Operation(summary = "AI 生成商品养护指南（仅草稿）")
+    @PostMapping("/care-guide")
+    public ApiResponse<AiCareGuideVO> careGuide(@Valid @RequestBody AiCareGuideRequest request) {
+        return ApiResponse.ok(merchantService.careGuide(request));
     }
 
     @Operation(summary = "AI 推荐权重调参建议（仅草稿）")

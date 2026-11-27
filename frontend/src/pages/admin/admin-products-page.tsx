@@ -8,6 +8,7 @@ import {
   Archive,
   ArchiveRestore,
   Check,
+  Eye,
   Flower2,
   MoreHorizontal,
   PackagePlus,
@@ -15,9 +16,10 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Sparkles,
   Trash2,
 } from "lucide-react";
-import { adminService } from "@/lib/services";
+import { adminService, aiService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { invalidateCatalogQueries } from "@/lib/query-invalidation";
 import { getErrorMessage } from "@/lib/api-client";
@@ -36,6 +38,7 @@ import type {
   ProductVO,
   SeasonSuitability,
   StockLevel,
+  AiCareGuideVO,
 } from "@/types/api";
 import { MultiImageUpload } from "@/components/domain/multi-image-upload";
 import { ProductImage } from "@/components/domain/product-image";
@@ -93,6 +96,23 @@ const productSortOptions: Array<{ value: ProductSort; label: string }> = [
   { value: "stock_desc", label: "库存从高到低" },
 ];
 
+const DEFAULT_GIFT_ACCESSORIES = "手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1";
+
+const DEFAULT_CARE_GUIDE = `01 45° 斜剪根
+收到花束后，在根部以上 2cm 处以 45° 斜剪，扩大吸水面积，避免平剪导致吸水面贴住瓶底。
+
+02 去叶入水
+摘除所有会浸入水中的叶片，避免叶片在水中腐烂滋生细菌，每两天清洗花瓶并更换清水。
+
+03 浅水养护
+水位控制在花瓶的 1/3，深水反而会加速茎秆腐烂。加入附赠保鲜剂，可延长 2–3 天花期。
+
+04 避开风口
+远离空调直吹、暖气与成熟水果（乙烯会催谢）。夜间可移至阴凉处，玫瑰会缓慢恢复挺立。
+
+05 常见小状况
+花头下垂：剪根后深水浸泡 1 小时（水位到花头下），多数可在 2 小时内恢复挺立。外层花瓣发软：玫瑰外层为保护瓣，属正常现象，请勿摘除。水质发浑：立即洗瓶换水并再次斜剪 1cm，避免细菌堵塞导管。`;
+
 const productSchema = z.object({
   name: z.string().trim().min(1, "请输入商品名称").max(100, "商品名称最多 100 个字符"),
   category: z.string().trim().min(1, "请选择品类").max(30, "品类最多 30 个字符"),
@@ -106,6 +126,8 @@ const productSchema = z.object({
     .refine((value) => /^\d+$/.test(value), "库存必须是非负整数"),
   imageUrl: z.string().trim().max(500, "图片地址最多 500 个字符").optional(),
   description: z.string().trim().max(2000, "描述最多 2000 个字符").optional(),
+  careGuide: z.string().trim().max(2000, "养护指南最多 2000 个字符").optional(),
+  giftAccessories: z.string().trim().max(200, "随赠配件最多 200 个字符").optional(),
   seasonSuitability: z.enum(["SPRING", "SUMMER", "AUTUMN", "WINTER", "ALL"]),
   status: z.enum(["ON_SALE", "OFF_SHELF"]),
 });
@@ -154,6 +176,8 @@ function toFormValues(product: ProductVO | null): ProductFormValues {
     stock: product ? String(product.stock) : "0",
     imageUrl: product?.imageUrl ?? "",
     description: product?.description ?? "",
+    careGuide: product?.careGuide ?? DEFAULT_CARE_GUIDE,
+    giftAccessories: product?.giftAccessories ?? DEFAULT_GIFT_ACCESSORIES,
     seasonSuitability: product?.seasonSuitability ?? "ALL",
     status: product?.status ?? "ON_SALE",
   };
@@ -645,6 +669,18 @@ export function AdminProductsPage() {
                           编辑商品
                         </DropdownItem>
                         <DropdownItem
+                          onClick={() =>
+                            window.open(
+                              `/products/${product.id}/preview`,
+                              "_blank",
+                              "noopener,noreferrer",
+                            )
+                          }
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          浏览商品详情
+                        </DropdownItem>
+                        <DropdownItem
                           disabled={statusMutation.isPending}
                           onClick={() => {
                             if (product.status !== "ON_SALE" && product.stock <= 0) {
@@ -745,6 +781,9 @@ function ProductEditorDialog({
     control,
     handleSubmit,
     reset,
+    setValue,
+    getValues,
+    watch,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -753,10 +792,14 @@ function ProductEditorDialog({
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [materialIds, setMaterialIds] = useState<number[]>([]);
   const [specDrafts, setSpecDrafts] = useState<SpecDraft[]>([]);
+  const [aiCareGuide, setAiCareGuide] = useState<AiCareGuideVO | null>(null);
+  const careGuide = watch("careGuide") ?? "";
+  const productName = watch("name") ?? "";
 
   useEffect(() => {
     if (!open) return;
     reset(toFormValues(product));
+    setAiCareGuide(null);
     setImageUrls(
       product?.imageUrls && product.imageUrls.length > 0
         ? product.imageUrls
@@ -805,6 +848,8 @@ function ProductEditorDialog({
         flowerMaterialIds: materialIds,
         specs,
         description: values.description?.trim() || undefined,
+        careGuide: values.careGuide?.trim() || "",
+        giftAccessories: values.giftAccessories?.trim() || "",
         seasonSuitability: values.seasonSuitability,
         status: values.status,
       };
@@ -822,6 +867,26 @@ function ProductEditorDialog({
       onOpenChange(false);
     },
     onError: (error) => toast.error(product ? "商品更新失败" : "商品创建失败", getErrorMessage(error)),
+  });
+
+  const careGuideMutation = useMutation({
+    mutationFn: () =>
+      aiService.careGuide({
+        productId: product?.id,
+        name: getValues("name")?.trim(),
+        category: getValues("category")?.trim(),
+        description: getValues("description")?.trim(),
+        flowerMeaning: getValues("flowerMeaning")?.trim(),
+        currentCareGuide: getValues("careGuide")?.trim(),
+      }),
+    onSuccess: (draft) => {
+      setAiCareGuide(draft);
+      toast.success(
+        draft.degraded ? "已生成模板养护指南" : "AI 养护指南已生成",
+        draft.degraded ? draft.fallbackReason : "可在右侧预览后替换原始版",
+      );
+    },
+    onError: (error) => toast.error("AI 养护指南生成失败", getErrorMessage(error)),
   });
 
   const categoryOptions = Array.from(
@@ -1322,6 +1387,126 @@ function ProductEditorDialog({
             {...register("description")}
           />
           <FieldError message={errors.description?.message} />
+        </div>
+
+        <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Label htmlFor="product-care-guide">养护指南</Label>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                展示在商品详情「养护指南」标签；空行分隔章节，第一行作为小标题。留空时使用默认养护指南。
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              loading={careGuideMutation.isPending}
+              disabled={!productName.trim()}
+              onClick={() => careGuideMutation.mutate()}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              AI 生成
+            </Button>
+          </div>
+
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-medium tracking-wide text-muted-foreground">
+                  原始版
+                </span>
+                <span className="text-[10px] text-muted-foreground tabular">
+                  {careGuide.length}/2000
+                </span>
+              </div>
+              <textarea
+                id="product-care-guide"
+                rows={10}
+                maxLength={2000}
+                placeholder="例如：01 斜剪根&#10;收到花束后先斜剪根部…"
+                className="flex min-h-[220px] w-full rounded-xl border border-border bg-card px-3 py-2 text-xs leading-6 shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
+                aria-invalid={Boolean(errors.careGuide)}
+                {...register("careGuide")}
+              />
+              <FieldError message={errors.careGuide?.message} />
+            </div>
+
+            <div className="flex min-h-[220px] flex-col rounded-xl border border-dashed border-border/70 bg-card/70 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  AI 草稿
+                </span>
+                {aiCareGuide ? (
+                  <Badge variant={aiCareGuide.degraded ? "warning" : "success"}>
+                    {aiCareGuide.degraded ? "模板降级" : "已生成"}
+                  </Badge>
+                ) : null}
+              </div>
+              {aiCareGuide ? (
+                <>
+                  <div className="mt-2 min-h-0 flex-1 overflow-y-auto rounded-lg bg-muted/30 px-3 py-2">
+                    <p className="whitespace-pre-wrap text-xs leading-6 text-foreground/85">
+                      {aiCareGuide.careGuide}
+                    </p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      {aiCareGuide.fallbackReason || "确认后可替换原始版，再保存商品。"}
+                    </span>
+                    <div className="flex gap-1.5">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        loading={careGuideMutation.isPending}
+                        onClick={() => careGuideMutation.mutate()}
+                      >
+                        重新生成
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          setValue("careGuide", aiCareGuide.careGuide, {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          });
+                          toast.success("已替换为 AI 养护指南", "保存商品后生效");
+                        }}
+                      >
+                        替换原始版
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-1 flex-col items-center justify-center px-4 py-6 text-center">
+                  <Sparkles className="h-6 w-6 text-primary/40" />
+                  <p className="mt-2 text-xs font-medium">让 AI 结合商品信息生成一版</p>
+                  <p className="mt-1 max-w-[240px] text-[11px] leading-relaxed text-muted-foreground">
+                    会参考花材、品类、花语与知识库；生成结果不会自动保存，确认后再替换。
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="product-gift-accessories">随赠配件</Label>
+          <Input
+            id="product-gift-accessories"
+            maxLength={200}
+            placeholder="例如：手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1"
+            aria-invalid={Boolean(errors.giftAccessories)}
+            {...register("giftAccessories")}
+          />
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            展示在商品详情页，并在下单时快照到履约详情；留空表示不随赠配件。
+          </p>
+          <FieldError message={errors.giftAccessories?.message} />
         </div>
       </form>
     </Dialog>

@@ -5,10 +5,13 @@ import com.flower.mall.module.catalog.dto.BusinessHourBatchRequest;
 import com.flower.mall.module.catalog.dto.BusinessHourVO;
 import com.flower.mall.module.catalog.dto.FlowerMaterialSaveRequest;
 import com.flower.mall.module.catalog.dto.FlowerMaterialVO;
+import com.flower.mall.module.catalog.dto.StoreProfileRequest;
+import com.flower.mall.module.catalog.dto.StoreProfileVO;
 import com.flower.mall.module.catalog.dto.WrapColorSaveRequest;
 import com.flower.mall.module.catalog.dto.WrapColorVO;
 import com.flower.mall.module.catalog.service.BusinessHourService;
 import com.flower.mall.module.catalog.service.CatalogService;
+import com.flower.mall.module.catalog.service.StoreProfileService;
 import com.flower.mall.module.log.annotation.OperationLogRecord;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +36,7 @@ public class AdminCatalogController {
 
     private final CatalogService catalogService;
     private final BusinessHourService businessHourService;
+    private final StoreProfileService storeProfileService;
 
     @Operation(summary = "花材列表（含停用）")
     @GetMapping("/flower-materials")
@@ -105,5 +109,19 @@ public class AdminCatalogController {
     public ApiResponse<List<BusinessHourVO>> saveBusinessHours(
             @Valid @RequestBody BusinessHourBatchRequest request) {
         return ApiResponse.ok(businessHourService.save(request));
+    }
+
+    @Operation(summary = "门店联系信息")
+    @GetMapping("/store-profile")
+    public ApiResponse<StoreProfileVO> storeProfile() {
+        return ApiResponse.ok(storeProfileService.get());
+    }
+
+    @Operation(summary = "保存营业电话")
+    @PutMapping("/store-profile")
+    @OperationLogRecord(module = "商品配置", operation = "保存营业电话")
+    public ApiResponse<StoreProfileVO> saveStoreProfile(
+            @Valid @RequestBody StoreProfileRequest request) {
+        return ApiResponse.ok(storeProfileService.update(request));
     }
 }

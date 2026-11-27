@@ -12,6 +12,8 @@ import type {
   AiCallLogVO,
   AiChatHandlers,
   AiChatRequest,
+  AiCareGuideRequest,
+  AiCareGuideVO,
   AiConversation,
   AiConversationDetail,
   AiHealthVO,
@@ -49,6 +51,8 @@ import type {
   AuthBackgroundVO,
   BusinessHourBatchRequest,
   BusinessHourVO,
+  StoreProfileRequest,
+  StoreProfileVO,
   CancelOrderRequest,
   CartAddRequest,
   CartItemVO,
@@ -149,6 +153,7 @@ export const catalogService = {
   flowerMaterials: () => api.get<FlowerMaterialVO[]>("/catalog/flower-materials"),
   wrapColors: () => api.get<WrapColorVO[]>("/catalog/wrap-colors"),
   businessHours: () => api.get<BusinessHourVO[]>("/catalog/business-hours"),
+  storeProfile: () => api.get<StoreProfileVO>("/catalog/store-profile"),
 };
 
 export const dictService = {
@@ -295,6 +300,9 @@ export const adminService = {
   businessHours: () => api.get<BusinessHourVO[]>("/admin/catalog/business-hours"),
   saveBusinessHours: (body: BusinessHourBatchRequest) =>
     api.put<BusinessHourVO[]>("/admin/catalog/business-hours", body),
+  storeProfile: () => api.get<StoreProfileVO>("/admin/catalog/store-profile"),
+  saveStoreProfile: (body: StoreProfileRequest) =>
+    api.put<StoreProfileVO>("/admin/catalog/store-profile", body),
   deleteProduct: (id: number) => api.delete<void>(`/admin/products/${id}`),
 
   reviews: (query: AdminReviewQuery) =>
@@ -524,6 +532,8 @@ export const aiService = {
     api.post<AiProductCopyVO>("/admin/ai/product-copy", body, { timeout: 30_000 }),
   applyProductCopy: (body: AiProductCopyApplyRequest) =>
     api.post<ProductVO>("/admin/ai/product-copy/apply", body),
+  careGuide: (body: AiCareGuideRequest) =>
+    api.post<AiCareGuideVO>("/admin/ai/care-guide", body, { timeout: 30_000 }),
   recommendationAdvice: (body: AiWeightAdviceRequest) =>
     api.post<AiWeightAdviceVO>("/admin/ai/recommendation-advice", body, { timeout: 30_000 }),
   applyRecommendationAdvice: (body: AiWeightAdviceApplyRequest) =>

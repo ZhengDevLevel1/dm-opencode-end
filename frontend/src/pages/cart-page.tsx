@@ -260,7 +260,7 @@ export function CartPage() {
           </p>
         ) : null}
 
-        <ul className="max-h-[28rem] divide-y divide-border/60 overflow-y-auto overscroll-contain">
+        <ul className="divide-y divide-border/60">
           {visibleItems.length === 0 ? (
             <li className="px-4 py-12">
               <EmptyState

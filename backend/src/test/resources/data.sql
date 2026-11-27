@@ -46,6 +46,8 @@ INSERT INTO wrap_color (id, name, hex, ring_hex, description, enabled, sort_orde
 (4, '夜墨黑', '#2E3034', '#17181A', '利落高级，适合红玫瑰', 1, 40),
 (5, '香槟金', '#C9A86A', '#A88A4E', '温润典雅，适合婚礼与庆典', 1, 50);
 
+INSERT INTO store_profile (id, business_phone) VALUES (1, '400-820-1024');
+
 INSERT INTO business_hour (day_of_week, open_time, close_time, enabled, note) VALUES
 (1, '09:00:00', '20:00:00', 1, '周一鲜切花正常供应'),
 (2, '09:00:00', '20:00:00', 1, '周二鲜切花正常供应'),

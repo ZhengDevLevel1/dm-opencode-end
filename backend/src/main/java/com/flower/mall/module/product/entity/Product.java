@@ -39,6 +39,10 @@ public class Product {
 
     private String description;
 
+    private String giftAccessories;
+
+    private String careGuide;
+
     private String aiTags;
 
     private String aiSellingPoints;

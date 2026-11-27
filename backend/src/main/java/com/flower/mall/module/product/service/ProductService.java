@@ -394,6 +394,10 @@ public class ProductService {
             product.setImageUrl(null);
         }
         product.setDescription(request.getDescription());
+        product.setGiftAccessories(request.getGiftAccessories() == null
+                ? null : request.getGiftAccessories().trim());
+        product.setCareGuide(request.getCareGuide() == null
+                ? null : request.getCareGuide().trim());
         product.setSeasonSuitability(SeasonSuitability.valueOf(request.getSeasonSuitability()).name());
     }
 

@@ -5,6 +5,8 @@ import com.flower.mall.common.exception.BusinessException;
 import com.flower.mall.common.exception.ErrorCode;
 import com.flower.mall.common.util.SecurityUtils;
 import com.flower.mall.config.AppProperties;
+import com.flower.mall.module.ai.dto.AiCareGuideRequest;
+import com.flower.mall.module.ai.dto.AiCareGuideVO;
 import com.flower.mall.module.ai.dto.AiProductCopyApplyRequest;
 import com.flower.mall.module.ai.dto.AiProductCopyRequest;
 import com.flower.mall.module.ai.dto.AiProductCopyVO;
@@ -93,6 +95,65 @@ public class AiMerchantService {
                 enabled(request.getApplyTags()),
                 enabled(request.getApplySellingPoints()));
         return productService.applyAiCopy(request.getProductId(), update);
+    }
+
+    public AiCareGuideVO careGuide(AiCareGuideRequest request) {
+        requireMerchantEnabled();
+        Product product = request.getProductId() == null
+                ? null : productService.getRequired(request.getProductId());
+        String name = firstText(request.getName(), product == null ? null : product.getName());
+        if (!StringUtils.hasText(name)) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "请填写商品名称或选择商品");
+        }
+        String category = firstText(request.getCategory(), product == null ? null : product.getCategory());
+        String description = firstText(request.getDescription(),
+                product == null ? null : product.getDescription());
+        String flowerMeaning = firstText(request.getFlowerMeaning(),
+                product == null ? null : product.getFlowerMeaning());
+        String currentCareGuide = firstText(request.getCurrentCareGuide(), null);
+
+        Map<String, Object> productBody = new LinkedHashMap<>();
+        productBody.put("id", product == null ? null : product.getId());
+        productBody.put("name", name);
+        productBody.put("category", category);
+        productBody.put("description", description);
+        productBody.put("flowerMeaning", flowerMeaning);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("product", productBody);
+        body.put("currentCareGuide", currentCareGuide);
+        long startedAt = System.currentTimeMillis();
+        try {
+            JsonNode response = aiClient.post("/internal/ai/care-guide", body,
+                    properties.getAi().getTimeoutMs());
+            String generated = response.path("careGuide").asText("").trim();
+            if (!StringUtils.hasText(generated)) {
+                AiCareGuideVO fallback = fallbackCareGuide(name, category, "AI 返回内容为空");
+                logMerchant("PRODUCT_CARE_GUIDE", "FALLBACK", true, "ai-service",
+                        fallback.getFallbackReason(), startedAt, body, null);
+                return fallback;
+            }
+            AiCareGuideVO vo = AiCareGuideVO.builder()
+                    .careGuide(truncate(generated, 2000))
+                    .degraded(response.path("degraded").asBoolean(false))
+                    .fallbackReason(response.path("fallbackReason").asText(null))
+                    .build();
+            logMerchant("PRODUCT_CARE_GUIDE", vo.isDegraded() ? "FALLBACK" : "SUCCESS",
+                    vo.isDegraded(), response.path("degradedStage").asText(
+                            vo.isDegraded() ? "ai-service" : null),
+                    vo.getFallbackReason(), startedAt, body, response);
+            return vo;
+        } catch (BusinessException ex) {
+            if (ex.getCode() != ErrorCode.AI_UNAVAILABLE.getCode()
+                    && ex.getCode() != ErrorCode.AI_DISABLED.getCode()) {
+                throw ex;
+            }
+            AiCareGuideVO fallback = fallbackCareGuide(name, category,
+                    "AI 服务暂不可用，已使用模板养护指南");
+            logMerchant("PRODUCT_CARE_GUIDE", "FALLBACK", true, "backend-fallback",
+                    fallback.getFallbackReason(), startedAt, body, null);
+            return fallback;
+        }
     }
 
     public AiWeightAdviceVO recommendationAdvice(AiWeightAdviceRequest request) {
@@ -206,6 +267,27 @@ public class AiMerchantService {
                 .degraded(true)
                 .fallbackReason("AI 服务暂不可用，已使用模板文案")
                 .build();
+    }
+
+    private AiCareGuideVO fallbackCareGuide(String name, String category, String reason) {
+        String subject = StringUtils.hasText(name) ? "「" + name + "」" : "这束花";
+        String categoryText = StringUtils.hasText(category) ? category : "鲜花";
+        String careGuide = String.join("\n\n",
+                "01 45° 斜剪根\n收到花束后，在根部以上 2cm 处以 45° 斜剪，扩大吸水面积，避免平剪导致吸水面贴住瓶底。",
+                "02 去叶入水\n摘除所有会浸入水中的叶片，避免叶片在水中腐烂滋生细菌，每两天清洗花瓶并更换清水。",
+                "03 浅水养护\n水位控制在花瓶的 1/3，深水反而会加速茎秆腐烂。加入附赠保鲜剂，可延长 2–3 天花期。",
+                "04 避开风口\n远离空调直吹、暖气与成熟水果（乙烯会催谢）。夜间可移至阴凉处，玫瑰会缓慢恢复挺立。",
+                "05 常见小状况\n花头下垂：剪根后深水浸泡 1 小时（水位到花头下），多数可在 2 小时内恢复挺立。外层花瓣发软：玫瑰外层为保护瓣，属正常现象，请勿摘除。水质发浑：立即洗瓶换水并再次斜剪 1cm，避免细菌堵塞导管。",
+                "养护提示\n" + subject + "属于" + categoryText + "花材，收到后请尽快拆包装、剪根入水；若花材出现明显萎蔫，请拍照联系门店处理。");
+        return AiCareGuideVO.builder()
+                .careGuide(careGuide)
+                .degraded(true)
+                .fallbackReason(reason)
+                .build();
+    }
+
+    private static String truncate(String value, int maxLength) {
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     private AiWeightAdviceVO fallbackAdvice(RecommendationSceneWeightVO scene, Map<String, Double> current) {

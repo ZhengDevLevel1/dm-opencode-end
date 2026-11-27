@@ -255,6 +255,21 @@ export function AppRoutes() {
         </Route>
 
         <Route
+          path="/products/:id/preview"
+          element={
+            <RequireRole roles={["ADMIN"]}>
+              <div
+                id="main-content"
+                className="h-dvh overflow-y-auto overscroll-contain bg-background text-foreground"
+              >
+                <div className="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-6 md:py-6 lg:px-8">
+                  <ProductDetailPage />
+                </div>
+              </div>
+            </RequireRole>
+          }
+        />
+        <Route
           path="/board"
           element={
             <RequireRole roles={["ADMIN"]}>

@@ -78,8 +78,8 @@ export function deliveryWindowError(
   if (deliveryAt.getTime() < now.getTime() + 60 * 60 * 1000) {
     return "请至少提前 1 小时预约送达时间";
   }
-  if (deliveryAt.getTime() > now.getTime() + 30 * 24 * 60 * 60 * 1000) {
-    return "最多支持预约 30 天内的送达时间";
+  if (deliveryAt.getTime() > now.getTime() + 6 * 24 * 60 * 60 * 1000) {
+    return "最多支持预约 6 天内的送达时间";
   }
   const businessHour = businessHourFor(date, hours);
   if (!businessHour || !businessHour.enabled) {
@@ -121,7 +121,7 @@ export function defaultDeliverySelection(
   hours: BusinessHourVO[],
   now = new Date(),
 ): { date: string; time: string } {
-  for (let offset = 0; offset <= 30; offset += 1) {
+  for (let offset = 0; offset <= 6; offset += 1) {
     const date = addDays(now, offset);
     const dateKey = formatDateKey(date);
     const first = deliverySlotOptions(dateKey, hours, now)[0];

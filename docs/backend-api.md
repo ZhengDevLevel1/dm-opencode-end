@@ -300,6 +300,10 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | GET | `/api/products` | 公开 | `ApiResponse<PageResult<ProductVO>>` |
 | GET | `/api/products/hot` | 公开 | `ApiResponse<ProductVO[]>` |
 | GET | `/api/products/{id}` | 公开 | `ApiResponse<ProductVO>` |
+| GET | `/api/catalog/flower-materials` | 公开 | `ApiResponse<FlowerMaterialVO[]>` |
+| GET | `/api/catalog/wrap-colors` | 公开 | `ApiResponse<WrapColorVO[]>` |
+| GET | `/api/catalog/business-hours` | 公开 | `ApiResponse<BusinessHourVO[]>` |
+| GET | `/api/catalog/store-profile` | 公开 | `ApiResponse<StoreProfileVO>` |
 | GET | `/api/cart` | 登录 | `ApiResponse<CartItemVO[]>` |
 | POST | `/api/cart/items` | 登录 | `ApiResponse<CartItemVO>` |
 | PUT | `/api/cart/items/{id}` | 登录 | `ApiResponse<CartItemVO>` |
@@ -360,6 +364,18 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/products/{id}` | 管理员 | `ApiResponse<ProductVO>` |
 | PUT | `/api/admin/products/{id}/status` | 管理员 | `ApiResponse<ProductVO>` |
 | DELETE | `/api/admin/products/{id}` | 管理员 | `ApiResponse<Void>` |
+| GET | `/api/admin/catalog/flower-materials` | 管理员 | `ApiResponse<FlowerMaterialVO[]>` |
+| POST | `/api/admin/catalog/flower-materials` | 管理员 | `ApiResponse<FlowerMaterialVO>` |
+| PUT | `/api/admin/catalog/flower-materials/{id}` | 管理员 | `ApiResponse<FlowerMaterialVO>` |
+| DELETE | `/api/admin/catalog/flower-materials/{id}` | 管理员 | `ApiResponse<Void>` |
+| GET | `/api/admin/catalog/wrap-colors` | 管理员 | `ApiResponse<WrapColorVO[]>` |
+| POST | `/api/admin/catalog/wrap-colors` | 管理员 | `ApiResponse<WrapColorVO>` |
+| PUT | `/api/admin/catalog/wrap-colors/{id}` | 管理员 | `ApiResponse<WrapColorVO>` |
+| DELETE | `/api/admin/catalog/wrap-colors/{id}` | 管理员 | `ApiResponse<Void>` |
+| GET | `/api/admin/catalog/business-hours` | 管理员 | `ApiResponse<BusinessHourVO[]>` |
+| PUT | `/api/admin/catalog/business-hours` | 管理员 | `ApiResponse<BusinessHourVO[]>` |
+| GET | `/api/admin/catalog/store-profile` | 管理员 | `ApiResponse<StoreProfileVO>` |
+| PUT | `/api/admin/catalog/store-profile` | 管理员 | `ApiResponse<StoreProfileVO>` |
 | GET | `/api/admin/tags` | 管理员 | `ApiResponse<TagOverviewVO>` |
 | POST | `/api/admin/tags` | 管理员 | `ApiResponse<TagOptionVO>` |
 | PUT | `/api/admin/tags/{id}` | 管理员 | `ApiResponse<TagOptionVO>` |
@@ -386,6 +402,7 @@ start=2026-10-01T00:00:00&end=2026-10-31T23:59:59
 | PUT | `/api/admin/recommendations/experiments/{id}/status` | 管理员 | `ApiResponse<RecommendationExperimentVO>` |
 | POST | `/api/admin/ai/product-copy` | 管理员 | `ApiResponse<AiProductCopyVO>` |
 | POST | `/api/admin/ai/product-copy/apply` | 管理员 | `ApiResponse<ProductVO>` |
+| POST | `/api/admin/ai/care-guide` | 管理员 | `ApiResponse<AiCareGuideVO>` |
 | POST | `/api/admin/ai/recommendation-advice` | 管理员 | `ApiResponse<AiWeightAdviceVO>` |
 | POST | `/api/admin/ai/recommendation-advice/apply` | 管理员 | `ApiResponse<RecommendationSceneWeightVO[]>` |
 | GET | `/api/admin/ai/metrics` | 管理员 | `ApiResponse<AiMetricsVO>` |
@@ -785,6 +802,8 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
   "stock": 120,
   "imageUrl": "/images/products/rose-11.svg",
   "description": "精选红玫瑰与尤加利叶搭配。",
+  "giftAccessories": "手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1",
+  "careGuide": "01 45° 斜剪根\\n收到花束后，在根部以上 2cm 处以 45° 斜剪。\\n\\n02 去叶入水\\n摘除会浸入水中的叶片，每两天换水。",
   "seasonSuitability": "ALL",
   "seasonLabel": "四季",
   "priceBand": "中端",
@@ -797,6 +816,61 @@ MinIO 配置位于 `application.yml` 的 `app.minio`，默认关闭；启用后�
   "updatedAt": "2026-10-28T10:00:00"
 }
 ```
+
+### 5.2 商品配置公开数据
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/api/catalog/flower-materials` | 公开 | 启用的花材列表，按 `sortOrder` 升序 |
+| GET | `/api/catalog/wrap-colors` | 公开 | 启用的包装色系列表，按 `sortOrder` 升序 |
+| GET | `/api/catalog/business-hours` | 公开 | 周一至周日营业时间 |
+| GET | `/api/catalog/store-profile` | 公开 | 门店营业电话 |
+
+公开接口只返回 `enabled=true` 的花材/色系；管理端 `/api/admin/catalog/*` 返回全部记录。花材和包装色系保存后立即生效，商品详情与结算页会重新读取。
+
+```ts
+export interface FlowerMaterialVO {
+  id: number;
+  name: string;
+  latinName?: string;
+  note?: string;
+  colorHex?: string;
+  imageUrl?: string;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface WrapColorVO {
+  id: number;
+  name: string;
+  hex: string;
+  ringHex?: string;
+  description?: string;
+  enabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface BusinessHourVO {
+  dayOfWeek: number;
+  dayLabel: string;
+  openTime: string;
+  closeTime: string;
+  enabled: boolean;
+  note?: string;
+}
+
+export interface StoreProfileVO {
+  businessPhone: string;
+}
+```
+
+`BusinessHourVO.openTime` / `closeTime` 为 `HH:mm`。`StoreProfileVO.businessPhone` 未配置时返回默认值 `400-820-1024`。商品 `giftAccessories` 为 `null` 时前端展示默认配件，空字符串时展示“无”。
+
+结算页按营业时间生成可选送达时刻，至少提前 1 小时、最多预约 6 天内；后端 `BusinessHourService` 使用相同窗口校验。商品 `careGuide` 为空时前端使用默认养护指南；纯文本按空行分章节，每段第一行作为小标题。
 
 ## 6. 购物车
 
@@ -936,6 +1010,7 @@ AFTER_SALE --店员拒绝--> COMPLETED
 - 订单列表支持 `status` 精确筛选，使用枚举值。
 - 订单列表支持 `keyword` 模糊搜索订单号、收货人、收货电话或订单商品名称，搜索范围仅限当前用户自己的订单。
 - `OrderVO.buyerUsername`、`buyerNickname` 主要出现在店员端和创建订单响应中，普通用户列表/详情中通常省略。
+- 订单项会快照 `specId`/`specName`、`wrapId`/`wrapName`、`flowerSummary` 与 `giftAccessories`；之后修改花材库、包装色系或商品配件不会改变历史订单。旧订单缺少快照字段时前端应显示“未记录”或“无”。
 
 ## 9. 支付（模拟支付）
 
@@ -1445,6 +1520,8 @@ SSE 事件：
 | `stock` | number | 是 | 大于等于 0 |
 | `imageUrl` | string | 否 | 最长 500 |
 | `description` | string | 否 | 最长 2000 |
+| `giftAccessories` | string | 否 | 最长 200；商品详情和订单快照中的随赠配件 |
+| `careGuide` | string | 否 | 最长 2000；纯文本养护指南，空行分章节，每段第一行为小标题；为空时使用默认指南 |
 | `seasonSuitability` | string | 是 | `SPRING/SUMMER/AUTUMN/WINTER/ALL` |
 | `status` | string | 否 | `ON_SALE/OFF_SHELF`；创建时默认 `ON_SALE`，编辑时不传则保持原状态；库存为 0 时强制为 `OFF_SHELF` |
 
@@ -1710,6 +1787,7 @@ SSE 事件：
 | --- | --- | --- | --- | --- |
 | POST | `/api/admin/ai/product-copy` | 管理员 | `AiProductCopyRequest` | `ApiResponse<AiProductCopyVO>` |
 | POST | `/api/admin/ai/product-copy/apply` | 管理员 | `AiProductCopyApplyRequest` | `ApiResponse<ProductVO>` |
+| POST | `/api/admin/ai/care-guide` | 管理员 | `AiCareGuideRequest` | `ApiResponse<AiCareGuideVO>` |
 | POST | `/api/admin/ai/recommendation-advice` | 管理员 | `AiWeightAdviceRequest` | `ApiResponse<AiWeightAdviceVO>` |
 | POST | `/api/admin/ai/recommendation-advice/apply` | 管理员 | `AiWeightAdviceApplyRequest` | `ApiResponse<RecommendationSceneWeightVO[]>` |
 | GET | `/api/admin/ai/metrics` | 管理员 | `days` 默认 30 | `ApiResponse<AiMetricsVO>` |
@@ -1728,6 +1806,8 @@ SSE 事件：
 | POST | `/api/admin/ai/prompt-tags/generate` | 管理员 | `AiPromptTagGenerateRequest` | `ApiResponse<AiPromptTagGenerateVO>` |
 
 `AiProductCopyRequest`：`{ productId?, name?, category?, grade?, origin?, flowerMeaning?, occasionTags?, festivalTags?, description?, price?, tone?, length? }`。`productId` 与 `name` 至少提供一个：传 `productId` 时读取已有商品字段并允许用请求字段覆盖；不传 `productId` 时仅按请求字段生成新品文案。`tone` 默认 `温暖`，`length` 取 `short`/`medium`/`long`，默认 `medium`。
+
+`AiCareGuideRequest`：`{ productId?, name?, category?, description?, flowerMeaning?, currentCareGuide? }`；`productId` 与 `name` 至少提供一个。`AiCareGuideVO` 返回 `{ careGuide, degraded, fallbackReason }`，只生成草稿，不会自动保存到商品；AI 不可用时返回模板指南并标记 `degraded=true`。
 
 `AiProductCopyApplyRequest`：
 
@@ -1789,6 +1869,57 @@ SSE 事件：
 `AiPromptTagGenerateRequest`：`{ category, theme? }`。调用 AI 服务生成 5–10 个候选标签词；`theme` 最长 100 字，会优先作为第一个候选词。AI 未启用或调用失败时返回本地兜底词，`degraded=true` 并带 `fallbackReason`。
 
 `AiPromptTagGenerateVO`：`{ words, degraded, fallbackReason, totalTokens }`。生成接口只返回草稿，不会写库；管理员确认后调用新增、批量追加或批量替换接口生效。所有写操作都会记录操作日志。
+
+### 13.10 商品配置管理
+
+| 方法 | 路径 | 权限 | 请求 | 响应 |
+| --- | --- | --- | --- | --- |
+| GET | `/api/admin/catalog/flower-materials` | 管理员 | 无 | `ApiResponse<FlowerMaterialVO[]>` |
+| POST | `/api/admin/catalog/flower-materials` | 管理员 | `FlowerMaterialSaveRequest` | `ApiResponse<FlowerMaterialVO>` |
+| PUT | `/api/admin/catalog/flower-materials/{id}` | 管理员 | `FlowerMaterialSaveRequest` | `ApiResponse<FlowerMaterialVO>` |
+| DELETE | `/api/admin/catalog/flower-materials/{id}` | 管理员 | 无 | `ApiResponse<Void>` |
+| GET | `/api/admin/catalog/wrap-colors` | 管理员 | 无 | `ApiResponse<WrapColorVO[]>` |
+| POST | `/api/admin/catalog/wrap-colors` | 管理员 | `WrapColorSaveRequest` | `ApiResponse<WrapColorVO>` |
+| PUT | `/api/admin/catalog/wrap-colors/{id}` | 管理员 | `WrapColorSaveRequest` | `ApiResponse<WrapColorVO>` |
+| DELETE | `/api/admin/catalog/wrap-colors/{id}` | 管理员 | 无 | `ApiResponse<Void>` |
+| GET | `/api/admin/catalog/business-hours` | 管理员 | 无 | `ApiResponse<BusinessHourVO[]>` |
+| PUT | `/api/admin/catalog/business-hours` | 管理员 | `BusinessHourBatchRequest` | `ApiResponse<BusinessHourVO[]>` |
+| GET | `/api/admin/catalog/store-profile` | 管理员 | 无 | `ApiResponse<StoreProfileVO>` |
+| PUT | `/api/admin/catalog/store-profile` | 管理员 | `StoreProfileRequest` | `ApiResponse<StoreProfileVO>` |
+
+`FlowerMaterialSaveRequest`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | 最长 50，同名返回 `409` |
+| `latinName` | string | 否 | 最长 80 |
+| `note` | string | 否 | 最长 200 |
+| `colorHex` | string | 否 | `#RRGGBB` |
+| `imageUrl` | string | 否 | 最长 500 |
+| `enabled` | number | 否 | `0/1`，默认 `1` |
+| `sortOrder` | number | 否 | 大于等于 0；创建时省略则追加到末尾（步长 10） |
+
+`WrapColorSaveRequest`
+
+| 字段 | 类型 | 必填 | 约束 |
+| --- | --- | --- | --- |
+| `name` | string | 是 | 最长 50，同名返回 `409` |
+| `hex` | string | 是 | `#RRGGBB`，保存时转为大写 |
+| `ringHex` | string | 否 | `#RRGGBB` |
+| `description` | string | 否 | 最长 200 |
+| `enabled` | number | 否 | `0/1`，默认 `1` |
+| `sortOrder` | number | 否 | 大于等于 0；创建时省略则追加到末尾（步长 10） |
+
+`BusinessHourBatchRequest`：`{ hours: BusinessHourSaveRequest[] }`，最多 7 天，`hours` 不能为空。`BusinessHourSaveRequest` 字段：`dayOfWeek`（1-7）、`openTime`/`closeTime`（`HH:mm` 或 `HH:mm:ss`）、`enabled`（`0/1`）、`note`（最长 100）。
+
+`StoreProfileRequest`：`{ businessPhone: string }`，5-30 个字符，仅允许数字、空格、`+`、`-`、括号。
+
+说明：
+
+- 花材/包装色系的名称在全局唯一，重复返回 `409`。
+- 删除已被商品、规格、购物车或订单引用的花材/色系会返回 `400`，应改为停用。
+- 保存花材或色系会清理商品详情缓存；营业时间与营业电话保存后由前端重新请求公开接口生效。所有写操作都会记录操作日志。
+- 管理员列表包含停用项；公开 `/api/catalog/*` 只返回启用项。
 
 ## 14. 前端对接流程
 
@@ -2021,6 +2152,8 @@ export interface ProductVO {
   stock: number;
   imageUrl?: string;
   description?: string;
+  giftAccessories?: string;
+  careGuide?: string;
   seasonSuitability: SeasonSuitability;
   seasonLabel: string;
   priceBand: string;
@@ -2059,6 +2192,8 @@ export interface ProductSaveRequest {
   stock: number;
   imageUrl?: string;
   description?: string;
+  giftAccessories?: string;
+  careGuide?: string;
   seasonSuitability: SeasonSuitability;
   status?: ProductStatus;
 }
@@ -2096,6 +2231,12 @@ export interface OrderItemVO {
   productName: string;
   productImage?: string;
   category: string;
+  specId?: number;
+  specName?: string;
+  wrapId?: number;
+  wrapName?: string;
+  flowerSummary?: string;
+  giftAccessories?: string;
   unitPrice: number;
   quantity: number;
   subtotal: number;

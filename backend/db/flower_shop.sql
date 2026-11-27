@@ -18,6 +18,7 @@ USE flower_shop;
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS user_theme_preference;
+DROP TABLE IF EXISTS store_profile;
 DROP TABLE IF EXISTS appearance_setting;
 DROP TABLE IF EXISTS metric_config;
 DROP TABLE IF EXISTS tag_type_setting;
@@ -103,6 +104,8 @@ CREATE TABLE product (
     stock INT NOT NULL DEFAULT 0 COMMENT '库存数量',
     image_url VARCHAR(500) DEFAULT NULL COMMENT '图片地址',
     description VARCHAR(2000) DEFAULT NULL COMMENT '商品描述',
+    gift_accessories VARCHAR(200) NOT NULL DEFAULT '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1' COMMENT '随赠配件',
+    care_guide TEXT DEFAULT NULL COMMENT '养护指南，空行分隔章节',
     ai_tags VARCHAR(255) DEFAULT NULL COMMENT 'AI 智能标签，逗号分隔',
     ai_selling_points VARCHAR(500) DEFAULT NULL COMMENT 'AI 卖点，逗号分隔',
     season_suitability VARCHAR(20) NOT NULL DEFAULT 'ALL' COMMENT '季节适用性',
@@ -303,6 +306,8 @@ CREATE TABLE order_item (
     spec_name VARCHAR(60) DEFAULT NULL,
     wrap_id BIGINT NOT NULL DEFAULT 0,
     wrap_name VARCHAR(60) DEFAULT NULL,
+    flower_summary VARCHAR(500) DEFAULT NULL COMMENT '花材种类与数量快照',
+    gift_accessories VARCHAR(200) DEFAULT NULL COMMENT '随赠配件快照',
     unit_price DECIMAL(10,2) NOT NULL,
     quantity INT NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
@@ -471,6 +476,14 @@ CREATE TABLE appearance_setting (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='外观设置表';
 
+CREATE TABLE store_profile (
+    id BIGINT NOT NULL,
+    business_phone VARCHAR(30) NOT NULL DEFAULT '400-820-1024' COMMENT '门店营业电话',
+    updated_by BIGINT DEFAULT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='门店联系信息';
+
 CREATE TABLE tag_option (
     id BIGINT NOT NULL AUTO_INCREMENT,
     tag_type VARCHAR(20) NOT NULL,
@@ -626,14 +639,14 @@ INSERT INTO shop_order (id, order_no, user_id, total_amount, pay_amount, status,
 (4, 'FL202605040004', 3, 599.00, 599.00, 'CANCELLED', '小玫', '13900000003', '上海市徐汇区衡山路88号', 121.4468000, 31.2043000, NULL, NULL, NULL, '临时取消，改日再订', NULL, NULL, 0, DATE_SUB(NOW(), INTERVAL 15 DAY)),
 (5, 'FL202605050005', 4, 189.00, 189.00, 'PAID', '爱丽丝', '13900000004', '上海市静安区南京西路1266号', 121.4539000, 31.2279000, '希望18点前送达', '谢谢你一直陪在我身边。', DATE_ADD(NOW(), INTERVAL 1 DAY), NULL, DATE_SUB(NOW(), INTERVAL 2 HOUR), NULL, 0, DATE_SUB(NOW(), INTERVAL 2 HOUR));
 
-INSERT INTO order_item (id, order_id, product_id, product_name, product_image, category, unit_price, quantity, subtotal, reviewed) VALUES
-(1, 1, 1, '经典红玫瑰礼盒·11朵', '/images/products/rose-11.svg', '玫瑰', 199.00, 1, 199.00, 1),
-(2, 1, 4, '白百合花束', '/images/products/lily-white.svg', '百合', 159.00, 1, 159.00, 0),
-(3, 2, 3, '粉色康乃馨花束', '/images/products/carnation-pink.svg', '康乃馨', 129.00, 1, 129.00, 1),
-(4, 2, 11, '康乃馨百合组合', '/images/products/carnation-lily.svg', '混合花束', 169.00, 1, 169.00, 0),
-(5, 3, 12, '圣诞花环', '/images/products/christmas-wreath.svg', '礼盒', 119.00, 2, 238.00, 0),
-(6, 4, 2, '香槟玫瑰·99朵', '/images/products/rose-99.svg', '玫瑰', 599.00, 1, 599.00, 0),
-(7, 5, 7, '混搭鲜花礼盒', '/images/products/mixed-box.svg', '混合花束', 189.00, 1, 189.00, 0);
+INSERT INTO order_item (id, order_id, product_id, product_name, product_image, category, spec_id, spec_name, wrap_id, wrap_name, flower_summary, gift_accessories, unit_price, quantity, subtotal, reviewed) VALUES
+(1, 1, 1, '经典红玫瑰礼盒·11朵', '/images/products/rose-11.svg', '玫瑰', 1, '心动款 · 11枝', 1, '雾面米白', '红玫瑰 ×11、尤加利 ×3', '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1', 199.00, 1, 199.00, 1),
+(2, 1, 4, '白百合花束', '/images/products/lily-white.svg', '百合', 0, NULL, 2, '苔藓绿', '香水百合、满天星', '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1', 159.00, 1, 159.00, 0),
+(3, 2, 3, '粉色康乃馨花束', '/images/products/carnation-pink.svg', '康乃馨', 0, NULL, 3, '胭脂粉', '康乃馨、洋桔梗', '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1', 129.00, 1, 129.00, 1),
+(4, 2, 11, '康乃馨百合组合', '/images/products/carnation-lily.svg', '混合花束', 0, NULL, 1, '雾面米白', '康乃馨、香水百合', '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1', 169.00, 1, 169.00, 0),
+(5, 3, 12, '圣诞花环', '/images/products/christmas-wreath.svg', '礼盒', 0, NULL, 2, '苔藓绿', NULL, '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1', 119.00, 2, 238.00, 0),
+(6, 4, 2, '香槟玫瑰·99朵', '/images/products/rose-99.svg', '玫瑰', 4, '经典款 · 99枝', 4, '夜墨黑', '红玫瑰 ×99、尤加利 ×12', '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1', 599.00, 1, 599.00, 0),
+(7, 5, 7, '混搭鲜花礼盒', '/images/products/mixed-box.svg', '混合花束', 5, '日常款', 1, '雾面米白', '红玫瑰 ×6、洋桔梗 ×4、满天星 ×2', '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1', 189.00, 1, 189.00, 0);
 
 INSERT INTO payment_record (id, payment_no, order_id, order_no, user_id, amount, channel, status, paid_at, callback_at, created_at) VALUES
 (1, 'PAY202605010001', 1, 'FL202605010001', 3, 358.00, 'MOCK', 'SUCCESS', DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY), DATE_SUB(NOW(), INTERVAL 5 DAY)),
@@ -692,6 +705,7 @@ INSERT INTO operation_log (id, user_id, username, module, operation, method, req
 (2, 2, 'staff', '履约管理', '订单接单', 'StaffOrderController.accept', '/api/staff/orders/1/accept', 'POST', NULL, 1, NULL, '127.0.0.1', 31, DATE_SUB(NOW(), INTERVAL 5 DAY));
 
 INSERT INTO appearance_setting (id) VALUES (1);
+INSERT INTO store_profile (id, business_phone) VALUES (1, '400-820-1024');
 INSERT INTO metric_config (id) VALUES (1);
 
 CREATE TABLE ai_call_log (

@@ -32,6 +32,10 @@ public class OrderItem {
 
     private String wrapName;
 
+    private String flowerSummary;
+
+    private String giftAccessories;
+
     private BigDecimal unitPrice;
 
     private Integer quantity;

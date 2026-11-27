@@ -194,36 +194,6 @@ export function GreetingCardEditor({
 
       {enabled ? (
         <div className="space-y-3 rounded-2xl border border-border/70 bg-muted/20 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[11px] text-muted-foreground">不知道写什么？试试这些</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-[11px]"
-              onClick={() => setQuotes(pickQuotes())}
-            >
-              <RefreshCw className="h-3 w-3" />
-              换一换
-            </Button>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {quotes.map((quote) => (
-              <button
-                key={quote}
-                type="button"
-                onClick={() => onChange(quote)}
-                className={cn(
-                  "rounded-xl border px-3 py-2 text-left text-xs leading-relaxed transition-colors",
-                  value === quote
-                    ? "border-primary/45 bg-primary/10 text-foreground"
-                    : "border-border/60 bg-card text-muted-foreground hover:border-primary/35 hover:text-foreground",
-                )}
-              >
-                {quote}
-              </button>
-            ))}
-          </div>
           <Textarea
             id="greeting-card"
             value={value}
@@ -232,6 +202,38 @@ export function GreetingCardEditor({
             placeholder="也可以自己写一句祝福语"
             onChange={(event) => onChange(event.target.value)}
           />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] text-muted-foreground">不知道写什么？试试这些</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => setQuotes(pickQuotes())}
+              >
+                <RefreshCw className="h-3 w-3" />
+                换一换
+              </Button>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {quotes.map((quote) => (
+                <button
+                  key={quote}
+                  type="button"
+                  onClick={() => onChange(quote)}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-left text-xs leading-relaxed transition-colors",
+                    value === quote
+                      ? "border-primary/45 bg-primary/10 text-foreground"
+                      : "border-border/60 bg-card text-muted-foreground hover:border-primary/35 hover:text-foreground",
+                  )}
+                >
+                  {quote}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex justify-between text-[11px] text-muted-foreground">
             <span>贺卡内容会随订单一起提交给花店</span>
             <span className="tabular">{value.length}/{maxLength}</span>

@@ -1,45 +1,11 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Flower2, Leaf, Quote, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { resolveImageUrl } from "@/lib/image";
 
 interface FloristNoteProps {
   productName: string;
-  imageUrl?: string;
   description?: string;
   className?: string;
-}
-
-function useProductImage(imageUrl?: string) {
-  const [broken, setBroken] = useState(false);
-  const resolved = resolveImageUrl(imageUrl);
-
-  useEffect(() => {
-    setBroken(false);
-  }, [imageUrl]);
-
-  const source = resolved && !broken ? resolved : null;
-  return {
-    source,
-    image: (className: string): ReactNode =>
-      source ? (
-        <img
-          src={source}
-          alt=""
-          onError={() => setBroken(true)}
-          className={cn("h-full w-full object-cover", className)}
-        />
-      ) : (
-        <div
-          className={cn(
-            "flex h-full w-full items-center justify-center bg-gradient-to-br from-flower-rose/20 via-muted to-flower-amber/20",
-            className,
-          )}
-        >
-          <Flower2 className="h-10 w-10 text-flower-rose/50" />
-        </div>
-      ),
-  };
 }
 
 function NoteCopy({ name, text }: { name: string; text: string }) {
@@ -55,8 +21,7 @@ function NoteCopy({ name, text }: { name: string; text: string }) {
   );
 }
 
-export function FloristNote({ productName, imageUrl, description, className }: FloristNoteProps) {
-  const { source, image } = useProductImage(imageUrl);
+export function FloristNote({ productName, description, className }: FloristNoteProps) {
   const name = productName || "这束花";
   const text =
     description?.trim() ||
@@ -66,14 +31,13 @@ export function FloristNote({ productName, imageUrl, description, className }: F
 
   if (layout === 0) {
     return (
-      <section className={cn("grid overflow-hidden rounded-3xl border border-border/60 bg-card md:grid-cols-2", className)}>
-        <div className="p-7 sm:p-10">
+      <section className={cn("rounded-3xl border border-border/60 bg-card p-7 sm:p-10", className)}>
+        <div className="max-w-2xl">
           <NoteCopy name={name} text={text} />
           <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
             <Leaf className="h-3.5 w-3.5 text-flower-leaf" /> 当日新鲜花材
           </div>
         </div>
-        <div className="min-h-[260px] overflow-hidden">{image("")}</div>
       </section>
     );
   }
@@ -88,11 +52,6 @@ export function FloristNote({ productName, imageUrl, description, className }: F
           <p className="mt-4 text-[11px] uppercase tracking-[0.35em] text-muted-foreground">A note from our florist</p>
           <h2 className="mt-3 font-display text-3xl tracking-tight">把心意，交给花来说</h2>
           <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-muted-foreground">{text}</p>
-          {source ? (
-            <div className="mx-auto mt-6 h-28 w-28 rotate-2 overflow-hidden rounded-2xl border-4 border-card shadow-lg">
-              {image("")}
-            </div>
-          ) : null}
           <p className="mt-5 text-xs text-muted-foreground">为「{name}」而作</p>
         </div>
       </section>
@@ -101,8 +60,8 @@ export function FloristNote({ productName, imageUrl, description, className }: F
 
   if (layout === 2) {
     return (
-      <section className={cn("grid overflow-hidden rounded-3xl bg-primary text-primary-foreground md:grid-cols-[1.1fr_0.9fr]", className)}>
-        <div className="p-7 sm:p-10">
+      <section className={cn("rounded-3xl bg-primary px-7 py-10 text-primary-foreground sm:px-10", className)}>
+        <div className="max-w-2xl">
           <p className="text-[11px] uppercase tracking-[0.3em] text-primary-foreground/60">Florist's Note</p>
           <h2 className="mt-3 font-display text-3xl leading-tight tracking-tight">花有花期，心意没有</h2>
           <p className="mt-4 text-sm leading-7 text-primary-foreground/75">{text}</p>
@@ -110,7 +69,6 @@ export function FloristNote({ productName, imageUrl, description, className }: F
             <Flower2 className="h-3.5 w-3.5" /> {name}
           </div>
         </div>
-        <div className="min-h-[260px] opacity-90">{image("")}</div>
       </section>
     );
   }
@@ -119,12 +77,9 @@ export function FloristNote({ productName, imageUrl, description, className }: F
     return (
       <section className={cn("relative overflow-hidden rounded-3xl border border-border/60 bg-card p-7 sm:p-10", className)}>
         <Quote className="absolute right-6 top-6 h-24 w-24 text-flower-rose/10" />
-        <div className="relative grid items-center gap-7 md:grid-cols-[0.7fr_1fr]">
-          {source ? <div className="h-52 overflow-hidden rounded-full border-8 border-muted/40">{image("")}</div> : null}
-          <div>
-            <p className="font-display text-2xl leading-relaxed text-foreground/90">“{text}”</p>
-            <p className="mt-5 text-xs uppercase tracking-[0.25em] text-muted-foreground">— Florist for {name}</p>
-          </div>
+        <div className="relative max-w-2xl">
+          <p className="font-display text-2xl leading-relaxed text-foreground/90">“{text}”</p>
+          <p className="mt-5 text-xs uppercase tracking-[0.25em] text-muted-foreground">— Florist for {name}</p>
         </div>
       </section>
     );
@@ -132,9 +87,7 @@ export function FloristNote({ productName, imageUrl, description, className }: F
 
   if (layout === 4) {
     return (
-      <section className={cn("relative min-h-[320px] overflow-hidden rounded-3xl", className)}>
-        {image("absolute inset-0")}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/25 to-transparent" />
+      <section className={cn("relative min-h-[320px] overflow-hidden rounded-3xl bg-gradient-to-br from-foreground via-foreground/95 to-primary/60", className)}>
         <div className="relative flex min-h-[320px] max-w-xl flex-col justify-center p-7 text-white sm:p-10">
           <div className="w-fit rotate-[-1.5deg] rounded-xl bg-white/95 p-5 text-foreground shadow-xl sm:p-6">
             <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Dear you,</p>
@@ -166,14 +119,8 @@ export function FloristNote({ productName, imageUrl, description, className }: F
 
   if (layout === 6) {
     return (
-      <section className={cn("grid overflow-hidden rounded-3xl border border-border/60 bg-card md:grid-cols-[0.9fr_1.1fr]", className)}>
-        <div className="relative min-h-[280px]">
-          {image("")}
-          <span className="absolute bottom-3 left-3 rounded-full bg-black/45 px-3 py-1 text-[10px] text-white backdrop-blur">
-            {name}
-          </span>
-        </div>
-        <div className="flex flex-col justify-center p-7 sm:p-10">
+      <section className={cn("rounded-3xl border border-border/60 bg-card p-7 sm:p-10", className)}>
+        <div className="max-w-2xl">
           <NoteCopy name={name} text={text} />
         </div>
       </section>
@@ -184,19 +131,11 @@ export function FloristNote({ productName, imageUrl, description, className }: F
     return (
       <section className={cn("relative overflow-hidden rounded-3xl bg-flower-rose/10 p-7 sm:p-10", className)}>
         <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full border border-flower-rose/20" />
-        <div className="relative grid items-center gap-7 md:grid-cols-2">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.3em] text-flower-rose/80">Hand tied with love</p>
-            <h2 className="mt-3 font-display text-3xl leading-tight tracking-tight">以手作，致心意</h2>
-            <p className="mt-3 text-sm leading-7 text-muted-foreground">{text}</p>
-            <p className="mt-5 text-xs text-muted-foreground">为「{name}」特别制作</p>
-          </div>
-          {source ? (
-            <div className="relative ml-auto w-full max-w-sm">
-              <div className="absolute -inset-3 rotate-2 rounded-3xl border border-flower-rose/25" />
-              <div className="relative h-56 overflow-hidden rounded-2xl">{image("")}</div>
-            </div>
-          ) : null}
+        <div className="relative max-w-2xl">
+          <p className="text-[11px] uppercase tracking-[0.3em] text-flower-rose/80">Hand tied with love</p>
+          <h2 className="mt-3 font-display text-3xl leading-tight tracking-tight">以手作，致心意</h2>
+          <p className="mt-3 text-sm leading-7 text-muted-foreground">{text}</p>
+          <p className="mt-5 text-xs text-muted-foreground">为「{name}」特别制作</p>
         </div>
       </section>
     );
@@ -234,8 +173,7 @@ export function FloristNote({ productName, imageUrl, description, className }: F
 
   return (
     <section className={cn("relative overflow-hidden rounded-3xl bg-foreground text-background", className)}>
-      <div className="absolute inset-0 opacity-35">{image("")}</div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/10" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/35 via-transparent to-flower-rose/25" />
       <div className="relative flex min-h-[300px] flex-col justify-end p-7 sm:p-10">
         <p className="text-[11px] uppercase tracking-[0.35em] text-white/60">From the flower room</p>
         <h2 className="mt-3 font-display text-3xl tracking-tight text-white sm:text-4xl">一束花，一段心意</h2>

@@ -59,6 +59,12 @@ public class ProductSaveRequest {
     @Size(max = 2000, message = "商品描述不能超过2000个字符")
     private String description;
 
+    @Size(max = 200, message = "随赠配件不能超过200个字符")
+    private String giftAccessories;
+
+    @Size(max = 2000, message = "养护指南不能超过2000个字符")
+    private String careGuide;
+
     @NotBlank(message = "季节适用性不能为空")
     @Pattern(regexp = "SPRING|SUMMER|AUTUMN|WINTER|ALL", message = "季节适用性不合法")
     private String seasonSuitability;

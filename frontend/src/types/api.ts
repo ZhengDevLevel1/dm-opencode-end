@@ -342,6 +342,14 @@ export interface BusinessHourBatchRequest {
   hours: BusinessHourSaveRequest[];
 }
 
+export interface StoreProfileVO {
+  businessPhone: string;
+}
+
+export interface StoreProfileRequest {
+  businessPhone: string;
+}
+
 export interface ProductSpecFlowerVO {
   materialId: number;
   name: string;
@@ -395,6 +403,8 @@ export interface ProductVO {
   flowerMaterials?: FlowerMaterialVO[];
   specs?: ProductSpecVO[];
   description?: string;
+  giftAccessories?: string;
+  careGuide?: string;
   seasonSuitability: SeasonSuitability;
   seasonLabel: string;
   priceBand: string;
@@ -437,6 +447,8 @@ export interface ProductSaveRequest {
   flowerMaterialIds?: number[];
   specs?: ProductSpecSaveRequest[];
   description?: string;
+  giftAccessories?: string;
+  careGuide?: string;
   seasonSuitability: SeasonSuitability;
   status?: ProductStatus;
 }
@@ -481,6 +493,8 @@ export interface OrderItemVO {
   specName?: string;
   wrapId?: number;
   wrapName?: string;
+  flowerSummary?: string;
+  giftAccessories?: string;
   unitPrice: number;
   quantity: number;
   subtotal: number;
@@ -1193,6 +1207,21 @@ export interface AiProductCopyApplyRequest {
   applyDescription?: boolean;
   applyTags?: boolean;
   applySellingPoints?: boolean;
+}
+
+export interface AiCareGuideRequest {
+  productId?: number;
+  name?: string;
+  category?: string;
+  description?: string;
+  flowerMeaning?: string;
+  currentCareGuide?: string;
+}
+
+export interface AiCareGuideVO {
+  careGuide: string;
+  degraded: boolean;
+  fallbackReason?: string;
 }
 
 export interface AiWeightAdviceRequest {

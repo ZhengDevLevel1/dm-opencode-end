@@ -4,6 +4,7 @@ import com.flower.ai.client.DeepSeekClient;
 import com.flower.ai.client.SiliconFlowClient;
 import com.flower.ai.qdrant.QdrantService;
 import com.flower.ai.service.AiIndexService;
+import com.flower.ai.service.CareGuideService;
 import com.flower.ai.service.ChatService;
 import com.flower.ai.service.MerchantService;
 import com.flower.ai.service.PromptTagService;
@@ -32,6 +33,7 @@ public class InternalAiController {
     private final RetrievalService retrievalService;
     private final ChatService chatService;
     private final MerchantService merchantService;
+    private final CareGuideService careGuideService;
     private final PromptTagService promptTagService;
     private final TitleService titleService;
     private final AiIndexService indexService;
@@ -42,6 +44,7 @@ public class InternalAiController {
     public InternalAiController(RetrievalService retrievalService,
                                 ChatService chatService,
                                 MerchantService merchantService,
+                                CareGuideService careGuideService,
                                 PromptTagService promptTagService,
                                 TitleService titleService,
                                 AiIndexService indexService,
@@ -51,6 +54,7 @@ public class InternalAiController {
         this.retrievalService = retrievalService;
         this.chatService = chatService;
         this.merchantService = merchantService;
+        this.careGuideService = careGuideService;
         this.promptTagService = promptTagService;
         this.titleService = titleService;
         this.indexService = indexService;
@@ -120,6 +124,11 @@ public class InternalAiController {
     @PostMapping("/product-copy")
     public Map<String, Object> productCopy(@RequestBody MerchantService.ProductCopyRequest request) {
         return merchantService.productCopy(request);
+    }
+
+    @PostMapping("/care-guide")
+    public Map<String, Object> careGuide(@RequestBody CareGuideService.CareGuideRequest request) {
+        return careGuideService.careGuide(request);
     }
 
     @PostMapping("/recommendation-advice")

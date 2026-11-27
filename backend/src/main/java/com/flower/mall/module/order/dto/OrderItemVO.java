@@ -23,6 +23,8 @@ public class OrderItemVO {
     private String specName;
     private Long wrapId;
     private String wrapName;
+    private String flowerSummary;
+    private String giftAccessories;
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal subtotal;
@@ -39,6 +41,8 @@ public class OrderItemVO {
                 .specName(item.getSpecName())
                 .wrapId(item.getWrapId())
                 .wrapName(item.getWrapName())
+                .flowerSummary(item.getFlowerSummary())
+                .giftAccessories(item.getGiftAccessories())
                 .unitPrice(item.getUnitPrice())
                 .quantity(item.getQuantity())
                 .subtotal(item.getSubtotal())

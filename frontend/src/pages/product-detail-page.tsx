@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { createPortal } from "react-dom";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -11,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Eye,
   Flower2,
   Leaf,
   Loader2,
@@ -26,6 +33,7 @@ import {
 } from "lucide-react";
 import { queryKeys, queryPolicy } from "@/lib/query-keys";
 import {
+  adminService,
   cartService,
   favoriteService,
   productService,
@@ -35,6 +43,7 @@ import {
   useBusinessHoursQuery,
   useDict,
   useFavoritesQuery,
+  useStoreProfileQuery,
   useWrapColorsQuery,
 } from "@/hooks/queries";
 import { useLoginGuard } from "@/hooks/use-login-guard";
@@ -43,12 +52,14 @@ import { cn } from "@/lib/cn";
 import { formatMoney, formatNumber, splitTags } from "@/lib/format";
 import { resolveImageUrl } from "@/lib/image";
 import {
+  businessHourFor,
   defaultDeliverySelection,
   deliveryWindowError,
   toDeliveryAt,
 } from "@/lib/business-hours";
 import { trackRecommendationView } from "@/lib/recommendation-tracking";
 import { toast } from "@/stores/toast";
+import { useAuthStore } from "@/stores/auth";
 import type { CartItemVO } from "@/types/api";
 import { ProductImage } from "@/components/domain/product-image";
 import { ZoomImage } from "@/components/domain/zoom-image";
@@ -69,6 +80,12 @@ import { Tooltip } from "@/components/ui/tooltip";
 const GREETING_STORAGE_KEY = "flower.greetingCard";
 const DELIVERY_STORAGE_KEY = "flower.deliveryAt";
 const IMAGE_LABELS = ["花束全貌", "花材特写", "包装细节", "随赠配件", "现场制作"];
+
+function imageLabel(index: number): string {
+  const label = IMAGE_LABELS[index];
+  if (label) return label;
+  return `细节图${index + 1}`;
+}
 
 const CARE_STEPS = [
   {
@@ -92,6 +109,21 @@ const CARE_STEPS = [
     text: "远离空调直吹、暖气与成熟水果（乙烯会催谢）。夜间可移至阴凉处，玫瑰会缓慢恢复挺立。",
   },
 ];
+
+function parseCareGuide(value?: string): Array<{ step: string; title: string; text: string }> {
+  const text = value?.trim();
+  if (!text) return [];
+  return text.split(/\n\s*\n/).flatMap((block, index) => {
+    const [firstLine, ...rest] = block.split("\n");
+    const title = (firstLine ?? "").replace(/^\s*\d{1,2}[.、\s-]*/, "").trim();
+    if (!title) return [];
+    return [{
+      step: String(index + 1).padStart(2, "0"),
+      title,
+      text: rest.join("\n").trim(),
+    }];
+  });
+}
 
 const TABS = [
   { id: "detail", label: "设计详情" },
@@ -126,12 +158,29 @@ export function ProductDetailPage() {
   const id = Number(params.id);
   const validId = Number.isInteger(id) && id > 0;
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const role = useAuthStore((state) => state.user?.role);
+  const standalonePreview = /^\/products\/\d+\/preview\/?$/.test(location.pathname);
+  const previewMode =
+    (searchParams.get("preview") === "1" || standalonePreview) && role === "ADMIN";
+  const blockPreviewNavigation = previewMode
+    ? (event: ReactMouseEvent<HTMLElement>) => {
+        if ((event.target as HTMLElement).closest("a")) event.preventDefault();
+      }
+    : undefined;
   const queryClient = useQueryClient();
   const { requireLogin, isLoggedIn } = useLoginGuard();
   const favorites = useFavoritesQuery();
   const dict = useDict();
   const wrapsQuery = useWrapColorsQuery();
   const hoursQuery = useBusinessHoursQuery();
+  const storeProfileQuery = useStoreProfileQuery();
+  const todayBusinessHour = useMemo(() => {
+    if (!hoursQuery.data) return null;
+    const hour = businessHourFor(new Date(), hoursQuery.data);
+    return hour?.enabled ? hour : null;
+  }, [hoursQuery.data]);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [specId, setSpecId] = useState<number | null>(null);
@@ -152,8 +201,8 @@ export function ProductDetailPage() {
   const [mainFrame, setMainFrame] = useState<{ left: number; width: number } | null>(null);
 
   const product = useQuery({
-    queryKey: queryKeys.product(id),
-    queryFn: () => productService.detail(id),
+    queryKey: previewMode ? queryKeys.adminProduct(id) : queryKeys.product(id),
+    queryFn: () => (previewMode ? adminService.product(id) : productService.detail(id)),
     enabled: validId,
     staleTime: 60 * 1000,
     retry: false,
@@ -163,11 +212,14 @@ export function ProductDetailPage() {
     queryKey: queryKeys.recommendations({ limit: 6, scene: "product", productId: id }),
     queryFn: () =>
       recommendationService.get({ limit: 6, scene: "product", productId: id }),
-    enabled: validId,
+    enabled: validId && !previewMode,
     staleTime: queryPolicy.recommendations.staleTime,
   });
 
   const data = product.data;
+  const customCareSections = useMemo(() => parseCareGuide(data?.careGuide), [data?.careGuide]);
+  const hasCustomCare = customCareSections.length > 0;
+  const careSections = hasCustomCare ? customCareSections : CARE_STEPS;
   const specs = useMemo(() => data?.specs ?? [], [data?.specs]);
   const wraps = useMemo(() => wrapsQuery.data ?? [], [wrapsQuery.data]);
   const hours = useMemo(() => hoursQuery.data ?? [], [hoursQuery.data]);
@@ -184,8 +236,14 @@ export function ProductDetailPage() {
     () => wraps.find((wrap) => wrap.id === wrapId) ?? null,
     [wraps, wrapId],
   );
+  const materialNotes = new Map(
+    (data?.flowerMaterials ?? []).map((material) => [material.id, material.note]),
+  );
   const flowerLines = selectedSpec?.flowers?.length
-    ? selectedSpec.flowers
+    ? selectedSpec.flowers.map((flower) => ({
+        ...flower,
+        note: materialNotes.get(flower.materialId),
+      }))
     : (data?.flowerMaterials ?? []).map((material) => ({
         materialId: material.id,
         name: material.name,
@@ -193,6 +251,7 @@ export function ProductDetailPage() {
         colorHex: material.colorHex,
         imageUrl: material.imageUrl,
         quantity: 0,
+        note: material.note,
       }));
   const totalStems = selectedSpec?.totalStems ?? 0;
   const unitPrice = selectedSpec?.effectivePrice ?? data?.price ?? 0;
@@ -377,17 +436,17 @@ export function ProductDetailPage() {
   });
 
   const handleAdd = async () => {
-    if (!requireLogin() || !data) return;
+    if (previewMode || !requireLogin() || !data) return;
     await addMutation.mutateAsync().catch(() => undefined);
   };
 
   const handleBuyNow = async () => {
-    if (!requireLogin() || !data) return;
+    if (previewMode || !requireLogin() || !data) return;
     await buyNowMutation.mutateAsync().catch(() => undefined);
   };
 
   const handleFavorite = async () => {
-    if (!requireLogin()) return;
+    if (previewMode || !requireLogin()) return;
     await favoriteMutation.mutateAsync(!isFavorite).catch(() => undefined);
   };
 
@@ -457,22 +516,22 @@ export function ProductDetailPage() {
   const festivalTags = splitTags(data.festivalTags);
   const related = recommendations.data?.items.filter((item) => item.productId !== id).slice(0, 4) ?? [];
   const activeSrc = images[activeImage] ? resolveImageUrl(images[activeImage]) : undefined;
+  const detailImageSrc = resolveImageUrl(images[1] ?? images[0] ?? data.imageUrl);
   const canAdd = !soldOut && Boolean(deliveryTime) && !deliveryError;
-  const priceOriginal =
-    selectedSpec?.originalPrice ?? (unitPrice === data.price ? data.originalPrice : undefined);
-  const priceText = Number.isInteger(unitPrice) ? formatNumber(unitPrice) : formatMoney(unitPrice);
-  const originalText =
-    priceOriginal !== undefined && priceOriginal > unitPrice
-      ? Number.isInteger(priceOriginal)
-        ? formatNumber(priceOriginal)
-        : formatMoney(priceOriginal)
-      : null;
-  const discountLabel =
-    priceOriginal && priceOriginal > unitPrice
-      ? `限时 ${(unitPrice / priceOriginal * 10).toFixed(1).replace(/\.0$/, "")} 折`
-      : null;
-  const savedAmount =
-    priceOriginal && priceOriginal > unitPrice ? (priceOriginal - unitPrice) * quantity : 0;
+  const salePrice = unitPrice;
+  const strikePrice =
+    selectedSpec?.originalPrice ?? (salePrice === data.price ? data.originalPrice : undefined);
+  const hasDiscount = strikePrice !== undefined && strikePrice > salePrice;
+  const priceText = Number.isInteger(salePrice) ? formatNumber(salePrice) : formatMoney(salePrice);
+  const originalText = hasDiscount
+    ? Number.isInteger(strikePrice)
+      ? formatNumber(strikePrice)
+      : formatMoney(strikePrice)
+    : null;
+  const discountLabel = hasDiscount
+    ? `限时 ${((salePrice / strikePrice) * 10).toFixed(1).replace(/\.0$/, "")} 折`
+    : null;
+  const savedAmount = hasDiscount ? (strikePrice - salePrice) * quantity : 0;
   const selectedSpecName = selectedSpec?.name ?? "基础款";
   const selectedWrapName = selectedWrap?.name ?? "花艺师搭配";
   const deliveryLabel = deliveryDate
@@ -482,13 +541,17 @@ export function ProductDetailPage() {
   const designFlowerTags = flowerLines.map((flower) =>
     flower.quantity > 0 ? `${flower.name} ×${flower.quantity}` : flower.name,
   );
+  const giftAccessories =
+    data.giftAccessories == null
+      ? "手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1"
+      : data.giftAccessories.trim() || "无";
   const attrRows: [string, string][] = [
     ["主花材", flowerLines.slice(0, 3).map((flower) => flower.name).join("、") || "花艺师当季搭配"],
     ["花束规格", selectedSpec?.description || (totalStems > 0 ? `${totalStems} 枝` : "按规格搭配")],
     ["包装方式", selectedWrap ? `${selectedWrap.name} · 手工包装` : "由花艺师现场搭配"],
     ["适用场合", tags.join(" · ") || data.category],
     ["保存时长", "正确养护下 7–10 天"],
-    ["随赠配件", "手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1"],
+    ["随赠配件", giftAccessories],
   ];
   const designHighlight = data.flowerMeaning
     ? `${data.flowerMeaning} 这也是花艺师在配色和花材选择时最想保留的情绪。`
@@ -498,15 +561,21 @@ export function ProductDetailPage() {
     <>
       <div className="absolute inset-x-0 top-0 flex items-start justify-between p-3">
         <div className="flex flex-col items-start gap-1.5">
-          {!soldOut ? <Badge variant="overlay">今日现货</Badge> : null}
-          <Badge variant="overlay">花市直采</Badge>
+          {!soldOut ? (
+            <Badge variant="overlay" className="bg-white/90 text-neutral-900 ring-1 ring-black/5">
+              今日现货
+            </Badge>
+          ) : null}
+          <Badge variant="overlay" className="bg-white/90 text-neutral-900 ring-1 ring-black/5">
+            花市直采
+          </Badge>
           {lowStock ? <Badge variant="warning">仅剩 {data.stock} 件</Badge> : null}
         </div>
         {soldOut ? <Badge variant="destructive">售罄</Badge> : null}
       </div>
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-black/50 to-transparent p-4 pt-16 text-white">
         <span className="rounded-full bg-background/75 px-3 py-1 text-[11px] tracking-[0.14em] text-foreground backdrop-blur">
-          {IMAGE_LABELS[activeImage] ?? `细节图 ${activeImage + 1}`}
+          {imageLabel(activeImage)}
         </span>
         <span className="flex items-center gap-1.5 rounded-full bg-background/80 px-2.5 py-1 font-display text-[10px] tracking-[0.18em] text-foreground backdrop-blur tabular">
           <Sparkles className="h-3 w-3 text-primary" />
@@ -522,21 +591,33 @@ export function ProductDetailPage() {
   };
 
   return (
-    <div className="space-y-10 pb-28">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          返回
-        </Button>
-        <span className="text-border">/</span>
-        <Link to="/products" className="hover:text-foreground">
-          全部花礼
-        </Link>
-        <span className="text-border">/</span>
-        <span className="text-muted-foreground">{data.category}</span>
-        <span className="text-border">/</span>
-        <span className="truncate text-foreground">{data.name}</span>
-      </div>
+    <div className="space-y-10 pb-28 [--ui-surface-opacity:1]">
+      {!previewMode ? (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-8">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            返回
+          </Button>
+          <span className="text-border">/</span>
+          <Link to="/products" className="hover:text-foreground">
+            全部花礼
+          </Link>
+          <span className="text-border">/</span>
+          <span className="text-muted-foreground">{data.category}</span>
+          <span className="text-border">/</span>
+          <span className="truncate text-foreground">{data.name}</span>
+        </div>
+      ) : null}
+
+      {previewMode ? (
+        <div className="flex flex-wrap items-center gap-2.5 rounded-xl border border-primary/25 bg-primary/[0.06] px-4 py-3 text-xs text-primary">
+          <Eye className="h-4 w-4 shrink-0" />
+          <span className="font-medium">预览模式</span>
+          <span className="text-primary/80">
+            当前商品状态：{data.statusLabel} · 购买、收藏与数量调整不会生效，仅用于检查详情页展示效果。
+          </span>
+        </div>
+      ) : null}
 
       <div ref={heroRef} className="grid gap-8 lg:grid-cols-[1fr_1.02fr] lg:gap-12">
         <div className="space-y-4 lg:sticky lg:top-20 lg:self-start">
@@ -555,7 +636,7 @@ export function ProductDetailPage() {
                           ? "border-primary ring-1 ring-primary/25"
                           : "border-border/60 opacity-70 hover:opacity-100",
                       )}
-                      aria-label={IMAGE_LABELS[index] ?? `图片 ${index + 1}`}
+                      aria-label={imageLabel(index)}
                     >
                       <ProductImage
                         src={image}
@@ -566,7 +647,7 @@ export function ProductDetailPage() {
                       />
                       {index === activeImage ? (
                         <span className="absolute inset-x-0 bottom-0 bg-primary/85 py-0.5 text-center text-[9px] text-primary-foreground">
-                          {IMAGE_LABELS[index] ?? index + 1}
+                          {imageLabel(index)}
                         </span>
                       ) : null}
                     </button>
@@ -645,6 +726,12 @@ export function ProductDetailPage() {
             <p className="mt-2 text-sm leading-6 text-foreground/75">
               {data.flowerMeaning || "把当季的花，交给在意的人。"}
             </p>
+            {tags.length > 0 || festivalTags.length > 0 ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {tags.length > 0 ? <TagList tags={tags} max={8} tone="flower" /> : null}
+                {festivalTags.length > 0 ? <TagList tags={festivalTags} max={6} /> : null}
+              </div>
+            ) : null}
 
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-border/60 py-3.5 text-xs text-muted-foreground">
               <Rating value={data.ratingAvg} count={data.ratingCount} />
@@ -671,13 +758,7 @@ export function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-flower-rose/[0.08] via-card to-card p-5 sm:p-6">
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -top-10 -right-4 font-display text-[130px] leading-none text-flower-rose/10 select-none"
-            >
-              ¥
-            </span>
+          <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-primary/[0.08] via-card to-card p-5 sm:p-6">
             <div className="relative flex flex-wrap items-end gap-x-3 gap-y-2">
               <span className="font-display text-[20px] leading-none text-flower-rose">¥</span>
               <span className="font-display text-[54px] leading-[0.82] font-semibold tracking-[-0.04em] tabular text-foreground sm:text-[60px]">
@@ -723,7 +804,7 @@ export function ProductDetailPage() {
                       className={cn(
                         "relative flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-all duration-300",
                         active
-                          ? "border-primary bg-primary/[0.06] shadow-sm ring-1 ring-primary/15"
+                          ? "border-primary-solid bg-primary-solid text-primary-solid-foreground shadow-sm ring-1 ring-primary-solid/20"
                           : "border-border/60 bg-card hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-sm",
                       )}
                     >
@@ -733,14 +814,19 @@ export function ProductDetailPage() {
                         </span>
                       ) : null}
                       <span className="text-[13px] font-medium">{spec.name}</span>
-                      <span className="line-clamp-1 text-[11px] text-muted-foreground">
+                      <span
+                        className={cn(
+                          "line-clamp-1 text-[11px]",
+                          active ? "text-primary-solid-foreground/70" : "text-muted-foreground",
+                        )}
+                      >
                         {spec.description || (spec.totalStems ? `${spec.totalStems} 枝` : "精选搭配")}
                       </span>
                       <span className="mt-1 flex items-baseline gap-1.5">
                         <span
                           className={cn(
                             "font-display text-[15px] font-semibold tracking-wide tabular",
-                            active ? "text-primary" : "text-flower-rose",
+                            active ? "text-primary-solid-foreground" : "text-flower-rose",
                           )}
                         >
                           ¥{formatMoney(spec.effectivePrice)}
@@ -749,7 +835,7 @@ export function ProductDetailPage() {
                           <span
                             className={cn(
                               "text-[10px] line-through tabular",
-                              active ? "text-muted-foreground/70" : "text-muted-foreground",
+                              active ? "text-primary-solid-foreground/60" : "text-muted-foreground",
                             )}
                           >
                             ¥{formatMoney(spec.originalPrice)}
@@ -821,6 +907,8 @@ export function ProductDetailPage() {
               <button
                 type="button"
                 onClick={() => setShowFlowers((value) => !value)}
+                aria-expanded={showFlowers}
+                aria-controls="flower-materials-panel"
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
               >
                 <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
@@ -831,38 +919,47 @@ export function ProductDetailPage() {
                 </span>
                 <ChevronDown
                   className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ease-out motion-reduce:transition-none",
                     showFlowers && "rotate-180",
                   )}
                 />
               </button>
-              {showFlowers ? (
-                <ul className="divide-y divide-border/60 border-t border-border/60">
-                  {flowerLines.map((flower) => (
-                    <li key={flower.materialId} className="flex items-start gap-3 px-4 py-3">
-                      <span
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-border/60"
-                        style={{ background: flower.colorHex || "#d8c7b8" }}
-                      />
-                      {flower.quantity > 0 ? (
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground tabular">
-                          ×{flower.quantity}
-                        </span>
-                      ) : null}
-                      <div className="min-w-0">
-                        <p className="text-sm">
-                          {flower.name}
-                          {flower.latinName ? (
-                            <span className="ml-2 text-[11px] text-muted-foreground italic">
-                              {flower.latinName}
-                            </span>
-                          ) : null}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              <div
+                id="flower-materials-panel"
+                aria-hidden={!showFlowers}
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none",
+                  showFlowers ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <ul className="divide-y divide-border/60 border-t border-border/60">
+                    {flowerLines.map((flower) => (
+                      <li key={flower.materialId} className="flex items-start gap-3 px-4 py-3">
+                        <span
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-border/60"
+                          style={{ background: flower.colorHex || "#d8c7b8" }}
+                        />
+                        {flower.quantity > 0 ? (
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground tabular">
+                            ×{flower.quantity}
+                          </span>
+                        ) : null}
+                        <div className="min-w-0">
+                          <p className="text-sm">
+                            {flower.name}
+                            {flower.latinName ? (
+                              <span className="ml-2 text-[11px] text-muted-foreground italic">
+                                {flower.latinName}
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </section>
           ) : null}
 
@@ -885,11 +982,7 @@ export function ProductDetailPage() {
             />
             {deliveryError ? (
               <p className="mt-2 text-[11px] text-destructive">{deliveryError}</p>
-            ) : (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                结算页会优先带入该送达时间；花艺师会在所选时间前 30 分钟完成打包。
-              </p>
-            )}
+            ) : null}
           </section>
 
           <GreetingCardEditor
@@ -917,7 +1010,7 @@ export function ProductDetailPage() {
                   size="icon-sm"
                   aria-label="减少数量"
                   className="h-8 w-8 rounded-full"
-                  disabled={quantity <= 1 || soldOut}
+                  disabled={previewMode || quantity <= 1 || soldOut}
                   onClick={() => setQuantity((value) => Math.max(1, value - 1))}
                 >
                   <Minus className="h-3.5 w-3.5" />
@@ -930,7 +1023,7 @@ export function ProductDetailPage() {
                   size="icon-sm"
                   aria-label="增加数量"
                   className="h-8 w-8 rounded-full"
-                  disabled={quantity >= maxQuantity || soldOut}
+                  disabled={previewMode || quantity >= maxQuantity || soldOut}
                   onClick={() => setQuantity((value) => Math.min(maxQuantity, value + 1))}
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -964,7 +1057,7 @@ export function ProductDetailPage() {
               </Tooltip>
               <Button
                 variant="outline"
-                className="group h-14 rounded-xl px-4 font-display text-[14px] font-semibold tracking-[0.12em]"
+                className="group h-14 rounded-xl px-4 font-display text-[14px] font-semibold tracking-[0.12em] shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-transparent hover:text-current hover:shadow-lg active:translate-y-0"
                 disabled={!canAdd || addMutation.isPending}
                 onClick={handleAdd}
               >
@@ -1022,17 +1115,12 @@ export function ProductDetailPage() {
               支持匿名配送 · 收花人不会看到价格 · 可指定「不要提前联系」
             </p>
           </section>
-
-          <div className="flex flex-wrap gap-2">
-            {tags.length > 0 ? <TagList tags={tags} max={8} tone="flower" /> : null}
-            {festivalTags.length > 0 ? <TagList tags={festivalTags} max={6} /> : null}
-          </div>
         </div>
       </div>
 
       <section className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border/60 bg-border/50 sm:grid-cols-3 lg:grid-cols-6">
         {[
-          { icon: ShieldCheck, title: "30 天售后", desc: "不新鲜可重做" },
+          { icon: ShieldCheck, title: "7 天售后", desc: "不新鲜可重做" },
           { icon: Truck, title: "全国配送", desc: "全程冷链跟踪" },
           { icon: Leaf, title: "花材溯源", desc: "当季产地直采" },
           { icon: Scissors, title: "当日鲜切", desc: "清晨修剪制作" },
@@ -1050,11 +1138,7 @@ export function ProductDetailPage() {
         })}
       </section>
 
-      <FloristNote
-        productName={data.name}
-        imageUrl={images[0] ?? data.imageUrl}
-        description={data.description}
-      />
+      <FloristNote productName={data.name} description={data.description} />
 
       <section id="detail">
         <div className="sticky top-0 z-20 -mx-4 border-y border-border/60 bg-background/95 px-4 backdrop-blur-lg md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
@@ -1118,26 +1202,36 @@ export function ProductDetailPage() {
                   </div>
                 </div>
 
-                <div className="relative min-h-[360px] overflow-hidden rounded-2xl border border-border/60 bg-muted/20 lg:min-h-[430px]">
+                {detailImageSrc ? (
+                  <ZoomImage
+                    src={detailImageSrc}
+                    alt={`${data.name} 花艺师制作`}
+                    seed={data.name}
+                    zoom={1.7}
+                    className="object-contain"
+                    wrapperClassName="relative mx-auto aspect-[4/5] w-full max-w-[380px] overflow-hidden rounded-2xl border border-border/60 bg-muted/20"
+                    iconClassName="h-14 w-14"
+                  >
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6">
+                      <p className="font-display text-[10px] tracking-[0.3em] text-white/70">
+                        IN-STUDIO · 每一束皆为当日现制
+                      </p>
+                      <p className="mt-2 font-display text-lg text-white">
+                        下单后 90 分钟内，由驻店花艺师亲手完成
+                      </p>
+                    </div>
+                  </ZoomImage>
+                ) : (
                   <ProductImage
                     src={images[1] ?? images[0] ?? data.imageUrl}
                     alt={`${data.name} 花艺师制作`}
                     seed={data.name}
-                    className="absolute inset-0"
+                    fit="contain"
+                    className="mx-auto aspect-[4/5] w-full max-w-[380px] rounded-2xl border border-border/60 bg-muted/20"
                     iconClassName="h-14 w-14"
-                    overlay={
-                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-black/5 to-transparent" />
-                    }
                   />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 p-5 sm:p-6">
-                    <p className="font-display text-[10px] tracking-[0.3em] text-white/70">
-                      IN-STUDIO · 每一束皆为当日现制
-                    </p>
-                    <p className="mt-2 font-display text-lg text-white">
-                      下单后 90 分钟内，由驻店花艺师亲手完成
-                    </p>
-                  </div>
-                </div>
+                )}
               </div>
 
               <div>
@@ -1153,43 +1247,38 @@ export function ProductDetailPage() {
               </div>
 
               <div>
-                <OptionHeading
-                  index="02"
-                  title="花材构成"
-                  note={totalStems > 0 ? `${flowerLines.length} 种 · 共 ${totalStems} 枝` : "Stem by stem"}
-                />
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/50 pb-3">
+                  <span className="font-display text-[10px] tracking-[0.2em] text-primary">02</span>
+                  <h3 className="font-display text-[22px] font-semibold tracking-tight">花材构成</h3>
+                  <span className="text-[11px] text-muted-foreground">Stem by stem</span>
+                  <span className="h-px min-w-8 flex-1 bg-border/70" />
+                </div>
                 {flowerLines.length === 0 ? (
                   <EmptyState title="花材信息整理中" bare />
                 ) : (
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="mt-4 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
                     {flowerLines.map((flower) => (
                       <div
                         key={flower.materialId}
-                        className="group overflow-hidden rounded-xl border border-border/60 bg-card transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-sm"
+                        className="flex min-h-[116px] items-start gap-4 rounded-xl border border-border/60 bg-card p-4 transition-colors hover:border-primary/35 sm:p-5"
                       >
                         <ProductImage
                           src={flower.imageUrl}
                           alt={flower.name}
                           seed={flower.name}
-                          className="aspect-[4/3] w-full"
-                          iconClassName="h-8 w-8"
+                          className="h-11 w-11 shrink-0 rounded-full border border-border/60"
+                          iconClassName="h-4 w-4"
                         />
-                        <div className="p-3.5">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-[13px] font-medium">{flower.name}</p>
-                            {flower.quantity > 0 ? (
-                              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground tabular">
-                                ×{flower.quantity}
-                              </span>
-                            ) : null}
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[15px] font-semibold tracking-tight">{flower.name}</p>
                           {flower.latinName ? (
-                            <p className="mt-0.5 font-display text-[10px] tracking-[0.16em] text-muted-foreground/70 uppercase">
+                            <p className="mt-1 font-display text-[10px] tracking-[0.18em] text-muted-foreground/60 uppercase">
                               {flower.latinName}
                             </p>
                           ) : null}
-                          <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">
-                            当日鲜切花材，保留自然姿态与香气。
+                          <p className="mt-4 text-[12px] leading-5 text-muted-foreground">
+                            {flower.quantity > 0 ? `${flower.quantity} 枝 · ` : ""}
+                            {flower.note || "当日鲜切花材，保留自然姿态与香气。"}
                           </p>
                         </div>
                       </div>
@@ -1204,48 +1293,56 @@ export function ProductDetailPage() {
           ) : null}
 
           {tab === "care" ? (
-            <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+            <div className={cn("grid gap-8", !hasCustomCare && "lg:grid-cols-[1fr_320px]")}>
               <div>
                 <SectionHeading
                   title="让它们开得更久一点"
-                  description="遵守下面四件小事，花束会用整整一周的盛放回报你。"
+                  description={
+                    hasCustomCare
+                      ? "按下面的步骤打理，花束会用更久的盛放回报你。"
+                      : "遵守下面四件小事，花束会用整整一周的盛放回报你。"
+                  }
                 />
                 <ol className="mt-6 space-y-4">
-                  {CARE_STEPS.map((step) => (
+                  {careSections.map((step) => (
                     <li key={step.step} className="flex gap-4">
                       <span className="text-2xl leading-none text-primary/40 tabular">
                         {step.step}
                       </span>
                       <div className="border-l border-border/60 pl-4">
                         <p className="text-base font-semibold">{step.title}</p>
-                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                          {step.text}
-                        </p>
+                        {step.text ? (
+                          <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                            {step.text}
+                          </p>
+                        ) : null}
                       </div>
                     </li>
                   ))}
                 </ol>
               </div>
-              <aside className="h-fit rounded-2xl border border-border/60 bg-card p-5">
-                <p className="text-[10px] tracking-[0.3em] text-primary uppercase">
-                  Troubleshooting
-                </p>
-                <p className="mt-2 text-base font-semibold">常见小状况</p>
-                <ul className="mt-3 space-y-3 text-xs leading-6 text-muted-foreground">
-                  <li>
-                    <span className="font-medium text-foreground">花头下垂：</span>
-                    剪根后深水浸泡 1 小时（水位到花头下），多数可在 2 小时内恢复挺立。
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">外层花瓣发软：</span>
-                    玫瑰外层为保护瓣，属正常现象，请勿摘除。
-                  </li>
-                  <li>
-                    <span className="font-medium text-foreground">水质发浑：</span>
-                    立即洗瓶换水并再次斜剪 1cm，避免细菌堵塞导管。
-                  </li>
-                </ul>
-              </aside>
+              {!hasCustomCare ? (
+                <aside className="h-fit rounded-2xl border border-border/60 bg-card p-5">
+                  <p className="text-[10px] tracking-[0.3em] text-primary uppercase">
+                    Troubleshooting
+                  </p>
+                  <p className="mt-2 text-base font-semibold">常见小状况</p>
+                  <ul className="mt-3 space-y-3 text-xs leading-6 text-muted-foreground">
+                    <li>
+                      <span className="font-medium text-foreground">花头下垂：</span>
+                      剪根后深水浸泡 1 小时（水位到花头下），多数可在 2 小时内恢复挺立。
+                    </li>
+                    <li>
+                      <span className="font-medium text-foreground">外层花瓣发软：</span>
+                      玫瑰外层为保护瓣，属正常现象，请勿摘除。
+                    </li>
+                    <li>
+                      <span className="font-medium text-foreground">水质发浑：</span>
+                      立即洗瓶换水并再次斜剪 1cm，避免细菌堵塞导管。
+                    </li>
+                  </ul>
+                </aside>
+              ) : null}
             </div>
           ) : null}
 
@@ -1277,7 +1374,7 @@ export function ProductDetailPage() {
               <div className="rounded-2xl border border-border/60 bg-card p-5">
                 <p className="text-base font-semibold">预约与配送</p>
                 <ul className="mt-3 space-y-2 text-xs leading-6 text-muted-foreground">
-                  <li>· 支持提前 1 小时至 30 天内预约送达。</li>
+                  <li>· 支持提前 1 小时至 6 天内预约送达。</li>
                   <li>· 花艺师会在所选时间前完成打包。</li>
                   <li>· 配送前会电话确认收花人是否在址。</li>
                   <li>· 支持匿名配送，收花人不会看到价格。</li>
@@ -1306,7 +1403,10 @@ export function ProductDetailPage() {
         </div>
       </section>
 
-      <section>
+      <section
+        onClickCapture={blockPreviewNavigation}
+        onAuxClickCapture={blockPreviewNavigation}
+      >
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-border/60 pb-4">
           <div>
             <p className="font-display text-[10px] tracking-[0.3em] text-primary uppercase">
@@ -1341,7 +1441,7 @@ export function ProductDetailPage() {
               <Link
                 key={item.productId}
                 to={`/products/${item.productId}`}
-                className="group flex flex-col"
+                className="group flex h-full flex-col"
               >
                 <ProductImage
                   src={item.imageUrl}
@@ -1370,7 +1470,7 @@ export function ProductDetailPage() {
                 <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">
                   {item.reason}
                 </p>
-                <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                   <p className="font-display text-base font-semibold tabular">
                     ¥{formatMoney(item.price)}
                   </p>
@@ -1384,7 +1484,11 @@ export function ProductDetailPage() {
         )}
       </section>
 
-      <section className="rounded-3xl border border-border/60 bg-muted/20 px-5 py-8 sm:px-8">
+      <section
+        className="rounded-3xl border border-border/60 bg-muted/20 px-5 py-8 sm:px-8"
+        onClickCapture={blockPreviewNavigation}
+        onAuxClickCapture={blockPreviewNavigation}
+      >
         <div className="flex flex-wrap items-end justify-between gap-3">
           <SectionHeading
             eyebrow="Keep exploring"
@@ -1447,7 +1551,11 @@ export function ProductDetailPage() {
         </div>
       </section>
 
-      <footer className="-mx-4 mt-4 border-t border-border/60 bg-muted/20 px-4 pt-10 pb-6 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8">
+      <footer
+        className="-mx-4 mt-4 border-t border-border/60 bg-muted/20 px-4 pt-10 pb-6 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8"
+        onClickCapture={blockPreviewNavigation}
+        onAuxClickCapture={blockPreviewNavigation}
+      >
         <div className="grid gap-9 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-3">
@@ -1464,12 +1572,20 @@ export function ProductDetailPage() {
               </span>
             </div>
             <p className="mt-4 max-w-xs text-[12px] leading-6 text-muted-foreground">
-              一家相信花能替人说话的花店。我们按当季花材与收花人的心情搭配，让每一束都保留手作的温度。
+              一家相信花能替人说话的花店。我们按当季花材与收花人的心情搭配，让每一束都保留手工的温度。
             </p>
             <p className="mt-4 font-display text-[13px] tracking-[0.12em] text-foreground/80">
-              400-820-1024
+              {storeProfileQuery.data?.businessPhone ?? "400-820-1024"}
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">每日 08:00 – 22:00 · 花艺师在线</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {hoursQuery.isLoading
+                ? "营业时间加载中"
+                : hoursQuery.isError
+                  ? "营业时间 请电话咨询"
+                  : todayBusinessHour
+                    ? `营业时间 ${todayBusinessHour.openTime} – ${todayBusinessHour.closeTime}`
+                    : "营业时间 今日休息"}
+            </p>
           </div>
 
           {[

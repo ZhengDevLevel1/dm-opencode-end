@@ -16,7 +16,9 @@ import com.flower.mall.module.address.dto.AddressVO;
 import com.flower.mall.module.address.service.AddressService;
 import com.flower.mall.module.cart.entity.CartItem;
 import com.flower.mall.module.cart.service.CartService;
+import com.flower.mall.module.catalog.entity.FlowerMaterial;
 import com.flower.mall.module.catalog.entity.WrapColor;
+import com.flower.mall.module.catalog.mapper.FlowerMaterialMapper;
 import com.flower.mall.module.catalog.mapper.WrapColorMapper;
 import com.flower.mall.module.catalog.service.BusinessHourService;
 import com.flower.mall.module.inventory.service.InventoryService;
@@ -30,8 +32,12 @@ import com.flower.mall.module.order.mapper.OrderMapper;
 import com.flower.mall.module.payment.entity.PaymentRecord;
 import com.flower.mall.module.payment.mapper.PaymentRecordMapper;
 import com.flower.mall.module.product.entity.Product;
+import com.flower.mall.module.product.entity.ProductFlowerMaterial;
 import com.flower.mall.module.product.entity.ProductSpec;
+import com.flower.mall.module.product.entity.ProductSpecFlower;
+import com.flower.mall.module.product.mapper.ProductFlowerMaterialMapper;
 import com.flower.mall.module.product.mapper.ProductMapper;
+import com.flower.mall.module.product.mapper.ProductSpecFlowerMapper;
 import com.flower.mall.module.product.mapper.ProductSpecMapper;
 import com.flower.mall.module.recommendation.service.RecommendationCatalogCache;
 import com.flower.mall.module.recommendation.service.RecommendationEventService;
@@ -73,6 +79,9 @@ public class OrderService {
     private final RecommendationEventService recommendationEventService;
     private final AddressService addressService;
     private final ProductSpecMapper productSpecMapper;
+    private final ProductSpecFlowerMapper productSpecFlowerMapper;
+    private final ProductFlowerMaterialMapper productFlowerMaterialMapper;
+    private final FlowerMaterialMapper flowerMaterialMapper;
     private final WrapColorMapper wrapColorMapper;
     private final BusinessHourService businessHourService;
 
@@ -94,6 +103,8 @@ public class OrderService {
                 .stream().collect(Collectors.toMap(Product::getId, Function.identity()));
         Map<Long, ProductSpec> specs = loadSpecs(cartItems);
         Map<Long, WrapColor> wraps = loadWraps(cartItems);
+        Map<Long, String> specFlowerSummaries = loadSpecFlowerSummaries(specs.values());
+        Map<Long, String> productFlowerSummaries = loadProductFlowerSummaries(products.keySet());
 
         BigDecimal total = BigDecimal.ZERO;
         for (CartItem cartItem : cartItems) {
@@ -165,6 +176,10 @@ public class OrderService {
             item.setSpecName(spec == null ? null : spec.getName());
             item.setWrapId(wrap == null ? 0L : wrap.getId());
             item.setWrapName(wrap == null ? null : wrap.getName());
+            item.setFlowerSummary(resolveFlowerSummary(cartItem, spec, specFlowerSummaries,
+                    productFlowerSummaries));
+            item.setGiftAccessories(product.getGiftAccessories() == null
+                    ? null : product.getGiftAccessories().trim());
             item.setUnitPrice(unitPrice);
             item.setQuantity(quantity);
             item.setSubtotal(unitPrice.multiply(BigDecimal.valueOf(quantity))
@@ -441,6 +456,112 @@ public class OrderService {
         }
         return wrapColorMapper.selectBatchIds(wrapIds).stream()
                 .collect(Collectors.toMap(WrapColor::getId, Function.identity()));
+    }
+
+    private Map<Long, String> loadSpecFlowerSummaries(java.util.Collection<ProductSpec> specs) {
+        List<Long> specIds = specs.stream()
+                .map(ProductSpec::getId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (specIds.isEmpty()) {
+            return Map.of();
+        }
+        List<ProductSpecFlower> links = productSpecFlowerMapper.selectList(
+                Wrappers.<ProductSpecFlower>lambdaQuery()
+                        .in(ProductSpecFlower::getSpecId, specIds)
+                        .orderByAsc(ProductSpecFlower::getId));
+        Map<Long, FlowerMaterial> materials = loadMaterials(links.stream()
+                .map(ProductSpecFlower::getMaterialId)
+                .toList());
+        return links.stream()
+                .collect(Collectors.groupingBy(ProductSpecFlower::getSpecId, LinkedHashMap::new,
+                        Collectors.toList()))
+                .entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        entry -> formatSpecFlowerSummary(entry.getValue(), materials)));
+    }
+
+    private Map<Long, String> loadProductFlowerSummaries(java.util.Collection<Long> productIds) {
+        List<Long> ids = productIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        List<ProductFlowerMaterial> links = productFlowerMaterialMapper.selectList(
+                Wrappers.<ProductFlowerMaterial>lambdaQuery()
+                        .in(ProductFlowerMaterial::getProductId, ids)
+                        .orderByAsc(ProductFlowerMaterial::getSortOrder)
+                        .orderByAsc(ProductFlowerMaterial::getId));
+        Map<Long, FlowerMaterial> materials = loadMaterials(links.stream()
+                .map(ProductFlowerMaterial::getMaterialId)
+                .toList());
+        return links.stream()
+                .collect(Collectors.groupingBy(ProductFlowerMaterial::getProductId, LinkedHashMap::new,
+                        Collectors.toList()))
+                .entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        entry -> formatProductFlowerSummary(entry.getValue(), materials)));
+    }
+
+    private Map<Long, FlowerMaterial> loadMaterials(List<Long> materialIds) {
+        List<Long> ids = materialIds.stream()
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return flowerMaterialMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(FlowerMaterial::getId, Function.identity()));
+    }
+
+    private String formatSpecFlowerSummary(List<ProductSpecFlower> flowers,
+                                           Map<Long, FlowerMaterial> materials) {
+        String summary = flowers.stream()
+                .map(flower -> {
+                    FlowerMaterial material = materials.get(flower.getMaterialId());
+                    if (material == null || !StringUtils.hasText(material.getName())) {
+                        return null;
+                    }
+                    return flower.getQuantity() == null
+                            ? material.getName()
+                            : material.getName() + " ×" + flower.getQuantity();
+                })
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining("、"));
+        return limit(summary, 500);
+    }
+
+    private String formatProductFlowerSummary(List<ProductFlowerMaterial> links,
+                                              Map<Long, FlowerMaterial> materials) {
+        String summary = links.stream()
+                .map(link -> materials.get(link.getMaterialId()))
+                .filter(material -> material != null && StringUtils.hasText(material.getName()))
+                .map(FlowerMaterial::getName)
+                .collect(Collectors.joining("、"));
+        return limit(summary, 500);
+    }
+
+    private String resolveFlowerSummary(CartItem cartItem, ProductSpec spec,
+                                        Map<Long, String> specSummaries,
+                                        Map<Long, String> productSummaries) {
+        if (spec != null) {
+            String summary = specSummaries.get(spec.getId());
+            if (StringUtils.hasText(summary)) {
+                return summary;
+            }
+        }
+        return productSummaries.get(cartItem.getProductId());
+    }
+
+    private String limit(String value, int maxLength) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     private ProductSpec resolveSpec(CartItem cartItem, Map<Long, ProductSpec> specs, Product product) {

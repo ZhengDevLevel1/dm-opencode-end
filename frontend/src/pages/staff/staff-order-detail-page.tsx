@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -8,16 +8,22 @@ import {
   CircleCheck,
   ClipboardList,
   FileQuestion,
+  Flower2,
+  Gift,
   MapPin,
   MessageSquareText,
+  Package,
+  Palette,
   Phone,
   Sprout,
   Truck,
   UserRound,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 import { staffService } from "@/lib/services";
 import { ApiError, getErrorMessage } from "@/lib/api-client";
+import { cn } from "@/lib/cn";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { queryKeys } from "@/lib/query-keys";
 import { toast } from "@/stores/toast";
@@ -385,41 +391,73 @@ export function StaffOrderDetailPage() {
       <div className="grid items-start gap-5 lg:grid-cols-[1fr_360px]">
         <div className="space-y-5">
           <section className="ui-card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border/60 px-5 py-3.5">
-              <h2 className="text-base font-semibold tracking-tight">花礼清单</h2>
-              <span className="text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-5 py-3.5">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">花礼清单</h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  按订单快照展示花材、包装与规格，便于备花核对。
+                </p>
+              </div>
+              <Badge variant="secondary">
                 共 {orderData.items.reduce((total, item) => total + item.quantity, 0)} 件
-              </span>
+              </Badge>
             </div>
-            <ul className="max-h-96 divide-y divide-border/60 overflow-y-auto overscroll-contain">
+            <ul className="divide-y divide-border/60">
               {orderData.items.map((item) => (
-                <li key={item.id} className="flex items-center gap-3 px-5 py-4">
-                  <ProductImage
-                    src={item.productImage}
-                    alt={item.productName}
-                    seed={item.productName}
-                    className="h-16 w-14 shrink-0 rounded-lg"
-                    iconClassName="h-5 w-5"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      to={`/products/${item.productId}`}
-                      className="line-clamp-1 text-sm font-medium hover:text-primary"
-                    >
-                      {item.productName}
-                    </Link>
-                    {item.specName || item.wrapName ? (
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        {[item.specName, item.wrapName].filter(Boolean).join(" / ")}
+                <li key={item.id} className="px-5 py-5">
+                  <div className="flex flex-wrap items-start gap-4">
+                    <ProductImage
+                      src={item.productImage}
+                      alt={item.productName}
+                      seed={item.productName}
+                      className="h-20 w-16 shrink-0 rounded-xl border border-border/60 shadow-sm"
+                      iconClassName="h-6 w-6"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={`/products/${item.productId}`}
+                          className="line-clamp-1 text-sm font-semibold hover:text-primary"
+                        >
+                          {item.productName}
+                        </Link>
+                        <Badge variant="outline">{item.category}</Badge>
+                      </div>
+                      <p className="mt-1 text-[11px] text-muted-foreground tabular">
+                        {formatCurrency(item.unitPrice)} × {item.quantity}
                       </p>
-                    ) : null}
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {item.category} · {formatCurrency(item.unitPrice)} × {item.quantity}
-                    </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] tracking-[0.12em] text-muted-foreground uppercase">
+                        小计
+                      </p>
+                      <p className="mt-0.5 text-base font-semibold tabular">
+                        {formatCurrency(item.subtotal)}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-sm font-semibold tabular">
-                    {formatCurrency(item.subtotal)}
-                  </span>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <ItemMeta
+                      icon={Flower2}
+                      label="花材"
+                      value={item.flowerSummary || "未记录"}
+                    />
+                    <ItemMeta
+                      icon={Palette}
+                      label="包装色系"
+                      value={item.wrapName || "花艺师搭配"}
+                    />
+                    <ItemMeta
+                      icon={Package}
+                      label="规格"
+                      value={item.specName || "基础款"}
+                    />
+                    <ItemMeta
+                      icon={Gift}
+                      label="随赠配件"
+                      value={item.giftAccessories?.trim() || "无"}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -477,99 +515,91 @@ export function StaffOrderDetailPage() {
             )}
           </section>
 
-          <section className="ui-card p-5">
-            <h2 className="text-base font-semibold tracking-tight">收花信息</h2>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="flex items-start gap-2.5">
-                <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <dt className="text-[11px] text-muted-foreground">收花人</dt>
-                  <dd className="mt-0.5 text-sm">{orderData.receiverName}</dd>
-                </div>
+          <section className="ui-card overflow-hidden">
+            <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/60 px-5 py-3.5">
+              <div>
+                <h2 className="text-base font-semibold tracking-tight">收花信息</h2>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  配送前请先电话确认收花人是否在址。
+                </p>
               </div>
-              <div className="flex items-start gap-2.5">
-                <Phone className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <dt className="text-[11px] text-muted-foreground">联系电话</dt>
-                  <dd className="mt-0.5 text-sm tabular">{orderData.receiverPhone}</dd>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5 sm:col-span-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <dt className="text-[11px] text-muted-foreground">送达地址</dt>
-                  <dd className="mt-0.5 text-sm leading-relaxed">{orderData.receiverAddress}</dd>
-                </div>
-              </div>
-              {orderData.deliveryAt ? (
-                <div className="flex items-start gap-2.5">
-                  <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <dt className="text-[11px] text-muted-foreground">预约送达</dt>
-                    <dd className="mt-0.5 text-sm tabular">
-                      {formatDateTime(orderData.deliveryAt)}
-                    </dd>
-                  </div>
-                </div>
-              ) : null}
-              {orderData.greetingCard ? (
-                <div className="flex items-start gap-2.5 sm:col-span-2">
-                  <MessageSquareText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <dt className="text-[11px] text-muted-foreground">贺卡留言</dt>
-                    <dd className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">
-                      {orderData.greetingCard}
-                    </dd>
-                  </div>
-                </div>
-              ) : null}
-            </dl>
-            <div className="mt-4 border-t border-border/60 pt-4">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <h3 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  配送地图
-                </h3>
-                {typeof orderData.receiverLongitude === "number" &&
-                typeof orderData.receiverLatitude === "number" ? (
-                  <span className="font-mono-ui text-[11px] text-muted-foreground">
-                    {orderData.receiverLongitude.toFixed(6)},{" "}
-                    {orderData.receiverLatitude.toFixed(6)}
-                  </span>
-                ) : null}
-              </div>
-              <DeliveryMap
-                longitude={orderData.receiverLongitude}
-                latitude={orderData.receiverLatitude}
-                address={orderData.receiverAddress}
-                height={260}
-              />
+              <Badge variant="secondary">配送信息</Badge>
             </div>
-            {orderData.remark || orderData.cancelReason || orderData.afterSaleReason ? (
-              <div className="mt-4 space-y-2.5 border-t border-border/60 pt-4 text-sm">
-                {orderData.remark ? (
-                  <div>
-                    <p className="text-[11px] text-muted-foreground">用户备注</p>
-                    <p className="mt-0.5 leading-relaxed">{orderData.remark}</p>
-                  </div>
+            <div className="p-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoCard icon={UserRound} label="收花人">
+                  {orderData.receiverName}
+                </InfoCard>
+                <InfoCard icon={Phone} label="联系电话">
+                  <span className="tabular">{orderData.receiverPhone}</span>
+                </InfoCard>
+                <InfoCard icon={MapPin} label="送达地址" className="sm:col-span-2">
+                  <span className="leading-relaxed">{orderData.receiverAddress}</span>
+                </InfoCard>
+                {orderData.deliveryAt ? (
+                  <InfoCard icon={CalendarClock} label="预约送达">
+                    <span className="tabular">{formatDateTime(orderData.deliveryAt)}</span>
+                  </InfoCard>
                 ) : null}
-                {orderData.cancelReason ? (
-                  <div>
-                    <p className="text-[11px] text-muted-foreground">取消原因</p>
-                    <p className="mt-0.5 leading-relaxed">{orderData.cancelReason}</p>
-                  </div>
-                ) : null}
-                {orderData.afterSaleReason ? (
-                  <div className="rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2.5">
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-warning">
-                      <MessageSquareText className="h-3.5 w-3.5" />
-                      售后说明
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed">{orderData.afterSaleReason}</p>
-                  </div>
+                {orderData.greetingCard ? (
+                  <InfoCard
+                    icon={MessageSquareText}
+                    label="贺卡留言"
+                    className="sm:col-span-2"
+                  >
+                    <span className="whitespace-pre-wrap leading-relaxed">
+                      {orderData.greetingCard}
+                    </span>
+                  </InfoCard>
                 ) : null}
               </div>
-            ) : null}
+              <div className="mt-5 border-t border-border/60 pt-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold tracking-tight">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    配送地图
+                  </h3>
+                  {typeof orderData.receiverLongitude === "number" &&
+                  typeof orderData.receiverLatitude === "number" ? (
+                    <span className="font-mono-ui text-[11px] text-muted-foreground">
+                      {orderData.receiverLongitude.toFixed(6)},{" "}
+                      {orderData.receiverLatitude.toFixed(6)}
+                    </span>
+                  ) : null}
+                </div>
+                <DeliveryMap
+                  longitude={orderData.receiverLongitude}
+                  latitude={orderData.receiverLatitude}
+                  address={orderData.receiverAddress}
+                  height={260}
+                />
+              </div>
+              {orderData.remark || orderData.cancelReason || orderData.afterSaleReason ? (
+                <div className="mt-4 space-y-2.5 border-t border-border/60 pt-4 text-sm">
+                  {orderData.remark ? (
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">用户备注</p>
+                      <p className="mt-0.5 leading-relaxed">{orderData.remark}</p>
+                    </div>
+                  ) : null}
+                  {orderData.cancelReason ? (
+                    <div>
+                      <p className="text-[11px] text-muted-foreground">取消原因</p>
+                      <p className="mt-0.5 leading-relaxed">{orderData.cancelReason}</p>
+                    </div>
+                  ) : null}
+                  {orderData.afterSaleReason ? (
+                    <div className="rounded-lg border border-warning/30 bg-warning/[0.06] px-3 py-2.5">
+                      <p className="flex items-center gap-1.5 text-[11px] font-medium text-warning">
+                        <MessageSquareText className="h-3.5 w-3.5" />
+                        售后说明
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed">{orderData.afterSaleReason}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </section>
         </div>
 
@@ -624,9 +654,6 @@ export function StaffOrderDetailPage() {
                 </dd>
               </div>
             </dl>
-            <p className="mt-4 rounded-lg bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
-              店员端没有支付查询权限，因此不展示支付单号，也不提供代支付按钮。
-            </p>
           </section>
 
           <section className="ui-card p-5">
@@ -709,6 +736,53 @@ export function StaffOrderDetailPage() {
           </div>
         </div>
       </Dialog>
+    </div>
+  );
+}
+
+function ItemMeta({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl border border-border/50 bg-muted/25 px-3 py-2.5">
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" />
+      <div className="min-w-0">
+        <p className="text-[10px] tracking-[0.12em] text-muted-foreground uppercase">{label}</p>
+        <p className="mt-0.5 break-words text-xs leading-relaxed text-foreground/85">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function InfoCard({
+  icon: Icon,
+  label,
+  className,
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2.5 rounded-xl border border-border/50 bg-muted/25 px-3 py-2.5",
+        className,
+      )}
+    >
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <div className="mt-0.5 break-words text-sm">{children}</div>
+      </div>
     </div>
   );
 }

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowDown,
-  ArrowUp,
   Clock3,
   Flower2,
   Palette,
   Pencil,
+  Phone,
   Plus,
   Save,
   Trash2,
@@ -14,6 +14,7 @@ import {
 import { adminService } from "@/lib/services";
 import { queryKeys } from "@/lib/query-keys";
 import { getErrorMessage } from "@/lib/api-client";
+import { useLongPressSort } from "@/hooks/use-long-press-sort";
 import { toast } from "@/stores/toast";
 import { cn } from "@/lib/cn";
 import { resolveImageUrl } from "@/lib/image";
@@ -22,6 +23,7 @@ import type {
   BusinessHourVO,
   FlowerMaterialSaveRequest,
   FlowerMaterialVO,
+  StoreProfileVO,
   WrapColorSaveRequest,
   WrapColorVO,
 } from "@/types/api";
@@ -82,6 +84,7 @@ const emptyWrapForm: WrapFormState = {
 
 export function AdminCatalogPage() {
   const queryClient = useQueryClient();
+  const reduceMotion = useReducedMotion();
   const [tab, setTab] = useState("flower");
   const [flowerEditor, setFlowerEditor] = useState<{
     open: boolean;
@@ -105,6 +108,10 @@ export function AdminCatalogPage() {
   const hours = useQuery({
     queryKey: queryKeys.adminBusinessHours,
     queryFn: adminService.businessHours,
+  });
+  const storeProfile = useQuery({
+    queryKey: queryKeys.adminStoreProfile,
+    queryFn: adminService.storeProfile,
   });
 
   const invalidateCatalog = () => {
@@ -152,11 +159,22 @@ export function AdminCatalogPage() {
         ),
       );
     },
+    onMutate: async (ordered) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.adminFlowerMaterials });
+      const previous = queryClient.getQueryData<FlowerMaterialVO[]>(queryKeys.adminFlowerMaterials);
+      queryClient.setQueryData(queryKeys.adminFlowerMaterials, ordered);
+      return { previous };
+    },
     onSuccess: () => {
       toast.success("花材顺序已更新");
       invalidateCatalog();
     },
-    onError: (error) => toast.error("调整花材顺序失败", getErrorMessage(error)),
+    onError: (error, _ordered, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.adminFlowerMaterials, context.previous);
+      }
+      toast.error("调整花材顺序失败", getErrorMessage(error));
+    },
   });
 
   const reorderWraps = useMutation({
@@ -174,30 +192,37 @@ export function AdminCatalogPage() {
         ),
       );
     },
+    onMutate: async (ordered) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.adminWrapColors });
+      const previous = queryClient.getQueryData<WrapColorVO[]>(queryKeys.adminWrapColors);
+      queryClient.setQueryData(queryKeys.adminWrapColors, ordered);
+      return { previous };
+    },
     onSuccess: () => {
       toast.success("包装色系顺序已更新");
       invalidateCatalog();
     },
-    onError: (error) => toast.error("调整包装色系顺序失败", getErrorMessage(error)),
+    onError: (error, _ordered, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.adminWrapColors, context.previous);
+      }
+      toast.error("调整包装色系顺序失败", getErrorMessage(error));
+    },
   });
 
-  const moveFlower = (material: FlowerMaterialVO, direction: -1 | 1) => {
-    const list = [...(flowers.data ?? [])];
-    const index = list.findIndex((item) => item.id === material.id);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= list.length) return;
-    [list[index], list[target]] = [list[target], list[index]];
-    reorderFlowers.mutate(list);
-  };
+  const flowerSort = useLongPressSort({
+    items: flowers.data ?? [],
+    group: "flower",
+    disabled: reorderFlowers.isPending,
+    onCommit: (ordered) => reorderFlowers.mutate(ordered),
+  });
 
-  const moveWrap = (color: WrapColorVO, direction: -1 | 1) => {
-    const list = [...(wraps.data ?? [])];
-    const index = list.findIndex((item) => item.id === color.id);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= list.length) return;
-    [list[index], list[target]] = [list[target], list[index]];
-    reorderWraps.mutate(list);
-  };
+  const wrapSort = useLongPressSort({
+    items: wraps.data ?? [],
+    group: "wrap",
+    disabled: reorderWraps.isPending,
+    onCommit: (ordered) => reorderWraps.mutate(ordered),
+  });
 
   return (
     <div className="space-y-5">
@@ -205,7 +230,7 @@ export function AdminCatalogPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight">商品配置</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            维护全局花材库、包装色系与门店营业时间，商品详情与结算页会实时读取。
+            维护全局花材库、包装色系、门店营业时间与营业电话，商品详情与结算页会实时读取。
           </p>
         </div>
       </div>
@@ -232,7 +257,7 @@ export function AdminCatalogPage() {
               <div>
                 <h2 className="text-base font-semibold tracking-tight">花材库</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  商品详情会展示已选花材，规格中可填写每种花材的枝数。
+                  商品详情会展示已选花材，规格中可填写每种花材的枝数；长按花材行即可拖动排序。
                 </p>
               </div>
               <Button size="sm" onClick={() => setFlowerEditor({ open: true, material: null })}>
@@ -262,13 +287,27 @@ export function AdminCatalogPage() {
                 bare
               />
             ) : (
-              <ul className="divide-y divide-border/60">
-                {flowers.data?.map((material, index, list) => {
+              <ul data-sortable-group="flower" className="divide-y divide-border/60">
+                {flowerSort.items.map((material) => {
                   const image = resolveImageUrl(material.imageUrl);
                   return (
-                    <li
+                    <motion.li
                       key={material.id}
-                      className="flex flex-wrap items-center gap-3 px-5 py-3.5"
+                      layout="position"
+                      transition={
+                        reduceMotion
+                          ? { duration: 0 }
+                          : { type: "spring", stiffness: 520, damping: 38, mass: 0.6 }
+                      }
+                      data-sortable-id={material.id}
+                      {...flowerSort.getItemProps(material.id)}
+                      title="长按整行拖动排序；聚焦后可用方向键调整"
+                      className={cn(
+                        "flex cursor-grab touch-none flex-wrap items-center gap-3 px-5 py-3.5 outline-none transition-[background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-primary/30",
+                        flowerSort.pressingId === material.id && "bg-accent/40",
+                        flowerSort.draggingId === material.id &&
+                          "relative z-10 cursor-grabbing bg-primary/[0.06] shadow-md ring-1 ring-primary/20",
+                      )}
                     >
                       {image ? (
                         <img
@@ -298,26 +337,6 @@ export function AdminCatalogPage() {
                           {material.note || "暂无说明"}
                         </p>
                       </div>
-                      <div className="flex items-center gap-0.5">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="花材上移"
-                          disabled={index === 0 || reorderFlowers.isPending}
-                          onClick={() => moveFlower(material, -1)}
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="花材下移"
-                          disabled={index === list.length - 1 || reorderFlowers.isPending}
-                          onClick={() => moveFlower(material, 1)}
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
                       <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
@@ -337,7 +356,7 @@ export function AdminCatalogPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                    </li>
+                    </motion.li>
                   );
                 })}
               </ul>
@@ -351,7 +370,7 @@ export function AdminCatalogPage() {
               <div>
                 <h2 className="text-base font-semibold tracking-tight">包装色系</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  商品详情展示所有启用色系，下单时随商品写入规格快照。
+                  商品详情展示所有启用色系，下单时随商品写入规格快照；长按色系卡片即可拖动排序。
                 </p>
               </div>
               <Button size="sm" onClick={() => setWrapEditor({ open: true, color: null })}>
@@ -381,11 +400,25 @@ export function AdminCatalogPage() {
                 bare
               />
             ) : (
-              <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                {wraps.data?.map((color, index, list) => (
-                  <article
+              <div data-sortable-group="wrap" className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                {wrapSort.items.map((color) => (
+                  <motion.article
                     key={color.id}
-                    className="flex items-start gap-3 rounded-xl border border-border/60 p-4"
+                    layout="position"
+                    transition={
+                      reduceMotion
+                        ? { duration: 0 }
+                        : { type: "spring", stiffness: 520, damping: 38, mass: 0.6 }
+                    }
+                    data-sortable-id={color.id}
+                    {...wrapSort.getItemProps(color.id)}
+                    title="长按整张卡片拖动排序；聚焦后可用方向键调整"
+                    className={cn(
+                      "flex cursor-grab touch-none items-start gap-3 rounded-xl border border-border/60 p-4 outline-none transition-[border-color,background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-primary/30",
+                      wrapSort.pressingId === color.id && "border-primary/30 bg-accent/40",
+                      wrapSort.draggingId === color.id &&
+                        "relative z-10 cursor-grabbing border-primary/40 bg-primary/[0.06] shadow-md ring-1 ring-primary/20",
+                    )}
                   >
                     <span
                       className="h-12 w-12 shrink-0 rounded-full"
@@ -411,24 +444,6 @@ export function AdminCatalogPage() {
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label="包装色系上移"
-                        disabled={index === 0 || reorderWraps.isPending}
-                        onClick={() => moveWrap(color, -1)}
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="包装色系下移"
-                        disabled={index === list.length - 1 || reorderWraps.isPending}
-                        onClick={() => moveWrap(color, 1)}
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
                         aria-label="编辑包装色系"
                         onClick={() => setWrapEditor({ open: true, color })}
                       >
@@ -444,7 +459,7 @@ export function AdminCatalogPage() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                  </article>
+                  </motion.article>
                 ))}
               </div>
             )}
@@ -452,12 +467,20 @@ export function AdminCatalogPage() {
         </TabsContent>
 
         <TabsContent value="hour" className="mt-4">
-          <BusinessHoursEditor
-            hours={hours.data}
-            loading={hours.isLoading}
-            error={hours.isError}
-            onRetry={() => void hours.refetch()}
-          />
+          <div className="space-y-4">
+            <StorePhoneEditor
+              profile={storeProfile.data}
+              loading={storeProfile.isLoading}
+              error={storeProfile.isError}
+              onRetry={() => void storeProfile.refetch()}
+            />
+            <BusinessHoursEditor
+              hours={hours.data}
+              loading={hours.isLoading}
+              error={hours.isError}
+              onRetry={() => void hours.refetch()}
+            />
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -823,6 +846,106 @@ function WrapColorDialog({
   );
 }
 
+function StorePhoneEditor({
+  profile,
+  loading,
+  error,
+  onRetry,
+}: {
+  profile?: StoreProfileVO;
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    if (profile) setPhone(profile.businessPhone);
+  }, [profile]);
+
+  const trimmed = phone.trim();
+  const valid = /^[0-9+()\-\s]{5,30}$/.test(trimmed);
+  const dirty = Boolean(profile) && trimmed !== profile?.businessPhone;
+
+  const mutation = useMutation({
+    mutationFn: () => adminService.saveStoreProfile({ businessPhone: trimmed }),
+    onSuccess: (saved) => {
+      setPhone(saved.businessPhone);
+      toast.success("营业电话已保存");
+      void queryClient.invalidateQueries({ queryKey: queryKeys.adminStoreProfile });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.storeProfile });
+    },
+    onError: (error) => toast.error("保存营业电话失败", getErrorMessage(error)),
+  });
+
+  if (loading) {
+    return (
+      <div className="ui-card space-y-3 p-5">
+        <Skeleton className="h-5 w-28" />
+        <Skeleton className="h-9 w-full max-w-sm" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        className="ui-card p-4"
+        description="营业电话加载失败。"
+        onRetry={onRetry}
+      />
+    );
+  }
+
+  return (
+    <section className="ui-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-3.5">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+            <Phone className="h-4 w-4 text-primary" />
+            门店营业电话
+          </h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            营业电话会展示在商品详情页脚，方便顾客咨询花礼与配送。
+          </p>
+        </div>
+        <Button
+          size="sm"
+          loading={mutation.isPending}
+          disabled={!dirty || !valid}
+          onClick={() => mutation.mutate()}
+        >
+          <Save className="h-3.5 w-3.5" />
+          保存营业电话
+        </Button>
+      </div>
+      <div className="max-w-md px-5 py-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="business-phone">营业电话</Label>
+          <Input
+            id="business-phone"
+            value={phone}
+            maxLength={30}
+            inputMode="tel"
+            placeholder="400-820-1024"
+            aria-invalid={!valid && phone.length > 0}
+            onChange={(event) => setPhone(event.target.value)}
+          />
+          <p
+            className={cn(
+              "text-[11px]",
+              valid ? "text-muted-foreground" : "text-destructive",
+            )}
+          >
+            支持数字、空格、+、-、括号，5–30 个字符。
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function BusinessHoursEditor({
   hours,
   loading,
@@ -900,7 +1023,7 @@ function BusinessHoursEditor({
         <div>
           <h2 className="text-base font-semibold tracking-tight">门店营业时间</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            结算页按营业时间生成可选送达时刻，至少提前 1 小时、最多 30 天内预约。
+            结算页按营业时间生成可选送达时刻，至少提前 1 小时、最多 6 天内预约。
           </p>
         </div>
         <Button

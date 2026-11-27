@@ -126,6 +126,7 @@ const exactRoutes: Record<string, () => Promise<unknown>> = {
 };
 
 const dynamicRoutes: Array<[RegExp, () => Promise<unknown>]> = [
+  [/^\/products\/\d+\/preview$/, routeLoaders.productDetail],
   [/^\/products\/\d+$/, routeLoaders.productDetail],
   [/^\/orders\/\d+$/, routeLoaders.orderDetail],
   [/^\/staff\/orders\/\d+$/, routeLoaders.staffOrderDetail],

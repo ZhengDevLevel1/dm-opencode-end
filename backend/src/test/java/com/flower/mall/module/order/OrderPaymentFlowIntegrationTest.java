@@ -89,7 +89,10 @@ class OrderPaymentFlowIntegrationTest {
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PENDING_PAYMENT"))
-                .andExpect(jsonPath("$.data.items[0].productId").value(16));
+                .andExpect(jsonPath("$.data.items[0].productId").value(16))
+                .andExpect(jsonPath("$.data.items[0].flowerSummary").value("康乃馨"))
+                .andExpect(jsonPath("$.data.items[0].giftAccessories")
+                        .value("手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1"));
 
         mockMvc.perform(post("/api/orders/" + orderId + "/cancel")
                         .header("Authorization", bearer(token))
@@ -106,6 +109,34 @@ class OrderPaymentFlowIntegrationTest {
                         .header("Authorization", bearer(token)))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(4002));
+    }
+
+    @Test
+    void createOrderSnapshotsSpecFlowerAndGiftAccessories() throws Exception {
+        String token = login("customer", "customer123");
+        MvcResult cartResult = mockMvc.perform(post("/api/cart/items")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"productId":1,"quantity":1,"specId":1,"wrapId":1}
+                                """))
+                .andExpect(status().isOk())
+                .andReturn();
+        long cartItemId = read(cartResult).path("data").path("id").asLong();
+
+        mockMvc.perform(post("/api/orders")
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"cartItemIds":[%d],"receiverName":"测试收花人",
+                                 "receiverPhone":"13900000003","receiverAddress":"上海市测试路1号"}
+                                """.formatted(cartItemId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].specName").value("心动款 · 11枝"))
+                .andExpect(jsonPath("$.data.items[0].wrapName").value("雾面米白"))
+                .andExpect(jsonPath("$.data.items[0].flowerSummary").value("红玫瑰 ×11、尤加利 ×3"))
+                .andExpect(jsonPath("$.data.items[0].giftAccessories")
+                        .value("手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1"));
     }
 
     @Test

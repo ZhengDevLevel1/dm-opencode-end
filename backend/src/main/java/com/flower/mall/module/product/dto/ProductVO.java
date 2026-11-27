@@ -33,6 +33,8 @@ public class ProductVO {
     private List<FlowerMaterialVO> flowerMaterials;
     private List<ProductSpecVO> specs;
     private String description;
+    private String giftAccessories;
+    private String careGuide;
     private String aiTags;
     private String aiSellingPoints;
     private String seasonSuitability;
@@ -61,6 +63,8 @@ public class ProductVO {
                 .stock(product.getStock())
                 .imageUrl(product.getImageUrl())
                 .description(product.getDescription())
+                .giftAccessories(product.getGiftAccessories())
+                .careGuide(product.getCareGuide())
                 .aiTags(product.getAiTags())
                 .aiSellingPoints(product.getAiSellingPoints())
                 .seasonSuitability(season.name())

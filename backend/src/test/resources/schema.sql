@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS metric_config;
 DROP TABLE IF EXISTS tag_option;
 DROP TABLE IF EXISTS tag_type_setting;
 DROP TABLE IF EXISTS user_theme_preference;
+DROP TABLE IF EXISTS store_profile;
 DROP TABLE IF EXISTS appearance_setting;
 DROP TABLE IF EXISTS operation_log;
 DROP TABLE IF EXISTS recommendation_log;
@@ -85,6 +86,8 @@ CREATE TABLE product (
     stock INT NOT NULL DEFAULT 0,
     image_url VARCHAR(500),
     description VARCHAR(2000),
+    gift_accessories VARCHAR(200) NOT NULL DEFAULT '手写贺卡 ×1 · 保鲜剂 ×2 · 养护卡 ×1',
+    care_guide TEXT,
     ai_tags VARCHAR(255),
     ai_selling_points VARCHAR(500),
     season_suitability VARCHAR(20) NOT NULL DEFAULT 'ALL',
@@ -263,6 +266,8 @@ CREATE TABLE order_item (
     spec_name VARCHAR(60),
     wrap_id BIGINT NOT NULL DEFAULT 0,
     wrap_name VARCHAR(60),
+    flower_summary VARCHAR(500),
+    gift_accessories VARCHAR(200),
     unit_price DECIMAL(10,2) NOT NULL,
     quantity INT NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
@@ -403,6 +408,13 @@ CREATE TABLE appearance_setting (
     auth_custom_accent VARCHAR(16) DEFAULT '#38bdf8',
     auth_font_family VARCHAR(20) DEFAULT 'default',
     auth_font_size DOUBLE DEFAULT 14,
+    updated_by BIGINT,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE store_profile (
+    id BIGINT PRIMARY KEY,
+    business_phone VARCHAR(30) NOT NULL DEFAULT '400-820-1024',
     updated_by BIGINT,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

@@ -67,8 +67,8 @@ public class BusinessHourService {
         if (deliveryAt.isBefore(now.plusMinutes(60))) {
             throw BusinessException.of(ErrorCode.BAD_REQUEST, "请至少提前1小时预约送达时间");
         }
-        if (deliveryAt.isAfter(now.plusDays(30))) {
-            throw BusinessException.of(ErrorCode.BAD_REQUEST, "最多支持预约30天内的送达时间");
+        if (deliveryAt.isAfter(now.plusDays(6))) {
+            throw BusinessException.of(ErrorCode.BAD_REQUEST, "最多支持预约6天内的送达时间");
         }
         BusinessHour hour = businessHourMapper.selectById(deliveryAt.getDayOfWeek().getValue());
         if (hour == null || hour.getEnabled() == null || hour.getEnabled() != 1) {
